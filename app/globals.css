@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+:root {
+  --background: #eff4fb;
+  --background-end: #f8fafc;
+  --foreground: #10213a;
+  --muted-foreground: #5c6f8f;
+  --surface: #e8eef8;
+  --surface-strong: #dde8f6;
+  --surface-contrast: #d7e5fa;
+  --card: rgba(255, 255, 255, 0.88);
+  --card-solid: #ffffff;
+  --border: rgba(15, 23, 42, 0.1);
+  --border-strong: rgba(15, 23, 42, 0.18);
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: #dbeafe;
+  --accent-contrast: #ffffff;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --success-border: #86efac;
+  --error: #dc2626;
+  --error-soft: #fee2e2;
+  --error-border: #fca5a5;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --warning-border: #fcd34d;
+  --hero-bg: #101a2f;
+  --hero-bg-end: #172554;
+  --hero-foreground: #f8fbff;
+  --hero-surface: rgba(255, 255, 255, 0.08);
+  --hero-border: rgba(255, 255, 255, 0.12);
+  --hero-muted: rgba(226, 232, 240, 0.72);
+  --hero-chip: rgba(255, 255, 255, 0.1);
+  --hero-chip-muted: rgba(255, 255, 255, 0.75);
+  --ambient-glow: rgba(59, 130, 246, 0.18);
+  --shadow-soft: 0 12px 36px -24px rgba(15, 23, 42, 0.28);
+  --shadow-floating: 0 24px 80px -48px rgba(15, 23, 42, 0.45);
+  --input-bg: #ffffff;
+  --input-foreground: #10213a;
+  --table-head: #eef4fb;
+  --grid: rgba(148, 163, 184, 0.18);
+  --overlay-scrim: rgba(15, 23, 42, 0.4);
+}
+
+html[data-theme="dark"] {
+  --background: #09111f;
+  --background-end: #111827;
+  --foreground: #edf4ff;
+  --muted-foreground: #91a4c5;
+  --surface: #101b31;
+  --surface-strong: #15223c;
+  --surface-contrast: #1c2b49;
+  --card: rgba(15, 23, 42, 0.86);
+  --card-solid: #0f172a;
+  --border: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.22);
+  --accent: #60a5fa;
+  --accent-strong: #3b82f6;
+  --accent-soft: rgba(96, 165, 250, 0.18);
+  --accent-contrast: #08111f;
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.16);
+  --success-border: rgba(34, 197, 94, 0.34);
+  --error: #f87171;
+  --error-soft: rgba(248, 113, 113, 0.18);
+  --error-border: rgba(248, 113, 113, 0.34);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.16);
+  --warning-border: rgba(245, 158, 11, 0.34);
+  --hero-bg: #08101f;
+  --hero-bg-end: #16233a;
+  --hero-foreground: #edf4ff;
+  --hero-surface: rgba(148, 163, 184, 0.12);
+  --hero-border: rgba(148, 163, 184, 0.14);
+  --hero-muted: rgba(191, 219, 254, 0.72);
+  --hero-chip: rgba(148, 163, 184, 0.16);
+  --hero-chip-muted: rgba(237, 244, 255, 0.76);
+  --ambient-glow: rgba(59, 130, 246, 0.14);
+  --shadow-soft: 0 12px 36px -24px rgba(2, 6, 23, 0.8);
+  --shadow-floating: 0 24px 80px -48px rgba(2, 6, 23, 0.95);
+  --input-bg: #0b1426;
+  --input-foreground: #edf4ff;
+  --table-head: #111c33;
+  --grid: rgba(148, 163, 184, 0.14);
+  --overlay-scrim: rgba(2, 6, 23, 0.72);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, var(--ambient-glow), transparent 28%),
+    linear-gradient(180deg, var(--background) 0%, var(--background-end) 100%);
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-manrope), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.22);
+}
+
+body,
+body * {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    fill 180ms ease,
+    stroke 180ms ease,
+    box-shadow 180ms ease;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  color: var(--input-foreground);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted-foreground);
+}
