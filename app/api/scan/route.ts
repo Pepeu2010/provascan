@@ -3,5 +3,9 @@ import { analyzeAnswerSheet } from "@/services/exam-correction";
 
 export async function POST() {
   const session = await analyzeAnswerSheet();
-  return NextResponse.json(session);
+  return NextResponse.json(session, {
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
 }

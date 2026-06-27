@@ -1,29 +1,32 @@
 # ProvaScan
 
-Sistema web para professores corrigirem provas objetivas, manterem turmas e alunos organizados, salvarem gabaritos e registrarem correções com histórico local pronto para uso imediato.
+Sistema web para professores corrigirem provas objetivas, organizarem turmas e alunos, salvarem gabaritos e registrarem correcoes com historico local pronto para uso imediato.
 
 ## Estado atual
 
-O projeto já está utilizável para operação inicial e deploy no Vercel sem backend obrigatório.
+O projeto ja esta utilizavel como MVP operacional e pode ser publicado no Vercel sem backend obrigatorio.
 
 Funciona hoje:
 
-- Landing page e login
+- Landing page e login local
+- Sessao minima por professor no navegador
 - Tema claro, escuro e sistema
-- Dashboard com métricas derivadas dos dados salvos
-- Cadastro de turmas
-- Cadastro de alunos
-- Cadastro de provas
-- Editor de gabarito com salvamento
-- Fluxo de correção com revisão manual
-- Histórico persistido no navegador
-- Backup e restauração em JSON
+- Dashboard com metricas derivadas do estado salvo
+- Cadastro, edicao e exclusao de turmas
+- Cadastro, edicao e exclusao de alunos
+- Cadastro, edicao e exclusao de provas
+- Editor de gabarito com salvamento real
+- Fluxo de correcao com revisao manual e historico local
+- UX mobile especifica para gabarito e correcao
+- Exportacao operacional em JSON e CSV
+- Importacao e restauracao por JSON
+- Painel local de integracao para continuidade futura com Google Sheets
 
-Limitações atuais:
+Limitacoes atuais:
 
-- Persistência padrão via `localStorage`
+- Persistencia padrao via `localStorage`
 - Google Sheets e OCR continuam opcionais
-- Ainda não há autenticação real por professor
+- Ainda nao ha autenticacao institucional real
 
 ## Stack
 
@@ -42,11 +45,11 @@ npm install
 npm run dev
 ```
 
-Abra `http://localhost:3000`.
+Abra [http://localhost:3000](http://localhost:3000).
 
-## Variáveis de ambiente
+## Variaveis de ambiente
 
-Essas variáveis são opcionais. Sem elas, o app opera em modo local com persistência no navegador.
+Essas variaveis sao opcionais. Sem elas, o app opera em modo local com persistencia no navegador.
 
 ```bash
 GOOGLE_SHEETS_CLIENT_EMAIL=
@@ -57,33 +60,37 @@ ENABLE_TESSERACT_OCR=
 
 ## Deploy no Vercel
 
-Para a primeira publicação:
-
-1. Suba este repositório para o GitHub.
+1. Suba este repositorio para o GitHub.
 2. Importe o projeto no Vercel.
-3. Se não for usar Google Sheets/OCR agora, publique sem variáveis extras.
-4. Se quiser integração depois, adicione as variáveis no painel do Vercel e faça novo deploy.
+3. Se nao for usar Google Sheets ou OCR agora, publique sem variaveis extras.
+4. Se quiser integracao depois, adicione as variaveis no painel do Vercel e faca novo deploy.
 
 ## Estrutura
 
-- `app/`: rotas e páginas
-- `components/`: shell, UI e áreas operacionais
-- `lib/`: store local, utilitários e dados base
-- `services/`: integrações opcionais
-- `types/`: contratos de domínio
+- `app/`: rotas e paginas
+- `components/`: shell, UI e areas operacionais
+- `lib/`: store local, utilitarios e dados base
+- `services/`: integracoes opcionais
+- `types/`: contratos de dominio
 
-## Publicação no GitHub
+## Publicacao no GitHub
 
-O `gh` não está instalado nesta máquina, então a criação automática do repositório não pôde ser feita por aqui.
+O `gh` nao esta instalado nesta maquina, entao a criacao automatica do repositorio nao foi feita por aqui.
 
 Fluxo recomendado:
 
 ```bash
+git init
 git add .
-git commit -m "feat: prepare provascan operational mvp"
+git commit -m "feat: finalize provascan local-first mvp"
 git branch -M main
 git remote add origin https://github.com/SEU-USUARIO/provascan.git
 git push -u origin main
 ```
 
-Se preferir, também posso te deixar no próximo passo com o repositório local já inicializado e os comandos finais prontos para copiar no GitHub.
+## Checklist antes de subir
+
+- Verifique se `.env*` continua fora do commit
+- Rode `npm run lint`
+- Rode `npm run build`
+- Abra o app e teste login, cadastros, gabarito, correcao e exportacao

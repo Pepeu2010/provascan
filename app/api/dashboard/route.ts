@@ -9,5 +9,9 @@ export async function GET() {
     metrics: dashboardMetrics,
     latestCorrection: correctionSessions[0],
     storage: snapshot,
+  }, {
+    headers: {
+      "Cache-Control": "no-store",
+    },
   });
 }

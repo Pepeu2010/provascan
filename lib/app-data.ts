@@ -21,6 +21,7 @@ import {
 } from "@/lib/mock-data";
 
 export const APP_DATA_STORAGE_KEY = "provascan-app-data";
+export const APP_SESSION_STORAGE_KEY = "provascan-session";
 
 export type AppDataState = {
   answerKeys: AnswerKey[];

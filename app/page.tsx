@@ -20,20 +20,20 @@ export default function HomePage() {
   return (
     <div className="pb-16">
       <div className="mx-auto max-w-[1280px] px-4 pt-4 lg:px-6">
-        <header className="relative z-40 flex items-center justify-between rounded-[30px] border border-[var(--border)] bg-[var(--card)] px-5 py-4 backdrop-blur">
-          <ProvaScanLogo />
+        <header className="relative z-40 flex flex-col gap-4 rounded-[30px] border border-[var(--border)] bg-[var(--card)] px-5 py-4 backdrop-blur md:flex-row md:items-center md:justify-between">
+          <ProvaScanLogo size="sm" priority />
           <div className="hidden items-center gap-6 text-sm text-[var(--muted-foreground)] md:flex">
             <a href="#beneficios">Benefícios</a>
             <a href="#fluxo">Como funciona</a>
             <a href="#recursos">Recursos</a>
           </div>
-          <div className="flex items-center gap-3">
-            <ThemeSwitcher />
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center md:justify-end">
+            <ThemeSwitcher compact />
             <Link href="/login">
-              <Button variant="ghost">Entrar</Button>
+              <Button variant="ghost" className="w-full sm:w-auto">Entrar</Button>
             </Link>
             <Link href="/dashboard">
-              <Button>Criar conta</Button>
+              <Button className="w-full sm:w-auto">Criar conta</Button>
             </Link>
           </div>
         </header>

@@ -8,8 +8,8 @@ const envSchema = z.object({
 });
 
 export type SheetsStatus = {
+  configured: boolean;
   mode: "mock" | "google-sheets";
-  spreadsheetId?: string;
 };
 
 export function getSheetsStatus(): SheetsStatus {
@@ -25,12 +25,12 @@ export function getSheetsStatus(): SheetsStatus {
     parsed.GOOGLE_SHEETS_SPREADSHEET_ID
   ) {
     return {
+      configured: true,
       mode: "google-sheets",
-      spreadsheetId: parsed.GOOGLE_SHEETS_SPREADSHEET_ID,
     };
   }
 
-  return { mode: "mock" };
+  return { configured: false, mode: "mock" };
 }
 
 export async function createSheetsClient() {
@@ -40,8 +40,7 @@ export async function createSheetsClient() {
   }
 
   return {
-    spreadsheetId: status.spreadsheetId,
-    baseUrl: `https://sheets.googleapis.com/v4/spreadsheets/${status.spreadsheetId}`,
+    baseUrl: `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEETS_SPREADSHEET_ID}`,
   };
 }
 

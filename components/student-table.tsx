@@ -1,21 +1,28 @@
 import type { ClassRoom, Student } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export function StudentTable({
   classes,
   students,
+  onDelete,
+  onEdit,
 }: {
   classes: ClassRoom[];
   students: Student[];
+  onDelete?: (studentId: string) => void;
+  onEdit?: (studentId: string) => void;
 }) {
+  const hasActions = Boolean(onDelete || onEdit);
+
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--foreground)]">Últimos alunos</h3>
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">Ultimos alunos</h3>
           <p className="text-sm text-[var(--muted-foreground)]">
-            Cadastros organizados por turma e prontos para sincronização.
+            Cadastros organizados por turma e prontos para correcao local.
           </p>
         </div>
         <Badge tone="accent">Modo operacional</Badge>
@@ -25,9 +32,10 @@ export function StudentTable({
           <thead className="bg-[var(--table-head)] text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
             <tr>
               <th className="px-6 py-4">Aluno</th>
-              <th className="px-6 py-4">Matrícula</th>
+              <th className="px-6 py-4">Matricula</th>
               <th className="px-6 py-4">Turma</th>
               <th className="px-6 py-4">Status</th>
+              {hasActions ? <th className="px-6 py-4 text-right">Acoes</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -51,12 +59,31 @@ export function StudentTable({
                       {student.status}
                     </Badge>
                   </td>
+                  {hasActions ? (
+                    <td className="px-6 py-4">
+                      <div className="flex justify-end gap-2">
+                        {onEdit ? (
+                          <Button variant="secondary" onClick={() => onEdit(student.id)}>
+                            Editar
+                          </Button>
+                        ) : null}
+                        {onDelete ? (
+                          <Button variant="ghost" onClick={() => onDelete(student.id)}>
+                            Excluir
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
             {!students.length ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-sm text-[var(--muted-foreground)]">
+                <td
+                  colSpan={hasActions ? 5 : 4}
+                  className="px-6 py-8 text-center text-sm text-[var(--muted-foreground)]"
+                >
                   Nenhum aluno cadastrado ainda.
                 </td>
               </tr>

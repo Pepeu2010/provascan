@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: "ProvaScan",
   description:
     "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Google Sheets.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
