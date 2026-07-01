@@ -162,8 +162,8 @@ export function DashboardShell({
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => {
-                  logoutTeacher();
+                onClick={async () => {
+                  await logoutTeacher();
                   router.push("/login");
                 }}
               >

@@ -291,7 +291,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setScreenMessage("Modo manual habilitado. A imagem continua disponivel para consulta.");
   };
 
-  const handleFileSelected = (file: File | null) => {
+  const handleFileSelected = async (file: File | null) => {
     setScreenMessage("");
     setReview(null);
     setProcessedPreviewUrl("");
@@ -304,7 +304,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       return;
     }
 
-    const validation = validateImageFile(file);
+    const validation = await validateImageFile(file);
     if (!validation.ok) {
       setSelectedFile(null);
       setErrorMessage(validation.message);
@@ -439,7 +439,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             capture="environment"
             className="hidden"
             onChange={(event) => {
-              handleFileSelected(event.target.files?.[0] ?? null);
+              void handleFileSelected(event.target.files?.[0] ?? null);
               event.target.value = "";
             }}
           />
@@ -449,7 +449,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={(event) => {
-              handleFileSelected(event.target.files?.[0] ?? null);
+              void handleFileSelected(event.target.files?.[0] ?? null);
               event.target.value = "";
             }}
           />
@@ -1058,13 +1058,41 @@ function InfoPanel({ label, value }: { label: string; value: string }) {
   );
 }
 
-function validateImageFile(file: File) {
+async function validateImageFile(file: File) {
   if (!ALLOWED_TYPES.includes(file.type)) {
     return { ok: false, message: "Formato invalido. Envie JPG, PNG ou WebP." };
   }
 
   if (file.size > MAX_FILE_SIZE) {
     return { ok: false, message: "Arquivo muito grande. O limite atual e 12 MB." };
+  }
+
+  const signature = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const isJpeg = signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff;
+  const isPng =
+    signature[0] === 0x89 &&
+    signature[1] === 0x50 &&
+    signature[2] === 0x4e &&
+    signature[3] === 0x47 &&
+    signature[4] === 0x0d &&
+    signature[5] === 0x0a &&
+    signature[6] === 0x1a &&
+    signature[7] === 0x0a;
+  const isWebp =
+    signature[0] === 0x52 &&
+    signature[1] === 0x49 &&
+    signature[2] === 0x46 &&
+    signature[3] === 0x46 &&
+    signature[8] === 0x57 &&
+    signature[9] === 0x45 &&
+    signature[10] === 0x42 &&
+    signature[11] === 0x50;
+
+  if (!isJpeg && !isPng && !isWebp) {
+    return {
+      ok: false,
+      message: "Arquivo rejeitado. A assinatura binaria nao corresponde a uma imagem JPG, PNG ou WebP valida.",
+    };
   }
 
   return { ok: true, message: "" };

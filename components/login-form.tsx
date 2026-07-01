@@ -19,11 +19,15 @@ export function LoginForm() {
   const [showRecovery, setShowRecovery] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handleLogin = () => {
-    const result = loginTeacher({ email, remember });
+  const handleLogin = async () => {
+    const result = await loginTeacher({ email, password, remember });
     setMessage(result.message);
     if (result.ok) {
-      router.push("/dashboard");
+      const redirect =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("redirect")
+          : null;
+      router.push(redirect || "/dashboard");
     }
   };
 
@@ -69,7 +73,7 @@ export function LoginForm() {
             className="mt-8 grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
-              handleLogin();
+              void handleLogin();
             }}
           >
             <label className="grid gap-2 text-sm font-medium text-[var(--foreground)]">
@@ -118,7 +122,7 @@ export function LoginForm() {
                 Esqueci minha senha
               </button>
             </div>
-            <Button size="lg" className="mt-2 w-full" type="button" onClick={handleLogin}>
+            <Button size="lg" className="mt-2 w-full" type="button" onClick={() => void handleLogin()}>
               Entrar como professor
             </Button>
           </form>

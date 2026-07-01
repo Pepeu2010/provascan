@@ -10,7 +10,6 @@ import {
 } from "react";
 import {
   APP_DATA_STORAGE_KEY,
-  APP_SESSION_STORAGE_KEY,
   calculateAnalytics,
   cloneDefaultAppData,
   createCorrectionSession,
@@ -76,8 +75,8 @@ type AppDataContextValue = {
   exportData: () => string;
   getOperationalCsv: () => string;
   importData: (payload: string) => { ok: boolean; message: string };
-  loginTeacher: (input: { email: string; remember: boolean }) => { ok: boolean; message: string };
-  logoutTeacher: () => void;
+  loginTeacher: (input: { email: string; password: string; remember: boolean }) => Promise<{ ok: boolean; message: string }>;
+  logoutTeacher: () => Promise<void>;
   resetData: () => void;
   saveAnswerKey: (examId: string, answers: string[]) => void;
   saveCorrection: (input: SaveCorrectionInput) => { ok: boolean; message: string };
@@ -166,16 +165,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   });
 
   const [session, setSession] = useState<TeacherSession | null>(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-
-    try {
-      const raw = window.localStorage.getItem(APP_SESSION_STORAGE_KEY);
-      return raw ? normalizeSession(JSON.parse(raw)) : null;
-    } catch {
-      return null;
-    }
+    return null;
   });
 
   useEffect(() => {
@@ -183,13 +173,39 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   useEffect(() => {
-    if (!session) {
-      window.localStorage.removeItem(APP_SESSION_STORAGE_KEY);
+    if (typeof window === "undefined") {
       return;
     }
 
-    window.localStorage.setItem(APP_SESSION_STORAGE_KEY, JSON.stringify(session));
-  }, [session]);
+    let cancelled = false;
+
+    const syncSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!response.ok) {
+          if (!cancelled) {
+            setSession(null);
+          }
+          return;
+        }
+
+        const payload = (await response.json()) as { session: TeacherSession | null };
+        if (!cancelled) {
+          setSession(normalizeSession(payload.session));
+        }
+      } catch {
+        if (!cancelled) {
+          setSession(null);
+        }
+      }
+    };
+
+    void syncSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const value = useMemo<AppDataContextValue>(() => {
     const createClassHandler = (input: CreateClassInput) => {
@@ -383,22 +399,51 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setData(cloneDefaultAppData());
     };
 
-    const loginTeacherHandler = (input: { email: string; remember: boolean }) => {
+    const loginTeacherHandler = async (input: { email: string; password: string; remember: boolean }) => {
       if (!input.email.trim()) {
         return { ok: false, message: "Informe um e-mail para entrar no painel." };
       }
 
-      setSession({
-        email: input.email.trim(),
-        loggedInAt: new Date().toISOString(),
-        remember: input.remember,
-      });
+      if (!input.password.trim()) {
+        return { ok: false, message: "Informe uma senha para continuar." };
+      }
 
-      return { ok: true, message: "Sessao local iniciada neste navegador." };
+      try {
+        const response = await fetch("/api/auth/login", {
+          body: JSON.stringify({
+            email: input.email.trim(),
+            password: input.password,
+            remember: input.remember,
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        });
+
+        const payload = (await response.json()) as {
+          error?: string;
+          message?: string;
+          session?: TeacherSession | null;
+        };
+
+        if (!response.ok || !payload.session) {
+          return { ok: false, message: payload.error ?? "Nao foi possivel iniciar a sessao segura." };
+        }
+
+        setSession(normalizeSession(payload.session));
+        return { ok: true, message: payload.message ?? "Sessao segura iniciada no navegador." };
+      } catch {
+        return { ok: false, message: "Falha ao iniciar a sessao segura." };
+      }
     };
 
-    const logoutTeacherHandler = () => {
-      setSession(null);
+    const logoutTeacherHandler = async () => {
+      try {
+        await fetch("/api/auth/logout", { method: "POST" });
+      } finally {
+        setSession(null);
+      }
     };
 
     return {
