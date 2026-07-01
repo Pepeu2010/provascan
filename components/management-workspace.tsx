@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Edit3, FileUp, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Download, Edit3, FileUp, Printer, QrCode, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
 import { StudentTable } from "@/components/student-table";
@@ -9,7 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getClassLabel } from "@/lib/app-data";
 import { formatDate } from "@/lib/utils";
+import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
+import {
+  buildAnswerSheetModel,
+  buildDefaultCorrectionRule,
+  getCorrectionRule,
+} from "@/services/exam-correction";
 import type { StudentStatus } from "@/types/domain";
 
 function FieldSelect({
@@ -30,6 +37,53 @@ function FieldSelect({
       {children}
     </select>
   );
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function openPrintWindow(title: string, body: string) {
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=980,height=720");
+  if (!printWindow) {
+    return false;
+  }
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+          .sheet { position: relative; width: ${ANSWER_SHEET_TEMPLATE.page.width}px; min-height: ${ANSWER_SHEET_TEMPLATE.page.height}px; page-break-inside: avoid; border: 1px solid #111827; padding: 24px; margin: 0 auto 24px; box-sizing: border-box; }
+          .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 1px solid #111827; padding-bottom: 16px; margin-bottom: 16px; }
+          .meta { font-size: 13px; line-height: 1.6; }
+          .title { font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+          .code { font-family: monospace; font-size: 13px; padding: 8px 12px; border: 1px solid #111827; display: inline-block; }
+          .qr-block { position: absolute; right: 40px; top: 124px; width: 124px; text-align: center; }
+          .qr-block img { width: 124px; height: 124px; display: block; margin-bottom: 8px; }
+          .questions { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height)}px; width: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.width * ANSWER_SHEET_TEMPLATE.page.width)}px; height: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.height * ANSWER_SHEET_TEMPLATE.page.height)}px; }
+          .question { position: absolute; left: 0; right: 0; display: grid; align-items: center; }
+          .question-number { font-weight: 700; font-size: 15px; }
+          .bubble-track { display: grid; gap: 0; }
+          .bubble { width: 22px; height: 22px; border: 1.5px solid #111827; border-radius: 999px; display: inline-block; justify-self: center; }
+          .footer { position: absolute; left: 32px; right: 32px; bottom: 74px; display: grid; gap: 10px; font-size: 12px; }
+          .signature { margin-top: 20px; border-top: 1px solid #111827; width: 280px; padding-top: 8px; font-size: 12px; }
+        </style>
+      </head>
+      <body>${body}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+  return true;
 }
 
 export function ClassesManager() {
@@ -55,21 +109,9 @@ export function ClassesManager() {
         <Badge tone="accent">{data.classes.length} turmas salvas</Badge>
       </div>
       <div className="mt-6 grid gap-3 md:grid-cols-4">
-        <Input
-          placeholder="Nome da turma"
-          value={form.nome}
-          onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
-        />
-        <Input
-          placeholder="Professor"
-          value={form.professor}
-          onChange={(event) => setForm((prev) => ({ ...prev, professor: event.target.value }))}
-        />
-        <Input
-          placeholder="Ano letivo"
-          value={form.ano}
-          onChange={(event) => setForm((prev) => ({ ...prev, ano: event.target.value }))}
-        />
+        <Input placeholder="Nome da turma" value={form.nome} onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))} />
+        <Input placeholder="Professor" value={form.professor} onChange={(event) => setForm((prev) => ({ ...prev, professor: event.target.value }))} />
+        <Input placeholder="Ano letivo" value={form.ano} onChange={(event) => setForm((prev) => ({ ...prev, ano: event.target.value }))} />
         <FieldSelect value={form.periodo} onChange={(periodo) => setForm((prev) => ({ ...prev, periodo }))}>
           <option>Manha</option>
           <option>Tarde</option>
@@ -89,7 +131,6 @@ export function ClassesManager() {
               createClass(form);
               setMessage("Turma criada com sucesso.");
             }
-
             setForm((prev) => ({ ...prev, nome: "" }));
           }}
         >
@@ -100,7 +141,7 @@ export function ClassesManager() {
             variant="secondary"
             onClick={() => {
               setEditingId(null);
-              setForm((prev) => ({ ...prev, nome: "", professor: data.teacherProfile.nome, ano: "2026", periodo: "Manha" }));
+              setForm({ ano: "2026", nome: "", periodo: "Manha", professor: data.teacherProfile.nome });
             }}
           >
             Cancelar edicao
@@ -127,25 +168,14 @@ export function ClassesManager() {
                 variant="secondary"
                 onClick={() => {
                   setEditingId(item.id);
-                  setForm({
-                    ano: item.ano,
-                    nome: item.nome,
-                    periodo: item.periodo,
-                    professor: item.professor,
-                  });
+                  setForm({ ano: item.ano, nome: item.nome, periodo: item.periodo, professor: item.professor });
                   setMessage(`Editando ${item.nome}.`);
                 }}
               >
                 <Edit3 className="size-4" />
                 Editar
               </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  const result = deleteClass(item.id);
-                  setMessage(result.message);
-                }}
-              >
+              <Button variant="ghost" onClick={() => setMessage(deleteClass(item.id).message)}>
                 <Trash2 className="size-4" />
                 Excluir
               </Button>
@@ -174,23 +204,13 @@ export function StudentsManager() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)]">Gerenciamento de alunos</h2>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Cadastre alunos e mantenha a base pronta para correcao imediata.
-            </p>
+            <p className="text-sm text-[var(--muted-foreground)]">Cadastre alunos e mantenha a base pronta para correcao imediata.</p>
           </div>
           <Badge tone="accent">{data.students.length} alunos salvos</Badge>
         </div>
         <div className="mt-6 grid gap-3 lg:grid-cols-4">
-          <Input
-            placeholder="Nome do aluno"
-            value={student.nome}
-            onChange={(event) => setStudent((prev) => ({ ...prev, nome: event.target.value }))}
-          />
-          <Input
-            placeholder="Matricula"
-            value={student.matricula}
-            onChange={(event) => setStudent((prev) => ({ ...prev, matricula: event.target.value }))}
-          />
+          <Input placeholder="Nome do aluno" value={student.nome} onChange={(event) => setStudent((prev) => ({ ...prev, nome: event.target.value }))} />
+          <Input placeholder="Matricula" value={student.matricula} onChange={(event) => setStudent((prev) => ({ ...prev, matricula: event.target.value }))} />
           <FieldSelect value={student.turma} onChange={(turma) => setStudent((prev) => ({ ...prev, turma }))}>
             {data.classes.map((item) => (
               <option key={item.id} value={item.id}>
@@ -208,17 +228,14 @@ export function StudentsManager() {
           <Button
             onClick={() => {
               if (!student.nome.trim() || !student.matricula.trim() || !student.turma) return;
-
               if (editingId) {
-                const result = updateStudent(editingId, { ...student, status });
-                setMessage(result.message);
+                setMessage(updateStudent(editingId, { ...student, status }).message);
                 setEditingId(null);
               } else {
                 createStudent({ ...student, status });
                 setMessage("Aluno cadastrado com sucesso.");
               }
-
-              setStudent((prev) => ({ ...prev, matricula: "", nome: "" }));
+              setStudent({ matricula: "", nome: "", turma: data.classes[0]?.id ?? "" });
               setStatus("Ativo");
             }}
           >
@@ -243,19 +260,12 @@ export function StudentsManager() {
         <StudentTable
           classes={data.classes}
           students={data.students}
-          onDelete={(studentId) => {
-            const result = deleteStudent(studentId);
-            setMessage(result.message);
-          }}
+          onDelete={(studentId) => setMessage(deleteStudent(studentId).message)}
           onEdit={(studentId) => {
             const current = data.students.find((item) => item.id === studentId);
             if (!current) return;
             setEditingId(current.id);
-            setStudent({
-              matricula: current.matricula,
-              nome: current.nome,
-              turma: current.turma,
-            });
+            setStudent({ matricula: current.matricula, nome: current.nome, turma: current.turma });
             setStatus(current.status);
             setMessage(`Editando ${current.nome}.`);
           }}
@@ -266,9 +276,12 @@ export function StudentsManager() {
 }
 
 export function ExamsManager() {
-  const { createExam, data, deleteExam, updateExam } = useAppData();
+  const { createExam, data, deleteExam, saveCorrectionRule, updateExam } = useAppData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [selectedExamId, setSelectedExamId] = useState(data.exams[0]?.id ?? "");
+  const [sheetMode, setSheetMode] = useState<"blank" | "class" | "student">("class");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [form, setForm] = useState({
     alternativas: "A,B,C,D,E",
     data: new Date().toISOString().slice(0, 10),
@@ -277,82 +290,193 @@ export function ExamsManager() {
     turma: data.classes[0]?.id ?? "",
   });
 
+  const activeExam = data.exams.find((item) => item.id === selectedExamId) ?? data.exams[0];
+  const activeClass = data.classes.find((item) => item.id === activeExam?.turma);
+  const rule = activeExam ? getCorrectionRule(activeExam, data.correctionRules) : null;
+  const studentsForExam = useMemo(
+    () => data.students.filter((item) => item.turma === activeExam?.turma),
+    [activeExam?.turma, data.students],
+  );
+
+  const [ruleForm, setRuleForm] = useState(() => {
+    if (!activeExam || !rule) {
+      return {
+        arredondamentoCasas: "1",
+        modoQuestaoAnulada: "full-credit",
+        notaMaxima: "10",
+        pesoPadrao: "1",
+        pesosPorQuestaoRaw: "",
+        questoesAnuladasRaw: "",
+      };
+    }
+
+    return {
+      arredondamentoCasas: String(rule.arredondamentoCasas),
+      modoQuestaoAnulada: rule.modoQuestaoAnulada,
+      notaMaxima: String(rule.notaMaxima),
+      pesoPadrao: String(rule.pesoPadrao),
+      pesosPorQuestaoRaw: rule.pesosPorQuestao.map((item) => `${item.questao}=${item.peso}`).join("\n"),
+      questoesAnuladasRaw: rule.questoesAnuladas.join(","),
+    };
+  });
+
+  const syncRuleForm = (examId: string) => {
+    const nextExam = data.exams.find((item) => item.id === examId);
+    const nextRule = nextExam ? getCorrectionRule(nextExam, data.correctionRules) : null;
+    setSelectedExamId(examId);
+    setSelectedStudentId("");
+    setRuleForm({
+      arredondamentoCasas: String(nextRule?.arredondamentoCasas ?? 1),
+      modoQuestaoAnulada: nextRule?.modoQuestaoAnulada ?? "full-credit",
+      notaMaxima: String(nextRule?.notaMaxima ?? 10),
+      pesoPadrao: String(nextRule?.pesoPadrao ?? 1),
+      pesosPorQuestaoRaw: nextRule?.pesosPorQuestao.map((item) => `${item.questao}=${item.peso}`).join("\n") ?? "",
+      questoesAnuladasRaw: nextRule?.questoesAnuladas.join(",") ?? "",
+    });
+  };
+
+  const printSheets = async () => {
+    if (!activeExam || !activeClass) {
+      return;
+    }
+
+    const items =
+      sheetMode === "blank"
+        ? [buildAnswerSheetModel({ exam: activeExam, teacherName: data.teacherProfile.nome, teacherSchool: data.teacherProfile.escola, turma: activeClass, student: null })]
+        : sheetMode === "student"
+          ? studentsForExam
+              .filter((item) => item.id === selectedStudentId)
+              .map((student) =>
+                buildAnswerSheetModel({
+                  exam: activeExam,
+                  teacherName: data.teacherProfile.nome,
+                  teacherSchool: data.teacherProfile.escola,
+                  turma: activeClass,
+                  student,
+                }),
+              )
+          : studentsForExam.map((student) =>
+              buildAnswerSheetModel({
+                exam: activeExam,
+                teacherName: data.teacherProfile.nome,
+                teacherSchool: data.teacherProfile.escola,
+                turma: activeClass,
+                student,
+              }),
+            );
+
+    const { toDataURL } = await import("qrcode");
+
+    const htmlParts = await Promise.all(
+      items.map(async (item) => {
+        const qrDataUrl = item.qrPayload
+          ? await toDataURL(item.qrPayload, {
+              errorCorrectionLevel: "M",
+              margin: 1,
+              width: 164,
+            })
+          : "";
+        const layout = getQuestionLayout(item.questionNumbers.length, activeExam.alternativas);
+        const bubbleTemplateColumns = `42px repeat(${Math.max(1, activeExam.alternativas.length)}, 1fr)`;
+
+        return `
+          <section class="sheet">
+            <div class="header">
+              <div>
+                <div class="title">${item.examTitle}</div>
+                <div class="meta">
+                  <div><strong>Escola/Professor:</strong> ${item.teacherSchool} - ${item.teacherName}</div>
+                  <div><strong>Turma:</strong> ${item.turmaName}</div>
+                  <div><strong>Aluno:</strong> ${item.studentName}</div>
+                  <div><strong>Matricula:</strong> ${item.studentRegistration}</div>
+                </div>
+              </div>
+              <div>
+                <div class="code">${item.uniqueCode}</div>
+                <div class="meta" style="margin-top: 12px;">
+                  <div><strong>Codigo da prova:</strong> ${item.examCode}</div>
+                  <div><strong>Template:</strong> ${ANSWER_SHEET_TEMPLATE.version}</div>
+                  <div><strong>Turma:</strong> ${item.turmaName}</div>
+                </div>
+              </div>
+            </div>
+            <div class="qr-block">
+              ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR Code do cartao-resposta" />` : ""}
+              <div class="meta"><strong>ID:</strong> ${item.uniqueCode}</div>
+            </div>
+            <div class="questions">
+              ${item.questionNumbers
+                .map(
+                  (question, index) => `
+                    <div class="question" style="top:${Math.round(layout.rowHeight * index)}px;height:${Math.round(layout.rowHeight)}px;grid-template-columns:${bubbleTemplateColumns};">
+                      <strong class="question-number">${question}</strong>
+                      ${activeExam.alternativas.map(() => `<span class="bubble"></span>`).join("")}
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>
+            <div class="footer">
+              ${item.instructions.map((instruction) => `<div>${instruction}</div>`).join("")}
+            </div>
+            <div class="signature">Assinatura / nome adicional</div>
+          </section>
+        `;
+      }),
+    );
+
+    const html = htmlParts.join("");
+
+    if (openPrintWindow(`Cartoes ${activeExam.titulo}`, html)) {
+      setMessage("Cartoes-resposta abertos para impressao ou salvamento em PDF.");
+    } else {
+      setMessage("Nao foi possivel abrir a janela de impressao neste navegador.");
+    }
+  };
+
   return (
-    <Card className="p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-[var(--foreground)]">Gerenciamento de provas</h2>
-          <p className="text-sm text-[var(--muted-foreground)]">
-            Crie provas reais e deixe o gabarito pronto para uso imediato.
-          </p>
+    <div className="grid gap-5">
+      <Card className="p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)]">Gerenciamento de provas</h2>
+            <p className="text-sm text-[var(--muted-foreground)]">Crie provas, defina regras e gere cartoes padrao do proprio sistema.</p>
+          </div>
+          <Badge tone="accent">{data.exams.length} provas salvas</Badge>
         </div>
-        <Badge tone="accent">{data.exams.length} provas salvas</Badge>
-      </div>
-      <div className="mt-6 grid gap-3 lg:grid-cols-5">
-        <Input
-          placeholder="Titulo da prova"
-          value={form.titulo}
-          onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))}
-        />
-        <FieldSelect value={form.turma} onChange={(turma) => setForm((prev) => ({ ...prev, turma }))}>
-          {data.classes.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.nome}
-            </option>
-          ))}
-        </FieldSelect>
-        <Input
-          type="date"
-          value={form.data}
-          onChange={(event) => setForm((prev) => ({ ...prev, data: event.target.value }))}
-        />
-        <Input
-          type="number"
-          min="1"
-          value={form.quantidadeQuestoes}
-          onChange={(event) => setForm((prev) => ({ ...prev, quantidadeQuestoes: event.target.value }))}
-        />
-        <Input
-          placeholder="Alternativas: A,B,C,D,E"
-          value={form.alternativas}
-          onChange={(event) => setForm((prev) => ({ ...prev, alternativas: event.target.value }))}
-        />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Button
-          onClick={() => {
-            if (!form.titulo.trim() || !form.turma) return;
-
-            const payload = {
-              alternativas: form.alternativas
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean),
-              data: form.data,
-              quantidadeQuestoes: Number(form.quantidadeQuestoes),
-              titulo: form.titulo,
-              turma: form.turma,
-            };
-
-            if (editingId) {
-              const result = updateExam(editingId, payload);
-              setMessage(result.message);
-              setEditingId(null);
-            } else {
-              createExam(payload);
-              setMessage("Prova criada com sucesso.");
-            }
-
-            setForm((prev) => ({ ...prev, titulo: "" }));
-          }}
-        >
-          {editingId ? "Salvar prova" : "Nova prova"}
-        </Button>
-        {editingId ? (
+        <div className="mt-6 grid gap-3 lg:grid-cols-5">
+          <Input placeholder="Titulo da prova" value={form.titulo} onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))} />
+          <FieldSelect value={form.turma} onChange={(turma) => setForm((prev) => ({ ...prev, turma }))}>
+            {data.classes.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.nome}
+              </option>
+            ))}
+          </FieldSelect>
+          <Input type="date" value={form.data} onChange={(event) => setForm((prev) => ({ ...prev, data: event.target.value }))} />
+          <Input type="number" min="1" value={form.quantidadeQuestoes} onChange={(event) => setForm((prev) => ({ ...prev, quantidadeQuestoes: event.target.value }))} />
+          <Input placeholder="Alternativas: A,B,C,D,E" value={form.alternativas} onChange={(event) => setForm((prev) => ({ ...prev, alternativas: event.target.value }))} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
           <Button
-            variant="secondary"
             onClick={() => {
-              setEditingId(null);
+              if (!form.titulo.trim() || !form.turma) return;
+              const payload = {
+                alternativas: form.alternativas.split(",").map((item) => item.trim()).filter(Boolean),
+                data: form.data,
+                quantidadeQuestoes: Number(form.quantidadeQuestoes),
+                titulo: form.titulo,
+                turma: form.turma,
+              };
+
+              if (editingId) {
+                setMessage(updateExam(editingId, payload).message);
+                setEditingId(null);
+              } else {
+                createExam(payload);
+                setMessage("Prova criada com sucesso.");
+              }
+
               setForm({
                 alternativas: "A,B,C,D,E",
                 data: new Date().toISOString().slice(0, 10),
@@ -362,64 +486,229 @@ export function ExamsManager() {
               });
             }}
           >
-            Cancelar edicao
+            {editingId ? "Salvar prova" : "Nova prova"}
           </Button>
-        ) : null}
-      </div>
-      {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        {data.exams.map((item) => (
-          <Card key={item.id} className="p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">{item.titulo}</p>
-                <p className="mt-1 text-sm text-[var(--muted-foreground)]">{formatDate(item.data)}</p>
+          {editingId ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setEditingId(null);
+                setForm({
+                  alternativas: "A,B,C,D,E",
+                  data: new Date().toISOString().slice(0, 10),
+                  quantidadeQuestoes: "10",
+                  titulo: "",
+                  turma: data.classes[0]?.id ?? "",
+                });
+              }}
+            >
+              Cancelar edicao
+            </Button>
+          ) : null}
+        </div>
+        {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
+        <div className="mt-6 grid gap-4 xl:grid-cols-3">
+          {data.exams.map((item) => (
+            <Card key={item.id} className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-[var(--foreground)]">{item.titulo}</p>
+                  <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                    {formatDate(item.data)} • {getClassLabel(data.classes, item.turma)}
+                  </p>
+                </div>
+                <Badge tone="neutral">{item.quantidadeQuestoes} questoes</Badge>
               </div>
-              <Badge tone="neutral">{item.quantidadeQuestoes} questoes</Badge>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {item.alternativas.map((alternative) => (
-                <span
-                  key={alternative}
-                  className="grid size-9 place-items-center rounded-xl bg-[var(--surface)] text-sm font-semibold text-[var(--foreground)]"
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Badge tone="accent">{item.codigo}</Badge>
+                <Badge tone="neutral">{item.templateVersion}</Badge>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {item.alternativas.map((alternative) => (
+                  <span key={alternative} className="grid size-9 place-items-center rounded-xl bg-[var(--surface)] text-sm font-semibold text-[var(--foreground)]">
+                    {alternative}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setEditingId(item.id);
+                    setForm({
+                      alternativas: item.alternativas.join(","),
+                      data: item.data,
+                      quantidadeQuestoes: String(item.quantidadeQuestoes),
+                      titulo: item.titulo,
+                      turma: item.turma,
+                    });
+                    syncRuleForm(item.id);
+                    setMessage(`Editando ${item.titulo}.`);
+                  }}
                 >
-                  {alternative}
-                </span>
-              ))}
+                  <Edit3 className="size-4" />
+                  Editar
+                </Button>
+                <Button variant="ghost" onClick={() => setMessage(deleteExam(item.id).message)}>
+                  <Trash2 className="size-4" />
+                  Excluir
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </Card>
+
+      {activeExam && activeClass ? (
+        <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-[var(--muted-foreground)]">Regras de correcao</p>
+                <h3 className="text-xl font-semibold text-[var(--foreground)]">{activeExam.titulo}</h3>
+              </div>
+              <FieldSelect value={activeExam.id} onChange={syncRuleForm}>
+                {data.exams.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.titulo}
+                  </option>
+                ))}
+              </FieldSelect>
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Input value={ruleForm.notaMaxima} onChange={(event) => setRuleForm((prev) => ({ ...prev, notaMaxima: event.target.value }))} placeholder="Nota maxima" type="number" min="1" step="0.1" />
+              <Input value={ruleForm.pesoPadrao} onChange={(event) => setRuleForm((prev) => ({ ...prev, pesoPadrao: event.target.value }))} placeholder="Peso padrao" type="number" min="0.1" step="0.1" />
+              <Input value={ruleForm.arredondamentoCasas} onChange={(event) => setRuleForm((prev) => ({ ...prev, arredondamentoCasas: event.target.value }))} placeholder="Casas decimais" type="number" min="0" max="3" />
+              <FieldSelect value={ruleForm.modoQuestaoAnulada} onChange={(value) => setRuleForm((prev) => ({ ...prev, modoQuestaoAnulada: value as "full-credit" | "ignore" }))}>
+                <option value="full-credit">Questao anulada vale ponto</option>
+                <option value="ignore">Questao anulada sai do calculo</option>
+              </FieldSelect>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <textarea
+                value={ruleForm.questoesAnuladasRaw}
+                onChange={(event) => setRuleForm((prev) => ({ ...prev, questoesAnuladasRaw: event.target.value }))}
+                className="min-h-28 rounded-[24px] border border-[var(--border)] bg-[var(--input-bg)] p-4 text-sm text-[var(--foreground)] outline-none"
+                placeholder="Questoes anuladas: 3,7,11"
+              />
+              <textarea
+                value={ruleForm.pesosPorQuestaoRaw}
+                onChange={(event) => setRuleForm((prev) => ({ ...prev, pesosPorQuestaoRaw: event.target.value }))}
+                className="min-h-28 rounded-[24px] border border-[var(--border)] bg-[var(--input-bg)] p-4 text-sm text-[var(--foreground)] outline-none"
+                placeholder={"Pesos por questao\n5=1.5\n12=2"}
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button
+                onClick={() => {
+                  setMessage(
+                    saveCorrectionRule({
+                      arredondamentoCasas: Number(ruleForm.arredondamentoCasas),
+                      modoQuestaoAnulada: ruleForm.modoQuestaoAnulada as "full-credit" | "ignore",
+                      notaMaxima: Number(ruleForm.notaMaxima),
+                      pesoPadrao: Number(ruleForm.pesoPadrao),
+                      pesosPorQuestaoRaw: ruleForm.pesosPorQuestaoRaw,
+                      provaId: activeExam.id,
+                      questoesAnuladasRaw: ruleForm.questoesAnuladasRaw,
+                      totalQuestions: activeExam.quantidadeQuestoes,
+                    }).message,
+                  );
+                }}
+              >
+                <Save className="size-4" />
+                Salvar regras
+              </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setEditingId(item.id);
-                  setForm({
-                    alternativas: item.alternativas.join(","),
-                    data: item.data,
-                    quantidadeQuestoes: String(item.quantidadeQuestoes),
-                    titulo: item.titulo,
-                    turma: item.turma,
+                  const fallback = buildDefaultCorrectionRule(activeExam);
+                  setRuleForm({
+                    arredondamentoCasas: String(fallback.arredondamentoCasas),
+                    modoQuestaoAnulada: fallback.modoQuestaoAnulada,
+                    notaMaxima: String(fallback.notaMaxima),
+                    pesoPadrao: String(fallback.pesoPadrao),
+                    pesosPorQuestaoRaw: "",
+                    questoesAnuladasRaw: "",
                   });
-                  setMessage(`Editando ${item.titulo}.`);
                 }}
               >
-                <Edit3 className="size-4" />
-                Editar
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  const result = deleteExam(item.id);
-                  setMessage(result.message);
-                }}
-              >
-                <Trash2 className="size-4" />
-                Excluir
+                Limpar regra
               </Button>
             </div>
           </Card>
-        ))}
-      </div>
-    </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-[var(--muted-foreground)]">Cartao-resposta padrao</p>
+                <h3 className="text-xl font-semibold text-[var(--foreground)]">Gerar para impressao</h3>
+              </div>
+              <Badge tone="accent">QR + codigo unico</Badge>
+            </div>
+            <div className="mt-6 grid gap-3">
+              <FieldSelect value={sheetMode} onChange={(value) => setSheetMode(value as "blank" | "class" | "student")}>
+                <option value="blank">Gerar cartao em branco</option>
+                <option value="class">Gerar cartao por turma</option>
+                <option value="student">Gerar cartao por aluno</option>
+              </FieldSelect>
+              {sheetMode === "student" ? (
+                <FieldSelect value={selectedStudentId} onChange={setSelectedStudentId}>
+                  <option value="">Selecione um aluno</option>
+                  {studentsForExam.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome}
+                    </option>
+                  ))}
+                </FieldSelect>
+              ) : null}
+            </div>
+            <div className="mt-6 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{activeExam.titulo}</p>
+                  <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                    {activeClass.nome} • {activeExam.codigo}
+                  </p>
+                </div>
+                <QrCode className="size-6 text-[var(--accent)]" />
+              </div>
+              <div className="mt-4 grid gap-3 text-sm text-[var(--muted-foreground)]">
+                <p>Modelo proprio do sistema para reduzir variacao do OCR e padronizar identificacao.</p>
+                <p>Inclui codigo unico da prova, aluno, turma e payload para leitura QR antes do OCR nominal.</p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button
+                onClick={() => {
+                  void printSheets();
+                }}
+                disabled={sheetMode === "student" && !selectedStudentId}
+              >
+                <Printer className="size-4" />
+                Imprimir / salvar PDF
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const payload = {
+                    examId: activeExam.id,
+                    generatedAt: new Date().toISOString(),
+                    mode: sheetMode,
+                    studentId: selectedStudentId || null,
+                    templateVersion: activeExam.templateVersion,
+                  };
+                  downloadTextFile(`cartoes-${activeExam.codigo}.json`, JSON.stringify(payload, null, 2), "application/json");
+                  setMessage("Manifesto de cartoes baixado com sucesso.");
+                }}
+              >
+                <Download className="size-4" />
+                Baixar manifesto
+              </Button>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -430,15 +719,9 @@ export function AnswerKeyEditor() {
   const [message, setMessage] = useState("");
   const exam = data.exams.find((item) => item.id === examId) ?? activeExam;
   const alternatives = exam?.alternativas ?? ["A", "B", "C", "D", "E"];
-  const initialAnswers = useMemo(
-    () =>
-      data.answerKeys
-        .filter((item) => item.provaId === exam?.id)
-        .sort((a, b) => a.questao - b.questao)
-        .map((item) => item.respostaCorreta),
-    [data.answerKeys, exam?.id],
+  const [answers, setAnswers] = useState<string[]>(
+    data.answerKeys.filter((item) => item.provaId === exam?.id).sort((a, b) => a.questao - b.questao).map((item) => item.respostaCorreta),
   );
-  const [answers, setAnswers] = useState<string[]>(initialAnswers);
 
   if (!exam) {
     return (
@@ -453,19 +736,18 @@ export function AnswerKeyEditor() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-[var(--foreground)]">Editor do gabarito</h2>
-          <p className="text-sm text-[var(--muted-foreground)]">
-            No mobile, o lancamento e objetivo. No desktop, voce ganha mais densidade visual.
-          </p>
+          <p className="text-sm text-[var(--muted-foreground)]">No mobile, o lancamento e objetivo. No desktop, voce ganha mais densidade visual.</p>
         </div>
         <FieldSelect
           value={examId}
           onChange={(nextExamId) => {
-            const nextAnswers = data.answerKeys
-              .filter((item) => item.provaId === nextExamId)
-              .sort((a, b) => a.questao - b.questao)
-              .map((item) => item.respostaCorreta);
             setExamId(nextExamId);
-            setAnswers(nextAnswers);
+            setAnswers(
+              data.answerKeys
+                .filter((item) => item.provaId === nextExamId)
+                .sort((a, b) => a.questao - b.questao)
+                .map((item) => item.respostaCorreta),
+            );
           }}
         >
           {data.exams.map((item) => (
@@ -567,8 +849,109 @@ export function AnswerKeyEditor() {
 }
 
 export function ReportsWorkspace() {
-  const { analytics } = useAppData();
-  return <AnalyticsPanels analytics={analytics} />;
+  const { analytics, data } = useAppData();
+  const [classFilter, setClassFilter] = useState("all");
+  const [examFilter, setExamFilter] = useState("all");
+  const [studentFilter, setStudentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const filteredCorrections = useMemo(
+    () =>
+      data.corrections.filter((item) => {
+        if (classFilter !== "all" && item.turma.id !== classFilter) return false;
+        if (examFilter !== "all" && item.prova.id !== examFilter) return false;
+        if (studentFilter !== "all" && item.aluno.id !== studentFilter) return false;
+        if (statusFilter !== "all" && !item.respostas.some((answer) => answer.status === statusFilter)) return false;
+        return true;
+      }),
+    [classFilter, data.corrections, examFilter, statusFilter, studentFilter],
+  );
+
+  const filteredAverage = filteredCorrections.length
+    ? Math.round(filteredCorrections.reduce((sum, item) => sum + item.correction.percentual, 0) / filteredCorrections.length)
+    : 0;
+
+  return (
+    <div className="grid gap-5">
+      <Card className="p-6">
+        <div className="grid gap-3 md:grid-cols-4">
+          <FieldSelect value={classFilter} onChange={setClassFilter}>
+            <option value="all">Todas as turmas</option>
+            {data.classes.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.nome}
+              </option>
+            ))}
+          </FieldSelect>
+          <FieldSelect value={examFilter} onChange={setExamFilter}>
+            <option value="all">Todas as provas</option>
+            {data.exams.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.titulo}
+              </option>
+            ))}
+          </FieldSelect>
+          <FieldSelect value={studentFilter} onChange={setStudentFilter}>
+            <option value="all">Todos os alunos</option>
+            {data.students.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.nome}
+              </option>
+            ))}
+          </FieldSelect>
+          <FieldSelect value={statusFilter} onChange={setStatusFilter}>
+            <option value="all">Todos os status</option>
+            <option value="erro">Com erro</option>
+            <option value="em-branco">Com em branco</option>
+            <option value="multipla-marcacao">Com multipla marcacao</option>
+            <option value="anulada">Com anulada</option>
+          </FieldSelect>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <Card className="p-4">
+            <p className="text-sm text-[var(--muted-foreground)]">Correcoes filtradas</p>
+            <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{filteredCorrections.length}</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-sm text-[var(--muted-foreground)]">Media filtrada</p>
+            <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{filteredAverage}%</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-sm text-[var(--muted-foreground)]">Ranking disponivel</p>
+            <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{analytics.studentRanking.length}</p>
+          </Card>
+        </div>
+      </Card>
+      <AnalyticsPanels analytics={analytics} />
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">Ranking dos alunos</h3>
+          <div className="mt-5 space-y-3">
+            {analytics.studentRanking.map((item, index) => (
+              <div key={`${item.aluno}-${index}`} className="flex items-center justify-between rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div>
+                  <p className="font-semibold text-[var(--foreground)]">{item.aluno}</p>
+                  <p className="text-sm text-[var(--muted-foreground)]">{item.percentual}% de aproveitamento</p>
+                </div>
+                <Badge tone="accent">{item.nota.toFixed(1)}</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">Quebras operacionais</h3>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {analytics.outcomeBreakdown.map((item) => (
+              <div key={item.label} className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4">
+                <p className="text-sm text-[var(--muted-foreground)]">{item.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{item.total}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
 }
 
 export function SettingsWorkspace() {
@@ -577,23 +960,11 @@ export function SettingsWorkspace() {
   const [payload, setPayload] = useState("");
   const [message, setMessage] = useState("");
 
-  const downloadFile = (filename: string, content: string, type: string) => {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Modo operacional local</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-          Ideal para uso imediato no Vercel sem backend obrigatorio. Tudo fica salvo no navegador do professor.
-        </p>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Ideal para uso imediato no Vercel sem backend obrigatorio. Tudo fica salvo no navegador do professor.</p>
         <div className="mt-6 rounded-[24px] bg-[var(--surface)] p-5">
           <p className="text-sm text-[var(--muted-foreground)]">Resumo atual</p>
           <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
@@ -605,7 +976,7 @@ export function SettingsWorkspace() {
             onClick={() => {
               const content = exportData();
               setPayload(content);
-              downloadFile("provascan-backup-manual.json", content, "application/json");
+              downloadTextFile("provascan-backup-manual.json", content, "application/json");
               setMessage("Backup JSON gerado e baixado.");
             }}
           >
@@ -614,7 +985,7 @@ export function SettingsWorkspace() {
           <Button
             variant="secondary"
             onClick={() => {
-              downloadFile("provascan-resumo-operacional.csv", getOperationalCsv(), "text/csv;charset=utf-8");
+              downloadTextFile("provascan-resumo-operacional.csv", getOperationalCsv(), "text/csv;charset=utf-8");
               setMessage("Resumo CSV baixado.");
             }}
           >
@@ -634,9 +1005,7 @@ export function SettingsWorkspace() {
       </Card>
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Importacao e restauracao</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-          Importe um backup JSON colando o conteudo abaixo ou escolhendo um arquivo salvo anteriormente.
-        </p>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Importe um backup JSON colando o conteudo abaixo ou escolhendo um arquivo salvo anteriormente.</p>
         <textarea
           value={payload}
           onChange={(event) => setPayload(event.target.value)}
@@ -644,12 +1013,7 @@ export function SettingsWorkspace() {
           placeholder="Cole aqui o JSON de backup do ProvaScan."
         />
         <div className="mt-4 flex flex-wrap gap-3">
-          <Button
-            onClick={() => {
-              const result = importData(payload);
-              setMessage(result.message);
-            }}
-          >
+          <Button onClick={() => setMessage(importData(payload).message)}>
             <FileUp className="size-4" />
             Importar backup
           </Button>
@@ -669,8 +1033,7 @@ export function SettingsWorkspace() {
             if (!file) return;
             const text = await file.text();
             setPayload(text);
-            const result = importData(text);
-            setMessage(result.message);
+            setMessage(importData(text).message);
             event.target.value = "";
           }}
         />

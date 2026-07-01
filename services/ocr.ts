@@ -1,30 +1,46 @@
-import { createWorker } from "tesseract.js";
-
 export type OcrDetection = {
-  nomeOuMatricula: string;
   confianca: number;
+  nomeOuMatricula: string;
   origem: "ocr" | "manual";
+  rawText: string;
 };
 
-export async function extractIdentityFromImage(imageUrl: string): Promise<OcrDetection> {
-  if (!process.env.ENABLE_TESSERACT_OCR) {
-    return {
-      nomeOuMatricula: "Ana Beatriz Rocha",
-      confianca: 94,
-      origem: "manual",
-    };
+let workerPromise: Promise<import("tesseract.js").Worker> | null = null;
+
+async function getWorker() {
+  if (!workerPromise) {
+    workerPromise = (async () => {
+      const { createWorker } = await import("tesseract.js");
+      return createWorker("por");
+    })();
   }
 
-  const worker = await createWorker("por");
+  return workerPromise;
+}
+
+export async function extractIdentityFromImage(imageUrl: string): Promise<OcrDetection> {
+  const worker = await getWorker();
 
   try {
     const result = await worker.recognize(imageUrl);
+    const rawText = result.data.text.trim();
+    const lines = rawText.split("\n").map((line) => line.trim()).filter(Boolean);
+    const registrationLine = lines.find((line) => /\b\d{5,}\b/.test(line)) ?? "";
+    const firstTextLine = lines.find((line) => /[A-Za-zÀ-ÿ]{3,}/.test(line)) ?? "";
+    const normalized = registrationLine || firstTextLine || rawText.slice(0, 120);
+
     return {
-      nomeOuMatricula: result.data.text.trim().split("\n")[0] ?? "",
       confianca: Math.round(result.data.confidence),
+      nomeOuMatricula: normalized,
       origem: "ocr",
+      rawText,
     };
-  } finally {
-    await worker.terminate();
+  } catch {
+    return {
+      confianca: 0,
+      nomeOuMatricula: "",
+      origem: "manual",
+      rawText: "",
+    };
   }
 }

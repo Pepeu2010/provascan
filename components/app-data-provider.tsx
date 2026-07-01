@@ -12,15 +12,22 @@ import {
   APP_DATA_STORAGE_KEY,
   calculateAnalytics,
   cloneDefaultAppData,
-  createCorrectionSession,
   createId,
   type AppDataState,
 } from "@/lib/app-data";
+import {
+  buildCorrectionSession,
+  buildDefaultCorrectionRule,
+  sanitizeQuestionList,
+  sanitizeWeights,
+  type ReviewAnswerInput,
+} from "@/services/exam-correction";
 import type {
   AnswerKey,
   ClassRoom,
   CorrectionSession,
   Exam,
+  ExamCorrectionRule,
   Student,
   StudentStatus,
 } from "@/types/domain";
@@ -48,11 +55,24 @@ type CreateExamInput = {
 };
 
 type SaveCorrectionInput = {
-  answers: string[];
+  answers: ReviewAnswerInput[];
+  confidence: number;
   examId: string;
   imageLabel: string;
+  method: "qr" | "ocr" | "manual";
   notes: string[];
   studentId: string;
+};
+
+type SaveCorrectionRuleInput = {
+  arredondamentoCasas: number;
+  modoQuestaoAnulada: "full-credit" | "ignore";
+  notaMaxima: number;
+  pesoPadrao: number;
+  pesosPorQuestaoRaw: string;
+  provaId: string;
+  questoesAnuladasRaw: string;
+  totalQuestions: number;
 };
 
 type TeacherSession = {
@@ -80,6 +100,7 @@ type AppDataContextValue = {
   resetData: () => void;
   saveAnswerKey: (examId: string, answers: string[]) => void;
   saveCorrection: (input: SaveCorrectionInput) => { ok: boolean; message: string };
+  saveCorrectionRule: (input: SaveCorrectionRuleInput) => { ok: boolean; message: string };
   updateClass: (classId: string, input: CreateClassInput) => { ok: boolean; message: string };
   updateExam: (examId: string, input: CreateExamInput) => { ok: boolean; message: string };
   updateStudent: (studentId: string, input: CreateStudentInput) => { ok: boolean; message: string };
@@ -106,6 +127,9 @@ function normalizeImportedData(value: unknown): AppDataState | null {
   return {
     answerKeys: candidate.answerKeys as AnswerKey[],
     classes: candidate.classes as ClassRoom[],
+    correctionRules: Array.isArray(candidate.correctionRules)
+      ? (candidate.correctionRules as ExamCorrectionRule[])
+      : cloneDefaultAppData().correctionRules,
     corrections: candidate.corrections as CorrectionSession[],
     exams: candidate.exams as Exam[],
     students: candidate.students as Student[],
@@ -137,6 +161,7 @@ function buildOperationalCsv(data: AppDataState) {
     ["alunos", String(data.students.length)],
     ["provas", String(data.exams.length)],
     ["gabaritos", String(data.answerKeys.length)],
+    ["regras_correcao", String(data.correctionRules.length)],
     ["correcoes", String(data.corrections.length)],
     ["alunos_ativos", String(data.students.filter((item) => item.status === "Ativo").length)],
   ];
@@ -164,9 +189,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  const [session, setSession] = useState<TeacherSession | null>(() => {
-    return null;
-  });
+  const [session, setSession] = useState<TeacherSession | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(APP_DATA_STORAGE_KEY, JSON.stringify(data));
@@ -231,6 +254,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         return {
           ...previous,
           classes: previous.classes.filter((item) => item.id !== classId),
+          correctionRules: previous.correctionRules.filter((item) => !linkedExams.includes(item.provaId)),
           students: previous.students.filter((item) => item.turma !== classId),
           exams: previous.exams.filter((item) => item.turma !== classId),
           answerKeys: previous.answerKeys.filter((item) => !linkedExams.includes(item.provaId)),
@@ -279,22 +303,39 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     const createExamHandler = (input: CreateExamInput) => {
       const examId = createId("P");
-      setData((previous) => ({
-        ...previous,
-        answerKeys: [
-          ...previous.answerKeys,
-          ...Array.from({ length: input.quantidadeQuestoes }, (_, index) => ({
-            provaId: examId,
-            questao: index + 1,
-            respostaCorreta: input.alternativas[0] ?? "A",
-          })),
-        ],
-        exams: [{ id: examId, ...input }, ...previous.exams],
-      }));
+      const codeBase = input.titulo
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 12);
+
+      setData((previous) => {
+        const nextExam: Exam = {
+          id: examId,
+          ...input,
+          codigo: `${codeBase || "PROVA"}-${input.data.slice(0, 4)}`,
+          templateVersion: "PS-CARD-1",
+        };
+
+        return {
+          ...previous,
+          answerKeys: [
+            ...previous.answerKeys,
+            ...Array.from({ length: input.quantidadeQuestoes }, (_, index) => ({
+              provaId: examId,
+              questao: index + 1,
+              respostaCorreta: input.alternativas[0] ?? "A",
+            })),
+          ],
+          correctionRules: [buildDefaultCorrectionRule(nextExam), ...previous.correctionRules],
+          exams: [nextExam, ...previous.exams],
+        };
+      });
     };
 
     const updateExamHandler = (examId: string, input: CreateExamInput) => {
       setData((previous) => {
+        const currentExam = previous.exams.find((item) => item.id === examId);
         const previousAnswerKey = previous.answerKeys
           .filter((item) => item.provaId === examId)
           .sort((a, b) => a.questao - b.questao);
@@ -307,8 +348,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         return {
           ...previous,
           answerKeys: [...previous.answerKeys.filter((item) => item.provaId !== examId), ...nextAnswerKeys],
+          correctionRules: previous.correctionRules.map((item) =>
+            item.provaId === examId
+              ? {
+                  ...item,
+                  pesosPorQuestao: item.pesosPorQuestao.filter((peso) => peso.questao <= input.quantidadeQuestoes),
+                  questoesAnuladas: item.questoesAnuladas.filter((questao) => questao <= input.quantidadeQuestoes),
+                }
+              : item,
+          ),
           corrections: previous.corrections.filter((item) => item.correction.provaId !== examId),
-          exams: previous.exams.map((item) => (item.id === examId ? { ...item, ...input } : item)),
+          exams: previous.exams.map((item) =>
+            item.id === examId
+              ? {
+                  ...item,
+                  ...input,
+                  codigo: currentExam?.codigo ?? item.codigo,
+                  templateVersion: "PS-CARD-1",
+                }
+              : item,
+          ),
         };
       });
 
@@ -322,11 +381,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setData((previous) => ({
         ...previous,
         answerKeys: previous.answerKeys.filter((item) => item.provaId !== examId),
+        correctionRules: previous.correctionRules.filter((item) => item.provaId !== examId),
         corrections: previous.corrections.filter((item) => item.correction.provaId !== examId),
         exams: previous.exams.filter((item) => item.id !== examId),
       }));
 
-      return { ok: true, message: "Prova, gabarito e correcoes vinculadas foram removidos." };
+      return { ok: true, message: "Prova, gabarito, regras e correcoes vinculadas foram removidos." };
     };
 
     const saveAnswerKeyHandler = (examId: string, answers: string[]) => {
@@ -346,6 +406,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
     };
 
+    const saveCorrectionRuleHandler = (input: SaveCorrectionRuleInput) => {
+      const nextRule: ExamCorrectionRule = {
+        arredondamentoCasas: input.arredondamentoCasas,
+        modoQuestaoAnulada: input.modoQuestaoAnulada,
+        notaMaxima: input.notaMaxima,
+        pesoPadrao: input.pesoPadrao,
+        pesosPorQuestao: sanitizeWeights(input.pesosPorQuestaoRaw, input.totalQuestions),
+        provaId: input.provaId,
+        questoesAnuladas: sanitizeQuestionList(input.questoesAnuladasRaw, input.totalQuestions),
+      };
+
+      setData((previous) => ({
+        ...previous,
+        correctionRules: [
+          ...previous.correctionRules.filter((item) => item.provaId !== input.provaId),
+          nextRule,
+        ],
+      }));
+
+      return { ok: true, message: "Regras de correcao salvas com sucesso." };
+    };
+
     const saveCorrectionHandler = (input: SaveCorrectionInput) => {
       const student = data.students.find((item) => item.id === input.studentId);
       const answerKey = data.answerKeys
@@ -360,13 +442,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         return { ok: false, message: "Esta prova ainda nao possui gabarito salvo." };
       }
 
-      const sessionToSave = createCorrectionSession({
+      const sessionToSave = buildCorrectionSession({
         answerKey,
         answers: input.answers,
         classes: data.classes,
+        confidence: input.confidence,
         exams: data.exams,
         imageLabel: input.imageLabel,
+        method: input.method,
         notes: input.notes,
+        rules: data.correctionRules,
         student,
       });
 
@@ -448,23 +533,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     return {
       analytics: calculateAnalytics(data),
-      data,
-      isHydrated,
-      session,
       createClass: createClassHandler,
       createExam: createExamHandler,
       createStudent: createStudentHandler,
+      data,
       deleteClass: deleteClassHandler,
       deleteExam: deleteExamHandler,
       deleteStudent: deleteStudentHandler,
       exportData: exportDataHandler,
       getOperationalCsv: getOperationalCsvHandler,
       importData: importDataHandler,
+      isHydrated,
       loginTeacher: loginTeacherHandler,
       logoutTeacher: logoutTeacherHandler,
       resetData: resetDataHandler,
       saveAnswerKey: saveAnswerKeyHandler,
       saveCorrection: saveCorrectionHandler,
+      saveCorrectionRule: saveCorrectionRuleHandler,
+      session,
       updateClass: updateClassHandler,
       updateExam: updateExamHandler,
       updateStudent: updateStudentHandler,

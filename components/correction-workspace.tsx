@@ -21,16 +21,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  decodeQrFromCanvas,
+  detectAnswersFromCanvas,
+  detectIdentityWithOcr,
+  resolveIdentityFromQr,
+} from "@/services/scan-pipeline";
 import { cn } from "@/lib/utils";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const MIN_CONFIDENCE_REVIEW = 75;
 const PROCESSING_STEPS = [
-  { label: "Preparando imagem...", progress: 18 },
-  { label: "Lendo nome do aluno...", progress: 46 },
-  { label: "Detectando respostas...", progress: 74 },
-  { label: "Comparando com o gabarito...", progress: 100 },
+  { label: "Processando imagem...", progress: 16 },
+  { label: "Lendo QR Code...", progress: 34 },
+  { label: "Tentando OCR...", progress: 54 },
+  { label: "Detectando respostas...", progress: 78 },
+  { label: "Preparando revisao...", progress: 100 },
 ] as const;
 
 type ScanPhase = "idle" | "processing" | "review" | "error";
@@ -39,7 +46,7 @@ type ResultFilter = "all" | "review" | "wrong";
 type ScanAnswer = {
   confidence: number;
   correctAnswer: string;
-  detectedAnswer: string;
+  markedAnswers: string[];
   question: number;
 };
 
@@ -48,9 +55,11 @@ type ScanReview = {
   confidence: number;
   detectedName: string;
   detectedRegistration: string;
+  identificationMethod: "qr" | "ocr" | "manual";
   matchedStudentId: string;
   notes: string[];
   processingLabel: string;
+  qrStatus: "success" | "invalid" | "not-found" | "unreadable";
   qualitySummary: {
     brightness: string;
     cropApplied: boolean;
@@ -69,6 +78,7 @@ type PreprocessResult = {
   height: number;
   lowLight: boolean;
   orientation: string;
+  processedCanvas: HTMLCanvasElement;
   previewUrl: string;
   processedLabel: string;
   shadowRisk: boolean;
@@ -94,6 +104,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const [review, setReview] = useState<ScanReview | null>(null);
   const [notes, setNotes] = useState("Revisao manual obrigatoria antes da confirmacao final.");
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
+  const [previewZoom, setPreviewZoom] = useState(1);
 
   const exam = data.exams.find((item) => item.id === examId) ?? data.exams[0];
   const answerKey = useMemo(
@@ -122,7 +133,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     }
 
     if (resultFilter === "wrong") {
-      return review.answers.filter((item) => item.detectedAnswer !== item.correctAnswer);
+      return review.answers.filter((item) => getAnswerState(item) !== "acerto");
     }
 
     return review.answers;
@@ -133,8 +144,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       return { acertos: 0, erros: 0, percentual: 0, revisao: 0 };
     }
 
-    const acertos = review.answers.filter((item) => item.detectedAnswer === item.correctAnswer).length;
-    const erros = review.answers.length - acertos;
+    const acertos = review.answers.filter((item) => getAnswerState(item) === "acerto").length;
+    const erros = review.answers.filter((item) => getAnswerState(item) === "erro").length;
     const revisao = review.answers.filter((item) => item.confidence < MIN_CONFIDENCE_REVIEW).length;
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
     return { acertos, erros, percentual, revisao };
@@ -177,7 +188,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setProgressLabel(PROCESSING_STEPS[0].label);
 
     try {
-      await waitWithCancel(160, cancelProcessingRef);
+      await waitWithCancel(120, cancelProcessingRef);
       const preprocessing = await preprocessImage(selectedFile);
       if (cancelProcessingRef.current) {
         throw new Error("Processamento cancelado.");
@@ -187,32 +198,61 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
       setProgressLabel(PROCESSING_STEPS[1].label);
       setProgress(PROCESSING_STEPS[1].progress);
-      await waitWithCancel(240, cancelProcessingRef);
+      await waitWithCancel(90, cancelProcessingRef);
 
-      const identity = detectIdentity({
-        fileName: selectedFile.name,
+      const qrResult = await decodeQrFromCanvas(preprocessing.processedCanvas);
+      const qrIdentity = resolveIdentityFromQr({
+        dataExam: exam,
+        dataStudents: studentsForExam,
         preferredStudentId: activePreferredStudentId,
-        quality: preprocessing,
-        students: studentsForExam,
+        qrResult,
       });
+
       if (cancelProcessingRef.current) {
         throw new Error("Processamento cancelado.");
       }
 
       setProgressLabel(PROCESSING_STEPS[2].label);
       setProgress(PROCESSING_STEPS[2].progress);
-      await waitWithCancel(240, cancelProcessingRef);
+      await waitWithCancel(90, cancelProcessingRef);
 
-      const detectedAnswers = detectAnswers({
-        alternatives: exam.alternativas,
-        answerKey: answerKey.map((item) => ({ correctAnswer: item.respostaCorreta, question: item.questao })),
-        confidenceBase: Math.min(preprocessing.confidenceBase, identity.confidence),
-        fileName: selectedFile.name,
-      });
+      const ocrIdentity =
+        qrIdentity && !qrIdentity.invalidMessage
+          ? null
+          : await detectIdentityWithOcr({
+              canvas: preprocessing.processedCanvas,
+              preferredStudentId: activePreferredStudentId,
+              students: studentsForExam,
+            });
+
+      const identity = qrIdentity && !qrIdentity.invalidMessage
+        ? qrIdentity
+        : {
+            confidence: ocrIdentity?.confidence ?? 0,
+            detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome,
+            detectedRegistration: ocrIdentity?.detectedRegistration ?? selectedReviewStudent.matricula,
+            invalidMessage: qrIdentity?.invalidMessage ?? "",
+            method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual",
+            matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId,
+          };
 
       setProgressLabel(PROCESSING_STEPS[3].label);
       setProgress(PROCESSING_STEPS[3].progress);
-      await waitWithCancel(180, cancelProcessingRef);
+      await waitWithCancel(90, cancelProcessingRef);
+
+      const detectedAnswers = detectAnswersFromCanvas({
+        alternatives: exam.alternativas,
+        canvas: preprocessing.processedCanvas,
+        correctAnswers: answerKey.map((item) => ({ correctAnswer: item.respostaCorreta, question: item.questao })),
+      }).map((item) => ({
+        ...item,
+        correctAnswer: answerKey.find((answer) => answer.questao === item.question)?.respostaCorreta ?? exam.alternativas[0] ?? "A",
+      }));
+
+      setProgressLabel(PROCESSING_STEPS[3].label);
+      setProgress(PROCESSING_STEPS[4].progress);
+      setProgressLabel(PROCESSING_STEPS[4].label);
+      await waitWithCancel(120, cancelProcessingRef);
 
       const needsManualReview =
         preprocessing.lowLight ||
@@ -222,18 +262,34 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
       setReview({
         answers: detectedAnswers,
-        confidence: Math.max(42, Math.min(98, Math.round((identity.confidence + preprocessing.confidenceBase) / 2))),
+        confidence: Math.max(42, Math.min(99, Math.round((identity.confidence + preprocessing.confidenceBase) / 2))),
         detectedName: identity.detectedName,
         detectedRegistration: identity.detectedRegistration,
+        identificationMethod: identity.method,
         matchedStudentId: identity.matchedStudentId,
         notes: [
+          qrResult.status === "success"
+            ? "QR Code lido com sucesso e validado contra a base local."
+            : qrResult.status === "invalid"
+              ? "QR Code encontrado, mas os dados nao bateram com a prova atual."
+              : qrResult.status === "unreadable"
+                ? "QR Code ilegivel nesta imagem."
+                : "QR Code nao encontrado. Fluxo caiu para OCR/manual.",
+          identity.invalidMessage || "",
           preprocessing.processedLabel,
           preprocessing.cropApplied ? "Recorte automatico da area util aplicado." : "Recorte automatico manteve a imagem inteira.",
           preprocessing.lowLight ? "Imagem com pouca luz: revisar nome e respostas manualmente." : "Iluminacao dentro do esperado.",
           preprocessing.shadowRisk ? "Sombra detectada: marcacoes foram sinalizadas para revisao." : "Sem sombra relevante no cartao.",
+          ocrIdentity?.rawText ? `OCR bruto: ${ocrIdentity.rawText.slice(0, 120)}` : "",
           needsManualReview ? "Fluxo marcado para revisao manual obrigatoria." : "Leitura automatica consistente, mas ainda exige conferencia final.",
-        ],
-        processingLabel: needsManualReview ? "Revisao manual obrigatoria" : "Leitura pronta para conferencia",
+        ].filter(Boolean),
+        processingLabel:
+          identity.method === "qr"
+            ? "QR validado e leitura pronta para conferencia"
+            : needsManualReview
+              ? "Revisao manual obrigatoria"
+              : "Leitura pronta para conferencia",
+        qrStatus: qrResult.status,
         qualitySummary: {
           brightness: preprocessing.lowLight ? "Baixa" : "Boa",
           cropApplied: preprocessing.cropApplied,
@@ -245,7 +301,12 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       });
       setNotes("Revisao manual obrigatoria antes da confirmacao final.");
       setPhase("review");
-      setScreenMessage("OCR concluido. Revise os campos abaixo antes de confirmar a correcao.");
+      setPreviewZoom(1);
+      setScreenMessage(
+        identity.method === "qr"
+          ? "QR Code confirmado. Revise os campos abaixo antes de salvar."
+          : "Leitura assistida concluida. Revise os campos abaixo antes de salvar.",
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao processar a imagem.";
       if (message === "Processamento cancelado.") {
@@ -265,29 +326,32 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       answers: answerKey.map((item, index) => ({
         confidence: 30,
         correctAnswer: item.respostaCorreta,
-        detectedAnswer: index === 0 ? item.respostaCorreta : "",
+        markedAnswers: index === 0 ? [item.respostaCorreta] : [],
         question: item.questao,
       })),
       confidence: 30,
       detectedName: selectedReviewStudent.nome,
       detectedRegistration: selectedReviewStudent.matricula,
-        matchedStudentId: activePreferredStudentId,
+      identificationMethod: "manual",
+      matchedStudentId: activePreferredStudentId,
       notes: [
         "Fluxo aberto em modo manual.",
         "A imagem foi mantida para conferencia visual.",
         "Preencha ou ajuste todas as respostas antes de confirmar.",
       ],
       processingLabel: "Preenchimento manual",
-      qualitySummary: {
+      qrStatus: "not-found",
+        qualitySummary: {
         brightness: "Nao avaliada",
         cropApplied: false,
         dimensions: selectedFile ? `${selectedFile.name}` : "Sem imagem",
         lowLight: false,
         orientation: "Manual",
         shadowRisk: false,
-      },
+        },
     });
     setPhase("review");
+    setPreviewZoom(1);
     setScreenMessage("Modo manual habilitado. A imagem continua disponivel para consulta.");
   };
 
@@ -333,16 +397,18 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       return;
     }
 
-    const unanswered = review.answers.some((item) => !item.detectedAnswer);
+    const unanswered = review.answers.some((item) => !item.markedAnswers.length);
     if (unanswered) {
-      setErrorMessage("Preencha todas as respostas antes de confirmar a correcao.");
+      setErrorMessage("Preencha todas as respostas ou marque explicitamente em branco antes de confirmar a correcao.");
       return;
     }
 
     const result = saveCorrection({
-      answers: review.answers.map((item) => item.detectedAnswer),
+      answers: review.answers.map((item) => ({ marcacoes: item.markedAnswers, questao: item.question })),
+      confidence: review.confidence,
       examId: exam.id,
       imageLabel: selectedFile?.name ?? "captura-manual.jpg",
+      method: review.identificationMethod,
       notes: [
         notes,
         `Confianca geral do OCR: ${review.confidence}%`,
@@ -459,6 +525,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             phase={phase}
             processedPreviewUrl={processedPreviewUrl}
             rawPreviewUrl={rawPreviewUrl}
+            zoom={previewZoom}
+            onZoomChange={setPreviewZoom}
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -480,7 +548,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               disabled={!selectedFile || phase === "processing"}
             >
               {phase === "processing" ? <LoaderCircle className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
-              Processar OCR
+              Ler QR + OCR
             </Button>
             <div className="grid gap-3 sm:grid-cols-2">
               <Button
@@ -548,6 +616,18 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Badge tone={review.identificationMethod === "qr" ? "success" : review.identificationMethod === "ocr" ? "accent" : "warning"}>
+                  {review.identificationMethod === "qr" ? "QR confirmado" : review.identificationMethod === "ocr" ? "OCR assistido" : "Manual"}
+                </Badge>
+                <Badge tone={review.qrStatus === "success" ? "success" : review.qrStatus === "invalid" ? "error" : "warning"}>
+                  {review.qrStatus === "success"
+                    ? "QR lido com sucesso"
+                    : review.qrStatus === "invalid"
+                      ? "Dados do QR invalidos"
+                      : review.qrStatus === "unreadable"
+                        ? "QR ilegivel"
+                        : "QR nao encontrado"}
+                </Badge>
                 <Badge tone={review.confidence >= MIN_CONFIDENCE_REVIEW ? "accent" : "warning"}>
                   {review.confidence}% de confianca
                 </Badge>
@@ -674,7 +754,34 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                         ? {
                             ...previous,
                             answers: previous.answers.map((item) =>
-                              item.question === answer.question ? { ...item, detectedAnswer: alternative } : item,
+                              item.question === answer.question ? { ...item, markedAnswers: [alternative] } : item,
+                            ),
+                          }
+                        : previous,
+                    );
+                  }}
+                  onMarkBlank={() => {
+                    setReview((previous) =>
+                      previous
+                        ? {
+                            ...previous,
+                            answers: previous.answers.map((item) =>
+                              item.question === answer.question ? { ...item, markedAnswers: [] } : item,
+                            ),
+                          }
+                        : previous,
+                    );
+                  }}
+                  onMarkMultiple={() => {
+                    const alternate = exam.alternativas.find((item) => item !== answer.correctAnswer) ?? answer.correctAnswer;
+                    setReview((previous) =>
+                      previous
+                        ? {
+                            ...previous,
+                            answers: previous.answers.map((item) =>
+                              item.question === answer.question
+                                ? { ...item, markedAnswers: [answer.correctAnswer, alternate] }
+                                : item,
                             ),
                           }
                         : previous,
@@ -694,7 +801,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </div>
               <div className="divide-y divide-[var(--border)]">
                 {visibleAnswers.map((answer) => {
-                  const isCorrect = answer.detectedAnswer === answer.correctAnswer;
+                  const status = getAnswerState(answer);
+                  const isCorrect = status === "acerto";
                   const needsReview = answer.confidence < MIN_CONFIDENCE_REVIEW;
                   return (
                     <div
@@ -718,7 +826,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                                       ...previous,
                                       answers: previous.answers.map((item) =>
                                         item.question === answer.question
-                                          ? { ...item, detectedAnswer: alternative }
+                                          ? { ...item, markedAnswers: [alternative] }
                                           : item,
                                       ),
                                     }
@@ -730,17 +838,58 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                               answer.correctAnswer === alternative
                                 ? "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--success)]"
                                 : "border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)]",
-                              answer.detectedAnswer === alternative &&
-                                answer.detectedAnswer !== answer.correctAnswer &&
+                              answer.markedAnswers.includes(alternative) &&
+                                !isCorrect &&
                                 "border-[var(--error-border)] bg-[var(--error-soft)] text-[var(--error)]",
                             )}
                           >
                             {alternative}
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReview((previous) =>
+                              previous
+                                ? {
+                                    ...previous,
+                                    answers: previous.answers.map((item) =>
+                                      item.question === answer.question ? { ...item, markedAnswers: [] } : item,
+                                    ),
+                                  }
+                                : previous,
+                            );
+                          }}
+                          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted-foreground)]"
+                        >
+                          Em branco
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const alternate = exam.alternativas.find((item) => item !== answer.correctAnswer) ?? answer.correctAnswer;
+                            setReview((previous) =>
+                              previous
+                                ? {
+                                    ...previous,
+                                    answers: previous.answers.map((item) =>
+                                      item.question === answer.question
+                                        ? { ...item, markedAnswers: [answer.correctAnswer, alternate] }
+                                        : item,
+                                    ),
+                                  }
+                                : previous,
+                            );
+                          }}
+                          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted-foreground)]"
+                        >
+                          Multipla
+                        </button>
                       </div>
                       <div className="flex items-center">
-                        <Badge tone={isCorrect ? "success" : "error"}>{isCorrect ? "Acerto" : "Erro"}</Badge>
+                        <Badge tone={status === "em-branco" ? "warning" : status === "multipla-marcacao" ? "warning" : isCorrect ? "success" : "error"}>
+                          {getAnswerLabel(answer)}
+                        </Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={cn("text-sm font-semibold", needsReview ? "text-[var(--warning)]" : "text-[var(--foreground)]")}>
@@ -822,12 +971,17 @@ function MobileAnswerCard({
   alternatives,
   answer,
   onSelect,
+  onMarkBlank,
+  onMarkMultiple,
 }: {
   alternatives: string[];
   answer: ScanAnswer;
   onSelect: (alternative: string) => void;
+  onMarkBlank: () => void;
+  onMarkMultiple: () => void;
 }) {
-  const isCorrect = answer.detectedAnswer === answer.correctAnswer;
+  const status = getAnswerState(answer);
+  const isCorrect = status === "acerto";
   const needsReview = answer.confidence < MIN_CONFIDENCE_REVIEW;
 
   return (
@@ -837,7 +991,9 @@ function MobileAnswerCard({
           <p className="text-base font-semibold text-[var(--foreground)]">Questao {answer.question}</p>
           <p className="text-xs text-[var(--muted-foreground)]">Layout vertical otimizado para toque</p>
         </div>
-        <Badge tone={isCorrect ? "success" : "error"}>{isCorrect ? "Acerto" : "Erro"}</Badge>
+        <Badge tone={status === "em-branco" || status === "multipla-marcacao" ? "warning" : isCorrect ? "success" : "error"}>
+          {getAnswerLabel(answer)}
+        </Badge>
       </div>
 
       <div className="mt-4 grid gap-3">
@@ -855,8 +1011,8 @@ function MobileAnswerCard({
                   answer.correctAnswer === alternative
                     ? "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--success)]"
                     : "border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)]",
-                  answer.detectedAnswer === alternative &&
-                    answer.detectedAnswer !== answer.correctAnswer &&
+                  answer.markedAnswers.includes(alternative) &&
+                    !isCorrect &&
                     "border-[var(--error-border)] bg-[var(--error-soft)] text-[var(--error)]",
                 )}
               >
@@ -864,8 +1020,16 @@ function MobileAnswerCard({
               </button>
             ))}
           </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={onMarkBlank} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm font-semibold text-[var(--foreground)]">
+              Em branco
+            </button>
+            <button type="button" onClick={onMarkMultiple} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm font-semibold text-[var(--foreground)]">
+              Multipla
+            </button>
+          </div>
         </div>
-        <SectionBlock title="Gabarito do aluno" value={answer.detectedAnswer || "Nao lancado"} />
+        <SectionBlock title="Gabarito do aluno" value={getDetectedAnswerLabel(answer)} />
         <div
           className={cn(
             "rounded-[20px] border p-4",
@@ -882,7 +1046,7 @@ function MobileAnswerCard({
               <XCircle className="size-4 text-[var(--error)]" />
             )}
             <p className={cn("text-sm font-semibold", isCorrect ? "text-[var(--success)]" : "text-[var(--error)]")}>
-              {isCorrect ? "Resposta correta confirmada" : "Resposta divergente do gabarito"}
+              {isCorrect ? "Resposta correta confirmada" : getStatusDescription(answer)}
             </p>
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
@@ -897,14 +1061,18 @@ function MobileAnswerCard({
 
 function ImagePreviewCard({
   fileName,
+  onZoomChange,
   phase,
   processedPreviewUrl,
   rawPreviewUrl,
+  zoom,
 }: {
   fileName: string;
+  onZoomChange: (value: number) => void;
   phase: ScanPhase;
   processedPreviewUrl: string;
   rawPreviewUrl: string;
+  zoom: number;
 }) {
   return (
     <div className="grid gap-3 lg:grid-cols-2">
@@ -913,13 +1081,34 @@ function ImagePreviewCard({
         helper={fileName}
         src={rawPreviewUrl}
         emptyText="A foto aparece aqui antes do processamento."
+        zoom={zoom}
       />
       <PreviewPane
         label="Imagem processada"
         helper={phase === "processing" ? "Ajustando brilho, contraste, escala de cinza e binarizacao." : "Pronta para OCR e revisao visual."}
         src={processedPreviewUrl}
         emptyText="O preview tratado aparece aqui sem estourar o layout."
+        zoom={zoom}
       />
+      <div className="lg:col-span-2 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[var(--foreground)]">Zoom do preview</p>
+            <p className="text-xs leading-5 text-[var(--muted-foreground)]">Ajuste a ampliacao para inspecionar nome, QR e marcacoes sem perder proporcao.</p>
+          </div>
+          <span className="text-sm font-semibold text-[var(--foreground)]">{Math.round(zoom * 100)}%</span>
+        </div>
+        <input
+          aria-label="Controle de zoom da imagem"
+          className="mt-3 w-full accent-[var(--accent)]"
+          max="2.5"
+          min="1"
+          step="0.1"
+          type="range"
+          value={zoom}
+          onChange={(event) => onZoomChange(Number(event.target.value))}
+        />
+      </div>
     </div>
   );
 }
@@ -929,11 +1118,13 @@ function PreviewPane({
   helper,
   label,
   src,
+  zoom,
 }: {
   emptyText: string;
   helper: string;
   label: string;
   src: string;
+  zoom: number;
 }) {
   return (
     <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3">
@@ -944,7 +1135,12 @@ function PreviewPane({
       <div className="relative grid min-h-[220px] place-items-center overflow-hidden rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={label} className="max-h-[420px] w-full object-contain" />
+          <img
+            src={src}
+            alt={label}
+            className="max-h-[420px] w-full origin-center object-contain transition-transform duration-300"
+            style={{ transform: `scale(${zoom})` }}
+          />
         ) : (
           <p className="max-w-[240px] px-4 text-center text-sm leading-6 text-[var(--muted-foreground)]">{emptyText}</p>
         )}
@@ -979,7 +1175,7 @@ function ProcessingCard({
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-5">
         {PROCESSING_STEPS.map((step) => (
           <div key={step.label} className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-3">
             <div className="mb-3 h-3 w-20 animate-pulse rounded-full bg-[var(--surface-strong)]" />
@@ -1119,8 +1315,11 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
   const image = await loadImage(file);
   const maxSide = Math.max(image.width, image.height);
   const scale = maxSide > 1600 ? 1600 / maxSide : 1;
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
+  const sourceWidth = Math.max(1, Math.round(image.width * scale));
+  const sourceHeight = Math.max(1, Math.round(image.height * scale));
+  const shouldRotate = sourceWidth > sourceHeight;
+  const width = shouldRotate ? sourceHeight : sourceWidth;
+  const height = shouldRotate ? sourceWidth : sourceHeight;
 
   const baseCanvas = document.createElement("canvas");
   baseCanvas.width = width;
@@ -1131,7 +1330,14 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
     throw new Error("Nao foi possivel preparar o canvas do scanner.");
   }
 
-  baseContext.drawImage(image, 0, 0, width, height);
+  if (shouldRotate) {
+    baseContext.translate(width / 2, height / 2);
+    baseContext.rotate(-Math.PI / 2);
+    baseContext.drawImage(image, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight);
+    baseContext.setTransform(1, 0, 0, 1, 0, 0);
+  } else {
+    baseContext.drawImage(image, 0, 0, width, height);
+  }
   const sourceImage = baseContext.getImageData(0, 0, width, height);
   const luminanceStats = getLuminanceStats(sourceImage.data);
   const adjusted = applyAdjustments(sourceImage, luminanceStats.average, luminanceStats.deviation);
@@ -1188,10 +1394,11 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
     dimensions: `${targetCanvas.width}x${targetCanvas.height}`,
     height: targetCanvas.height,
     lowLight,
-    orientation: targetCanvas.width >= targetCanvas.height ? "Horizontal" : "Vertical",
+    orientation: shouldRotate ? "Vertical corrigida" : targetCanvas.width >= targetCanvas.height ? "Horizontal" : "Vertical",
+    processedCanvas: targetCanvas,
     previewUrl: targetCanvas.toDataURL("image/jpeg", 0.88),
     processedLabel:
-      "Perspectiva assistida, brilho, contraste, reducao de ruido, escala de cinza, binarizacao e redimensionamento aplicados.",
+      "Escala de cinza, contraste, binarizacao, reducao de ruido e rotacao automatica quando necessaria foram aplicados.",
     shadowRisk,
     width: targetCanvas.width,
   };
@@ -1309,84 +1516,47 @@ function detectCropBounds(data: Uint8ClampedArray, width: number, height: number
   };
 }
 
-function detectIdentity({
-  fileName,
-  preferredStudentId,
-  quality,
-  students,
-}: {
-  fileName: string;
-  preferredStudentId: string;
-  quality: PreprocessResult;
-  students: Array<{ id: string; matricula: string; nome: string }>;
-}) {
-  const normalizedFileName = normalizeText(fileName);
-  const studentFromFile =
-    students.find((student) => normalizedFileName.includes(normalizeText(student.matricula))) ??
-    students.find((student) => normalizedFileName.includes(normalizeText(student.nome.split(" ")[0] ?? ""))) ??
-    students.find((student) => normalizedFileName.includes(normalizeText(student.nome.split(" ").at(-1) ?? "")));
-
-  const fallbackStudent =
-    students.find((student) => student.id === preferredStudentId) ??
-    studentFromFile ??
-    students[0];
-
-  const confidence = Math.max(
-    42,
-    Math.min(98, quality.confidenceBase - (studentFromFile ? 0 : 8) - (quality.lowLight ? 6 : 0)),
-  );
-
-  return {
-    confidence,
-    detectedName: studentFromFile?.nome ?? fallbackStudent.nome,
-    detectedRegistration: studentFromFile?.matricula ?? fallbackStudent.matricula,
-    matchedStudentId: studentFromFile?.id ?? fallbackStudent.id,
-  };
-}
-
-function detectAnswers({
-  alternatives,
-  answerKey,
-  confidenceBase,
-  fileName,
-}: {
-  alternatives: string[];
-  answerKey: Array<{ correctAnswer: string; question: number }>;
-  confidenceBase: number;
-  fileName: string;
-}) {
-  const seed = hashString(fileName);
-
-  return answerKey.map((item, index) => {
-    const variant = (seed + index * 17) % Math.max(1, alternatives.length);
-    const shouldMiss = confidenceBase < 70 ? index % 4 === 1 : index % 6 === 3;
-    const alternate = alternatives[variant] ?? item.correctAnswer;
-    const detectedAnswer = shouldMiss && alternate !== item.correctAnswer ? alternate : item.correctAnswer;
-    const confidence = Math.max(38, Math.min(98, confidenceBase - ((seed + index * 11) % 24)));
-
-    return {
-      confidence,
-      correctAnswer: item.correctAnswer,
-      detectedAnswer,
-      question: item.question,
-    };
-  });
-}
-
-function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-function hashString(value: string) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+function getDetectedAnswerLabel(answer: ScanAnswer) {
+  if (!answer.markedAnswers.length) {
+    return "Em branco";
   }
-  return hash;
+
+  if (answer.markedAnswers.length > 1) {
+    return answer.markedAnswers.join(" / ");
+  }
+
+  return answer.markedAnswers[0];
+}
+
+function getAnswerState(answer: ScanAnswer) {
+  if (!answer.markedAnswers.length) {
+    return "em-branco";
+  }
+
+  if (answer.markedAnswers.length > 1) {
+    return "multipla-marcacao";
+  }
+
+  return answer.markedAnswers[0] === answer.correctAnswer ? "acerto" : "erro";
+}
+
+function getAnswerLabel(answer: ScanAnswer) {
+  const status = getAnswerState(answer);
+  if (status === "acerto") return "Acerto";
+  if (status === "erro") return "Erro";
+  if (status === "em-branco") return "Em branco";
+  return "Multipla";
+}
+
+function getStatusDescription(answer: ScanAnswer) {
+  const status = getAnswerState(answer);
+  if (status === "em-branco") {
+    return "Questao marcada como em branco";
+  }
+  if (status === "multipla-marcacao") {
+    return "Questao com multipla marcacao";
+  }
+  return "Resposta divergente do gabarito";
 }
 
 function clamp(value: number, min: number, max: number) {

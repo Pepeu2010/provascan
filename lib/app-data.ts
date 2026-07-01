@@ -2,9 +2,9 @@ import type {
   AnswerKey,
   ClassRoom,
   CorrectionSession,
-  CorrectionSummary,
   DashboardMetric,
   Exam,
+  ExamCorrectionRule,
   Student,
   TeacherProfile,
 } from "@/types/domain";
@@ -12,6 +12,7 @@ import {
   answerKeys,
   classAverages,
   classes,
+  correctionRules,
   correctionSessions,
   errorRanking,
   exams,
@@ -26,6 +27,7 @@ export const APP_SESSION_STORAGE_KEY = "provascan-session";
 export type AppDataState = {
   answerKeys: AnswerKey[];
   classes: ClassRoom[];
+  correctionRules: ExamCorrectionRule[];
   corrections: CorrectionSession[];
   exams: Exam[];
   students: Student[];
@@ -35,6 +37,7 @@ export type AppDataState = {
 export const defaultAppData: AppDataState = {
   answerKeys,
   classes,
+  correctionRules,
   corrections: correctionSessions,
   exams,
   students,
@@ -46,6 +49,8 @@ export type AnalyticsSnapshot = {
   dashboardMetrics: DashboardMetric[];
   errorRanking: Array<{ questao: string; erros: number }>;
   gradeEvolution: Array<{ periodo: string; media: number }>;
+  outcomeBreakdown: Array<{ label: string; total: number }>;
+  studentRanking: Array<{ aluno: string; nota: number; percentual: number }>;
 };
 
 export function createId(prefix: string) {
@@ -78,20 +83,28 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
           trend: "Modo operacional local",
         },
         {
-          label: "Correções salvas",
+          label: "Correcoes salvas",
           value: "0",
-          helper: "Ainda sem histórico",
-          trend: "Pronto para começar",
+          helper: "Ainda sem historico",
+          trend: "Pronto para comecar",
         },
         {
-          label: "Média geral",
+          label: "Media geral",
           value: "0%",
-          helper: "Sem correções concluídas",
+          helper: "Sem correcoes concluidas",
           trend: "Aguardando uso",
         },
       ],
       errorRanking,
       gradeEvolution,
+      outcomeBreakdown: [
+        { label: "Acertos", total: 0 },
+        { label: "Erros", total: 0 },
+        { label: "Em branco", total: 0 },
+        { label: "Multiplas", total: 0 },
+        { label: "Anuladas", total: 0 },
+      ],
+      studentRanking: [],
     };
   }
 
@@ -114,7 +127,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
       );
 
       return {
-        turma: item.nome.replace(" Ensino Médio", "").replace(" Ano", ""),
+        turma: item.nome.replace(" Ensino Medio", "").replace(" Ano", ""),
         media,
       };
     })
@@ -123,7 +136,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
   const questionMap = new Map<number, number>();
   for (const correction of data.corrections) {
     for (const answer of correction.respostas) {
-      if (answer.resultado === "erro") {
+      if (answer.status === "erro" || answer.status === "multipla-marcacao" || answer.status === "em-branco") {
         questionMap.set(answer.questao, (questionMap.get(answer.questao) ?? 0) + 1);
       }
     }
@@ -131,7 +144,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
 
   const computedErrorRanking = [...questionMap.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
+    .slice(0, 5)
     .map(([questao, erros]) => ({
       questao: `Q${String(questao).padStart(2, "0")}`,
       erros,
@@ -147,7 +160,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
 
   const computedGradeEvolution = [...groupedByDate.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(-4)
+    .slice(-6)
     .map(([date, values]) => ({
       periodo: new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }),
       media: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
@@ -178,80 +191,52 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
         label: "Provas criadas",
         value: String(data.exams.length),
         helper: `${totalQuestions} respostas em gabaritos`,
-        trend: `${data.answerKeys.length} linhas salvas`,
+        trend: `${data.correctionRules.length} regras salvas`,
       },
       {
-        label: "Correções salvas",
+        label: "Correcoes salvas",
         value: String(correctionsToday),
-        helper: `Histórico total ${data.corrections.length}`,
-        trend: `Tempo médio ${avgTimeSeconds || 0}s`,
+        helper: `Historico total ${data.corrections.length}`,
+        trend: `Tempo medio ${avgTimeSeconds || 0}s`,
       },
       {
-        label: "Média geral",
+        label: "Media geral",
         value: `${avgPercent}%`,
-        helper: "Com base nas correções registradas",
+        helper: "Com base nas correcoes registradas",
         trend: "Atualizado em tempo real",
       },
     ],
     errorRanking: computedErrorRanking.length ? computedErrorRanking : errorRanking,
     gradeEvolution: computedGradeEvolution.length ? computedGradeEvolution : gradeEvolution,
-  };
-}
-
-export function createCorrectionSession(params: {
-  answerKey: AnswerKey[];
-  answers: string[];
-  classes: ClassRoom[];
-  exams: Exam[];
-  imageLabel: string;
-  notes?: string[];
-  student: Student;
-}): CorrectionSession {
-  const { answerKey, answers, classes: classesList, exams: examsList, imageLabel, notes = [], student } = params;
-  const exam = examsList.find((item) => item.id === answerKey[0]?.provaId);
-  const turma = classesList.find((item) => item.id === student.turma);
-
-  if (!exam || !turma) {
-    throw new Error("Não foi possível localizar prova ou turma para salvar a correção.");
-  }
-
-  const respostas = answerKey.map((item, index) => {
-    const respostaAluno = answers[index] ?? "";
-    return {
-      questao: item.questao,
-      respostaAluno,
-      respostaCorreta: item.respostaCorreta,
-      resultado: respostaAluno === item.respostaCorreta ? "acerto" : "erro",
-    } as const;
-  });
-
-  const acertos = respostas.filter((item) => item.resultado === "acerto").length;
-  const erros = respostas.length - acertos;
-  const percentual = respostas.length ? Math.round((acertos / respostas.length) * 100) : 0;
-  const nota = Number(((percentual / 100) * 10).toFixed(1));
-  const now = new Date();
-  const summary: CorrectionSummary = {
-    id: createId("C"),
-    provaId: exam.id,
-    alunoId: student.id,
-    nomeDetectado: student.nome,
-    nota,
-    acertos,
-    erros,
-    percentual,
-    data: now.toISOString(),
-    imagem: imageLabel,
-    tempoCorrecao: "manual",
-  };
-
-  return {
-    correction: summary,
-    aluno: student,
-    prova: exam,
-    turma,
-    respostas,
-    confiancaOcr: 0,
-    imagemProcessada: "Correção registrada em modo operacional local.",
-    observacoes: notes.length ? notes : ["Correção salva manualmente pelo professor."],
+    outcomeBreakdown: [
+      {
+        label: "Acertos",
+        total: data.corrections.reduce((sum, item) => sum + item.correction.acertos, 0),
+      },
+      {
+        label: "Erros",
+        total: data.corrections.reduce((sum, item) => sum + item.correction.erros, 0),
+      },
+      {
+        label: "Em branco",
+        total: data.corrections.reduce((sum, item) => sum + item.correction.emBranco, 0),
+      },
+      {
+        label: "Multiplas",
+        total: data.corrections.reduce((sum, item) => sum + item.correction.multiplasMarcacoes, 0),
+      },
+      {
+        label: "Anuladas",
+        total: data.corrections.reduce((sum, item) => sum + item.correction.anuladas, 0),
+      },
+    ],
+    studentRanking: [...data.corrections]
+      .sort((a, b) => b.correction.nota - a.correction.nota)
+      .slice(0, 6)
+      .map((item) => ({
+        aluno: item.aluno.nome,
+        nota: item.correction.nota,
+        percentual: item.correction.percentual,
+      })),
   };
 }
