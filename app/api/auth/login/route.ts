@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AUTH_COOKIE_NAME, createSessionToken, getSessionDuration } from "@/lib/auth";
+import { getSheetsStatus, validateCredentials } from "@/services/google-sheets";
 
 const loginSchema = z.object({
   email: z.string().trim().email(),
@@ -51,8 +52,24 @@ export async function POST(request: Request) {
 
   try {
     const payload = loginSchema.parse(await request.json());
+    const email = payload.email.trim().toLowerCase();
+
+    // Validate credentials against Google Sheets (if configured)
+    const sheetsStatus = getSheetsStatus();
+    if (sheetsStatus.mode === "google-sheets") {
+      const user = await validateCredentials(email, payload.password);
+      if (!user) {
+        const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
+        attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
+        return NextResponse.json(
+          { error: "E-mail ou senha incorretos. Verifique suas credenciais." },
+          { status: 401 },
+        );
+      }
+    }
+
     const token = await createSessionToken({
-      email: payload.email,
+      email,
       remember: payload.remember,
     });
 
@@ -70,12 +87,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: "Sessao segura iniciada no navegador.",
       session: {
-        email: payload.email.trim().toLowerCase(),
+        email,
         loggedInAt: new Date().toISOString(),
         remember: payload.remember,
       },
     });
-  } catch {
+  } catch (error) {
     const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
     attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
     return NextResponse.json({ error: "Nao foi possivel autenticar este acesso." }, { status: 400 });
