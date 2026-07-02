@@ -66,6 +66,20 @@ export async function POST(request: Request) {
           { status: 401 },
         );
       }
+
+      // Use email from the database (normalized in validateCredentials)
+      // Normalize: always use the email as stored/returned from validation
+    } else {
+      // Google Sheets não está configurado - não podemos validar contra o banco de dados
+      const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
+      attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
+      return NextResponse.json(
+        {
+          error:
+            "A autenticacao via Google Sheets nao esta configurada. Configure as credenciais do Google Sheets para fazer login.",
+        },
+        { status: 503 },
+      );
     }
 
     const token = await createSessionToken({
