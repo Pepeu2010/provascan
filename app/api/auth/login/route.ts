@@ -40,6 +40,7 @@ export async function POST(request: Request) {
   console.log("[LOGIN] GOOGLE_SHEETS_SPREADSHEET_ID:", process.env.GOOGLE_SHEETS_SPREADSHEET_ID ? "configured" : "not set");
   console.log("[LOGIN] GOOGLE_SHEETS_PRIVATE_KEY:", process.env.GOOGLE_SHEETS_PRIVATE_KEY ? "configured" : "not set");
   if (!isSameOrigin(origin, host)) {
+    console.log("[LOGIN] Blocked by CORS: origin does not match host");
     return NextResponse.json({ error: "Origem da requisicao nao autorizada." }, { status: 403 });
   }
 
@@ -55,17 +56,31 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = loginSchema.parse(await request.json());
+    console.log("[LOGIN] Step 1: parsing request body");
+    const rawBody = await request.json();
+    console.log("[LOGIN] Step 2: raw body received", typeof rawBody);
+    const payload = loginSchema.parse(rawBody);
+    console.log("[LOGIN] Step 3: body parsed successfully, email:", payload.email);
     const email = payload.email.trim().toLowerCase();
 
     // Validate credentials against Google Sheets (if configured)
+    console.log("[LOGIN] Step 4: checking sheets status");
     const sheetsStatus = getSheetsStatus();
+    console.log("[LOGIN] Step 5: sheets status mode:", sheetsStatus.mode);
     if (sheetsStatus.mode === "google-sheets") {
+      console.log("[LOGIN] Step 6: validating credentials against Google Sheets");
       let user: Awaited<ReturnType<typeof validateCredentials>> | null = null;
       try {
+        console.log("[LOGIN] Step 6a: calling validateCredentials");
         user = await validateCredentials(email, payload.password);
+        console.log("[LOGIN] Step 6b: validateCredentials returned:", user ? "user found" : "user not found");
       } catch (validationError) {
         console.error("[LOGIN] Google Sheets validation threw an error:", validationError);
+        if (validationError instanceof Error) {
+          console.error("[LOGIN] Error name:", validationError.name);
+          console.error("[LOGIN] Error message:", validationError.message);
+          console.error("[LOGIN] Error stack:", validationError.stack);
+        }
         const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
         attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
         return NextResponse.json(
