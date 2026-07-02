@@ -35,6 +35,10 @@ export async function POST(request: Request) {
   const headersList = await headers();
   const origin = headersList.get("origin");
   const host = headersList.get("host");
+  console.log("[LOGIN] Request origin:", origin, "host:", host);
+  console.log("[LOGIN] GOOGLE_SHEETS_CLIENT_EMAIL:", process.env.GOOGLE_SHEETS_CLIENT_EMAIL ? "configured" : "not set");
+  console.log("[LOGIN] GOOGLE_SHEETS_SPREADSHEET_ID:", process.env.GOOGLE_SHEETS_SPREADSHEET_ID ? "configured" : "not set");
+  console.log("[LOGIN] GOOGLE_SHEETS_PRIVATE_KEY:", process.env.GOOGLE_SHEETS_PRIVATE_KEY ? "configured" : "not set");
   if (!isSameOrigin(origin, host)) {
     return NextResponse.json({ error: "Origem da requisicao nao autorizada." }, { status: 403 });
   }
@@ -57,7 +61,19 @@ export async function POST(request: Request) {
     // Validate credentials against Google Sheets (if configured)
     const sheetsStatus = getSheetsStatus();
     if (sheetsStatus.mode === "google-sheets") {
-      const user = await validateCredentials(email, payload.password);
+      let user: Awaited<ReturnType<typeof validateCredentials>> | null = null;
+      try {
+        user = await validateCredentials(email, payload.password);
+      } catch (validationError) {
+        console.error("[LOGIN] Google Sheets validation threw an error:", validationError);
+        const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
+        attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
+        return NextResponse.json(
+          { error: "Nao foi possivel conectar ao Google Sheets. Verifique as credenciais e tente novamente." },
+          { status: 502 },
+        );
+      }
+
       if (!user) {
         const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
         attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
@@ -66,9 +82,6 @@ export async function POST(request: Request) {
           { status: 401 },
         );
       }
-
-      // Use email from the database (normalized in validateCredentials)
-      // Normalize: always use the email as stored/returned from validation
     } else {
       // Google Sheets não está configurado - não podemos validar contra o banco de dados
       const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
@@ -109,6 +122,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
     attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
+    console.error("[LOGIN] Unexpected error during authentication:", error instanceof Error ? error.message : String(error));
+    console.error("[LOGIN] Error stack:", error instanceof Error ? error.stack : "No stack available");
     return NextResponse.json({ error: "Nao foi possivel autenticar este acesso." }, { status: 400 });
   }
 }
