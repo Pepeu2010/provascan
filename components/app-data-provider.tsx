@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -115,6 +116,7 @@ type AppDataContextValue = {
 };
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
+const subscribe = () => () => {};
 
 function normalizeImportedData(value: unknown): AppDataState | null {
   if (!value || typeof value !== "object") {
@@ -246,7 +248,7 @@ function applyRemoteSchoolData(
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [isHydrated] = useState(() => typeof window !== "undefined");
+  const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
   const [data, setData] = useState<AppDataState>(() => cloneDefaultAppData());
 
   const [session, setSession] = useState<AuthSessionUser | null>(null);

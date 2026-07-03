@@ -1,17 +1,21 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { Moon, SunMedium } from "lucide-react";
 import { useAppTheme } from "@/components/providers";
 import { cn } from "@/lib/utils";
 
+const subscribe = () => () => {};
+
 export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { resolvedTheme, setTheme } = useAppTheme();
-  const isDark = resolvedTheme === "dark";
+  const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
+  const isDark = (isHydrated ? resolvedTheme : "light") === "dark";
 
   return (
     <button
       type="button"
-      aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
+      aria-label={isHydrated ? (isDark ? "Ativar tema claro" : "Ativar tema escuro") : "Alternar tema"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className={cn(
         "group inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] px-1.5 py-1.5 shadow-[var(--shadow-soft)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface)]",
