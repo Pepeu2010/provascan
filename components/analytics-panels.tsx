@@ -17,13 +17,13 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-      <Card className="p-6">
+      <Card className="dashboard-grid-card p-6">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
               Desempenho
             </p>
-            <h3 className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">
+            <h3 className="dashboard-section-title mt-2 text-2xl font-semibold text-[var(--foreground)]">
               Média das turmas
             </h3>
           </div>
@@ -32,13 +32,13 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-6">
+        <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_94%,transparent),transparent)] p-6">
           <div className="flex h-56 items-end gap-4 sm:gap-6">
             {classAverages.map((item) => (
               <div key={item.turma} className="flex flex-1 flex-col items-center gap-4">
                 <div className="flex h-full w-full items-end justify-center rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface),transparent)] px-3 pb-3 sm:px-4 sm:pb-4">
                   <div
-                    className="w-full rounded-[18px] bg-[linear-gradient(180deg,var(--accent-strong),var(--accent))] shadow-[var(--shadow-soft)]"
+                    className="w-full rounded-[18px] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent-strong)_88%,white),var(--accent))] shadow-[var(--shadow-soft)]"
                     style={{ height: `${(item.media / barMax) * 100}%` }}
                   />
                 </div>
@@ -52,11 +52,11 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
         </div>
       </Card>
 
-      <Card className="p-6">
+      <Card className="dashboard-grid-card p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
           Prioridades
         </p>
-        <h3 className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">
+        <h3 className="dashboard-section-title mt-2 text-2xl font-semibold text-[var(--foreground)]">
           Questões com mais erro
         </h3>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
@@ -67,7 +67,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
           {errorRanking.map((item) => (
             <div
               key={item.questao}
-              className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_64%,transparent)] p-4"
+              className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_72%,transparent),transparent)] p-4"
             >
               <div className="mb-3 flex items-center justify-between gap-3 text-sm">
                 <span className="font-semibold text-[var(--foreground)]">{item.questao}</span>
@@ -84,13 +84,13 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
         </div>
       </Card>
 
-      <Card className="p-6 xl:col-span-2">
+      <Card className="dashboard-grid-card p-6 xl:col-span-2">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
               Tendência
             </p>
-            <h3 className="mt-2 text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">
+            <h3 className="dashboard-section-title mt-2 text-2xl font-semibold text-[var(--foreground)]">
               Evolução das notas
             </h3>
           </div>
@@ -99,7 +99,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-6">
+        <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_94%,transparent),transparent)] p-6">
           <div className="grid gap-6 md:grid-cols-[1fr_auto]">
             <div>
               <svg viewBox="0 0 100 100" className="h-56 w-full overflow-visible">

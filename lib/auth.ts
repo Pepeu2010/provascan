@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import type { NextResponse } from "next/server";
 import { z } from "zod";
 import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
 
@@ -14,7 +15,10 @@ const sessionPayloadSchema = z.object({
   forcePasswordChange: z.boolean(),
   remember: z.boolean(),
   loggedInAt: z.string().datetime(),
+  passwordStamp: z.string().length(64),
 });
+
+export type ParsedSessionToken = z.infer<typeof sessionPayloadSchema>;
 
 function getSessionSecret() {
   const secret = process.env.AUTH_SECRET ?? process.env.AUTH_SESSION_SECRET;
@@ -37,7 +41,12 @@ export function buildSessionUser(user: SafeAuthUser, remember: boolean, loggedIn
   };
 }
 
-export async function createSessionToken(input: { user: SafeAuthUser; remember: boolean; loggedInAt: string }) {
+export async function createSessionToken(input: {
+  user: SafeAuthUser;
+  remember: boolean;
+  loggedInAt: string;
+  passwordStamp: string;
+}) {
   const maxAge = getSessionDuration(input.remember);
 
   return new SignJWT({
@@ -45,6 +54,7 @@ export async function createSessionToken(input: { user: SafeAuthUser; remember: 
     forcePasswordChange: input.user.forcePasswordChange,
     loggedInAt: input.loggedInAt,
     nome: input.user.nome,
+    passwordStamp: input.passwordStamp,
     remember: input.remember,
     role: input.user.role,
   })
@@ -66,18 +76,29 @@ export async function parseSessionToken(token: string | undefined) {
     });
 
     const parsed = sessionPayloadSchema.parse(payload);
-    return buildSessionUser(
-      {
-        id: parsed.sub,
-        nome: parsed.nome,
-        email: parsed.email,
-        role: parsed.role,
-        forcePasswordChange: parsed.forcePasswordChange,
-      },
-      parsed.remember,
-      parsed.loggedInAt,
-    );
+    return parsed;
   } catch {
     return null;
   }
+}
+
+export function applyAuthCookie(response: NextResponse, token: string, remember: boolean) {
+  response.cookies.set(AUTH_COOKIE_NAME, token, {
+    httpOnly: true,
+    maxAge: getSessionDuration(remember),
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
+export function clearAuthCookie(response: NextResponse) {
+  response.cookies.set(AUTH_COOKIE_NAME, "", {
+    expires: new Date(0),
+    httpOnly: true,
+    maxAge: 0,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }

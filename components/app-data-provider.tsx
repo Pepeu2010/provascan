@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  APP_DATA_STORAGE_KEY,
   calculateAnalytics,
   cloneDefaultAppData,
   createId,
@@ -248,29 +247,9 @@ function applyRemoteSchoolData(
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [isHydrated] = useState(() => typeof window !== "undefined");
-  const [data, setData] = useState<AppDataState>(() => {
-    if (typeof window === "undefined") {
-      return cloneDefaultAppData();
-    }
-
-    try {
-      const raw = window.localStorage.getItem(APP_DATA_STORAGE_KEY);
-      if (!raw) {
-        return cloneDefaultAppData();
-      }
-
-      const parsed = normalizeImportedData(JSON.parse(raw));
-      return parsed ?? cloneDefaultAppData();
-    } catch {
-      return cloneDefaultAppData();
-    }
-  });
+  const [data, setData] = useState<AppDataState>(() => cloneDefaultAppData());
 
   const [session, setSession] = useState<AuthSessionUser | null>(null);
-
-  useEffect(() => {
-    window.localStorage.setItem(APP_DATA_STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
 
   useEffect(() => {
     if (typeof window === "undefined") {

@@ -23,6 +23,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { canAccessSensitiveSettings } from "@/lib/access-control";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -31,9 +32,9 @@ const items = [
   { href: "/dashboard/alunos", label: "Alunos", icon: Users },
   { href: "/dashboard/provas", label: "Provas", icon: BookCheck },
   { href: "/dashboard/gabaritos", label: "Gabaritos", icon: ClipboardCheck },
-  { href: "/dashboard/correcao", label: "Correção por foto", icon: ScanLine },
-  { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+  { href: "/dashboard/correcao", label: "Correcao por foto", icon: ScanLine },
+  { href: "/dashboard/relatorios", label: "Relatorios", icon: BarChart3 },
+  { href: "/dashboard/configuracoes", label: "Configuracoes", icon: Settings, privileged: true },
 ];
 
 export function DashboardShell({
@@ -53,7 +54,7 @@ export function DashboardShell({
         `${data.classes.length} turmas`,
         `${data.students.length} alunos`,
         `${data.exams.length} provas`,
-        `${data.corrections.length} correções`,
+        `${data.corrections.length} correcoes`,
       ].join(" • "),
     [data.classes.length, data.corrections.length, data.exams.length, data.students.length],
   );
@@ -68,12 +69,12 @@ export function DashboardShell({
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
         <Card className="w-full max-w-xl p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">Sessão necessária</p>
+          <p className="text-sm text-[var(--muted-foreground)]">Sessao necessaria</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
             Redirecionando para o login do professor
           </h1>
           <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-            O painel exige uma sessão ativa neste navegador para reduzir exposição acidental do workspace.
+            O painel exige uma sessao ativa neste navegador para reduzir exposicao acidental do workspace.
           </p>
         </Card>
       </div>
@@ -83,9 +84,9 @@ export function DashboardShell({
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1680px] gap-6 px-4 py-4 lg:px-6">
       <aside className="hidden w-[296px] shrink-0 lg:flex lg:flex-col">
-        <Card className="sticky top-4 p-5">
+        <Card className="dashboard-shell-panel sticky top-4 p-5">
           <div className="flex h-full flex-col">
-            <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),transparent)] p-4">
+            <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_98%,transparent),transparent)] p-4">
               <ProvaScanLogo variant="sidebar" />
               <div className="mt-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
@@ -96,9 +97,11 @@ export function DashboardShell({
               </div>
             </div>
 
-            <div className="mt-6 space-y-1.5">{renderNavItems(active, () => setMenuOpen(false))}</div>
+            <div className="mt-6 space-y-2">
+              {renderNavItems(active, session?.role ?? "professor", () => setMenuOpen(false))}
+            </div>
 
-            <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface),transparent)] p-4">
+            <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">Acesso atual</p>
@@ -108,10 +111,13 @@ export function DashboardShell({
               </div>
             </div>
 
-            <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] p-5">
-              <p className="text-sm font-semibold text-[var(--foreground)]">Ambiente ativo</p>
+            <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_98%,transparent),color-mix(in_srgb,var(--surface)_86%,transparent))] p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                Ambiente ativo
+              </p>
+              <p className="mt-2 text-base font-semibold text-[var(--foreground)]">Painel operacional pronto</p>
               <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                O painel está pronto para uso. Backup e restauração continuam disponíveis em Configurações.
+                O painel esta pronto para uso. Backup e restauracao continuam disponiveis em Configuracoes.
               </p>
             </div>
           </div>
@@ -123,10 +129,10 @@ export function DashboardShell({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
-          className="relative z-40 mb-6 overflow-hidden rounded-[32px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card)_88%,transparent)] p-5"
+          className="dashboard-shell-panel relative z-40 mb-6 overflow-hidden rounded-[32px] border border-[var(--border)] p-5"
         >
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.1),transparent_24%)]" />
-          <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
+          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="flex items-start justify-between gap-3 xl:block">
               <button
                 type="button"
@@ -139,20 +145,24 @@ export function DashboardShell({
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge tone="neutral">Workspace do professor</Badge>
-                  <Badge tone="accent">Resposta imediata</Badge>
+                  <Badge tone="accent">Monitoramento ao vivo</Badge>
                 </div>
-                <h1 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-[var(--foreground)] sm:text-3xl">
+                <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-4xl">
                   {data.teacherProfile.escola}
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm text-[var(--muted-foreground)]">{summary}</p>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3 xl:max-w-[360px]">
               <ThemeSwitcher />
-              <div className="hidden rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_86%,transparent)] px-4 py-3 text-right sm:block">
-                <p className="text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">{session?.email ?? data.teacherProfile.email}</p>
+              <div className="hidden min-w-[150px] rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),transparent)] px-4 py-3 text-right sm:block">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                  Sessao atual
+                </p>
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {session?.nome ?? data.teacherProfile.nome}
+                </p>
               </div>
               <Button
                 variant="ghost"
@@ -197,13 +207,16 @@ export function DashboardShell({
                   <X className="size-5" />
                 </button>
               </div>
-              <div className="mt-6 space-y-1.5">{renderNavItems(active, () => setMenuOpen(false))}</div>
+              <div className="mt-6 space-y-1.5">
+                {renderNavItems(active, session?.role ?? "professor", () => setMenuOpen(false))}
+              </div>
               <div className="mt-6">
                 <ThemeSwitcher compact />
               </div>
-              <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <p className="text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
-                <p className="mt-1 text-xs text-[var(--muted-foreground)]">{session?.email ?? data.teacherProfile.email}</p>
+              <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-4">
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {session?.nome ?? data.teacherProfile.nome}
+                </p>
               </div>
             </motion.div>
           </motion.div>
@@ -213,36 +226,38 @@ export function DashboardShell({
   );
 }
 
-function renderNavItems(active: string, onNavigate: () => void) {
-  return items.map((item) => {
-    const Icon = item.icon;
-    const isActive = active === item.href;
+function renderNavItems(active: string, role: string, onNavigate: () => void) {
+  return items
+    .filter((item) => !item.privileged || canAccessSensitiveSettings(role))
+    .map((item) => {
+      const Icon = item.icon;
+      const isActive = active === item.href;
 
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        onClick={onNavigate}
-        className={cn(
-          "group flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition-all duration-200",
-          isActive
-            ? "border-[var(--border-strong)] bg-[linear-gradient(180deg,var(--surface-strong),transparent)] text-[var(--foreground)] shadow-[var(--shadow-soft)]"
-            : "border-transparent text-[var(--muted-foreground)] hover:border-[var(--border)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]",
-        )}
-      >
-        <span
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={onNavigate}
           className={cn(
-            "grid size-9 place-items-center rounded-xl border transition-colors",
+            "group flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition-all duration-200",
             isActive
-              ? "border-[var(--border)] bg-[var(--card-solid)] text-[var(--accent)]"
-              : "border-transparent bg-transparent text-[var(--muted-foreground)] group-hover:bg-[var(--card-solid)]",
+              ? "border-[var(--border-strong)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-contrast)_62%,transparent),transparent)] text-[var(--foreground)] shadow-[var(--shadow-soft)]"
+              : "border-transparent text-[var(--muted-foreground)] hover:border-[var(--border)] hover:bg-[color-mix(in_srgb,var(--surface)_86%,transparent)] hover:text-[var(--foreground)]",
           )}
         >
-          <Icon className="size-4" />
-        </span>
-        <span className="flex-1">{item.label}</span>
-        {isActive ? <span className="size-2 rounded-full bg-[var(--accent)]" aria-hidden="true" /> : null}
-      </Link>
-    );
-  });
+          <span
+            className={cn(
+              "grid size-9 place-items-center rounded-xl border transition-colors",
+              isActive
+                ? "border-[var(--border-strong)] bg-[color-mix(in_srgb,var(--accent-soft)_76%,transparent)] text-[var(--accent)]"
+                : "border-transparent bg-transparent text-[var(--muted-foreground)] group-hover:bg-[var(--card-solid)]",
+            )}
+          >
+            <Icon className="size-4" />
+          </span>
+          <span className="flex-1">{item.label}</span>
+          {isActive ? <span className="size-2 rounded-full bg-[var(--accent)]" aria-hidden="true" /> : null}
+        </Link>
+      );
+    });
 }

@@ -18,6 +18,15 @@ export type ReviewAnswerInput = {
   questao: number;
 };
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 export function buildDefaultCorrectionRule(exam: Exam): ExamCorrectionRule {
   return {
     provaId: exam.id,
@@ -35,12 +44,14 @@ export function getCorrectionRule(exam: Exam, rules: ExamCorrectionRule[]) {
 }
 
 export function sanitizeQuestionList(raw: string, totalQuestions: number) {
-  return [...new Set(
-    raw
-      .split(",")
-      .map((item) => Number(item.trim()))
-      .filter((item) => Number.isInteger(item) && item >= 1 && item <= totalQuestions),
-  )].sort((a, b) => a - b);
+  return [
+    ...new Set(
+      raw
+        .split(",")
+        .map((item) => Number(item.trim()))
+        .filter((item) => Number.isInteger(item) && item >= 1 && item <= totalQuestions),
+    ),
+  ].sort((a, b) => a - b);
 }
 
 export function sanitizeWeights(raw: string, totalQuestions: number) {
@@ -88,22 +99,22 @@ export function buildAnswerSheetModel(params: {
   const uniqueCode = student ? buildIdentificationCode(exam, student) : `${exam.codigo}-EM-BRANCO`;
 
   return {
-    examCode: exam.codigo,
-    examTitle: exam.titulo,
+    examCode: escapeHtml(exam.codigo),
+    examTitle: escapeHtml(exam.titulo),
     instructions: [
       "Use caneta azul ou preta.",
       "Preencha completamente a bolinha.",
-      "Não marque mais de uma alternativa por questão.",
-      "Não dobre a área do código de identificação.",
-    ],
+      "Nao marque mais de uma alternativa por questao.",
+      "Nao dobre a area do codigo de identificacao.",
+    ].map(escapeHtml),
     qrPayload: student ? buildQrPayload(exam, student, turma) : "",
     questionNumbers: Array.from({ length: exam.quantidadeQuestoes }, (_, index) => index + 1),
-    studentName: student?.nome ?? "____________________________",
-    studentRegistration: student?.matricula ?? "________________",
-    teacherName,
-    teacherSchool,
-    turmaName: turma.nome,
-    uniqueCode,
+    studentName: escapeHtml(student?.nome ?? "____________________________"),
+    studentRegistration: escapeHtml(student?.matricula ?? "________________"),
+    teacherName: escapeHtml(teacherName),
+    teacherSchool: escapeHtml(teacherSchool),
+    turmaName: escapeHtml(turma.nome),
+    uniqueCode: escapeHtml(uniqueCode),
   };
 }
 
@@ -169,7 +180,7 @@ export function buildCorrectionSession(params: {
   const turma = classes.find((item) => item.id === student.turma);
 
   if (!exam || !turma) {
-    throw new Error("Não foi possível localizar prova ou turma para salvar a correção.");
+    throw new Error("Nao foi possivel localizar prova ou turma para salvar a correcao.");
   }
 
   const rule = getCorrectionRule(exam, rules);
@@ -248,7 +259,7 @@ export function buildCorrectionSession(params: {
       uniqueCode,
     },
     imagemProcessada: "Leitura revisada manualmente antes do salvamento final.",
-    observacoes: notes.length ? notes : ["Correção salva manualmente pelo professor."],
+    observacoes: notes.length ? notes : ["Correcao salva manualmente pelo professor."],
     prova: exam,
     respostas: normalizedAnswers,
     turma,

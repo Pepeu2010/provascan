@@ -28,13 +28,13 @@ export function DashboardWorkspace() {
           ))}
         </div>
 
-        <Card className="hairline-grid relative overflow-hidden p-6">
+        <Card className="dashboard-grid-card hairline-grid relative overflow-hidden p-6">
           <div className="relative z-10">
             <div className="flex flex-wrap items-center gap-3">
               <Badge tone="neutral">Insights operacionais</Badge>
               <Badge tone="accent">Atualização imediata</Badge>
             </div>
-            <h2 className="mt-4 max-w-lg text-2xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+            <h2 className="dashboard-section-title mt-4 max-w-xl text-3xl font-semibold text-[var(--foreground)]">
               Um cockpit de revisão pensado para a rotina de correção
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--muted-foreground)]">
@@ -42,7 +42,7 @@ export function DashboardWorkspace() {
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_84%,transparent)] p-4">
+              <div className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_90%,transparent),transparent)] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                   Melhor desempenho
                 </p>
@@ -54,7 +54,7 @@ export function DashboardWorkspace() {
                 </p>
               </div>
 
-              <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_84%,transparent)] p-4">
+              <div className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_90%,transparent),transparent)] p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                   Sinal dominante
                 </p>
@@ -67,7 +67,7 @@ export function DashboardWorkspace() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface),transparent)] p-4">
+            <div className="mt-6 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_82%,transparent),transparent)] p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                 Capacidade atual
               </p>

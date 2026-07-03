@@ -1,8 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { AUTH_COOKIE_NAME, buildSessionUser, createSessionToken, getSessionDuration, parseSessionToken } from "@/lib/auth";
-import { createStoredPassword, verifyPassword } from "@/lib/passwords";
+import { applyAuthCookie, AUTH_COOKIE_NAME, buildSessionUser, createSessionToken, parseSessionToken } from "@/lib/auth";
+import { createPasswordStamp, createStoredPassword, verifyPassword } from "@/lib/passwords";
 import {
   GoogleSheetsConnectionError,
   GoogleSheetsSchemaError,
@@ -81,21 +81,16 @@ export async function POST(request: Request) {
       user: safeUser,
       remember: session.remember,
       loggedInAt,
+      passwordStamp: createPasswordStamp(nextStoredPassword),
     });
 
-    cookieStore.set(AUTH_COOKIE_NAME, token, {
-      httpOnly: true,
-      maxAge: getSessionDuration(session.remember),
-      path: "/",
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: "Senha alterada com sucesso.",
       redirectTo: "/dashboard",
       user: buildSessionUser(safeUser, session.remember, loggedInAt),
     });
+    applyAuthCookie(response, token, session.remember);
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });

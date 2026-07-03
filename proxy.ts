@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, parseSessionToken } from "@/lib/auth";
+import { canAccessPath } from "@/lib/access-control";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/admin", "/painel", "/trocar-senha", "/api/dashboard", "/api/scan"];
 
@@ -25,6 +26,14 @@ export async function proxy(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (!canAccessPath(session.role, pathname)) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Acesso negado para este perfil." }, { status: 403 });
+    }
+
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   if (session.forcePasswordChange && !pathname.startsWith("/trocar-senha")) {

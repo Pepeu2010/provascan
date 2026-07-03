@@ -1,13 +1,12 @@
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  AUTH_COOKIE_NAME,
+  applyAuthCookie,
   buildSessionUser,
   createSessionToken,
-  getSessionDuration,
 } from "@/lib/auth";
-import { verifyPassword } from "@/lib/passwords";
+import { createPasswordStamp, createStoredPassword, isBcryptHash, verifyPassword } from "@/lib/passwords";
 import {
   GoogleSheetsConfigError,
   GoogleSheetsConnectionError,
@@ -15,6 +14,7 @@ import {
   getUserByEmail,
   isActiveUser,
   shouldForcePasswordChange,
+  updateUserPassword,
 } from "@/services/google-sheets";
 
 export const runtime = "nodejs";
@@ -91,6 +91,12 @@ export async function POST(request: Request) {
       return invalidCredentialsResponse();
     }
 
+    let storedPassword = user.senha;
+    if (!isBcryptHash(storedPassword)) {
+      storedPassword = await createStoredPassword(payload.password);
+      await updateUserPassword(user.id, storedPassword);
+    }
+
     const loggedInAt = new Date().toISOString();
     const safeUser = {
       id: user.id,
@@ -104,24 +110,18 @@ export async function POST(request: Request) {
       user: safeUser,
       remember: payload.remember,
       loggedInAt,
-    });
-
-    const cookieStore = await cookies();
-    cookieStore.set(AUTH_COOKIE_NAME, token, {
-      httpOnly: true,
-      maxAge: getSessionDuration(payload.remember),
-      path: "/",
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      passwordStamp: createPasswordStamp(storedPassword),
     });
 
     attempts.delete(clientKey);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: "Login realizado com sucesso.",
       redirectTo: safeUser.forcePasswordChange ? "/trocar-senha" : "/dashboard",
       user: buildSessionUser(safeUser, payload.remember, loggedInAt),
     });
+    applyAuthCookie(response, token, payload.remember);
+    return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
       const nextCount = current && current.resetAt > now ? current.count + 1 : 1;

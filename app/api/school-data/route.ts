@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, parseSessionToken } from "@/lib/auth";
+import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
   GoogleSheetsConfigError,
   GoogleSheetsConnectionError,
@@ -12,24 +13,36 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const cookieStore = await cookies();
-  const session = await parseSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const validation = await validateSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
-  if (!session) {
-    return NextResponse.json(
-      { error: "Autenticação necessária." },
+  if (!validation.ok) {
+    const response = NextResponse.json(
+      { error: "Autenticacao necessaria." },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
+    clearInvalidSessionCookie(response);
+    return response;
   }
 
   try {
     const roster = await getSchoolRoster();
-
-    return NextResponse.json(roster, {
+    const response = NextResponse.json(roster, {
       headers: { "Cache-Control": "no-store" },
     });
+
+    if (validation.shouldRefreshCookie) {
+      await syncValidatedSessionCookie(response, {
+        loggedInAt: validation.session.loggedInAt,
+        passwordStamp: validation.passwordStamp,
+        remember: validation.session.remember,
+        user: validation.user,
+      });
+    }
+
+    return response;
   } catch (error) {
     if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Planilha não configurada." }, { status: 500 });
+      return NextResponse.json({ error: "Planilha nao configurada." }, { status: 500 });
     }
 
     if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {

@@ -22,7 +22,7 @@ Funciona hoje:
 
 Limitacoes atuais:
 
-- Persistencia funcional principal ainda segue em `localStorage`
+- Os dados operacionais sensiveis nao sao mais persistidos automaticamente no navegador
 - O painel administrativo de usuarios ainda nao foi implementado
 - OCR continua opcional
 
@@ -54,7 +54,7 @@ Para o login funcionar de verdade, estas variaveis precisam existir.
 ```bash
 GOOGLE_SHEETS_CLIENT_EMAIL=
 GOOGLE_SHEETS_PRIVATE_KEY=
-GOOGLE_SHEETS_SPREADSHEET_ID=1T9KxrlZxyQGr-721Q93AZ9PO1gaIxq4mHg6vK--5aOo
+GOOGLE_SHEETS_SPREADSHEET_ID=
 GOOGLE_SHEETS_USERS_TAB=usuarios
 ENABLE_TESSERACT_OCR=
 AUTH_SECRET=
@@ -85,9 +85,9 @@ Regras aplicadas:
 
 ## Compatibilidade atual e futura da senha
 
-Hoje o sistema aceita a planilha do jeito que ela esta. Se o valor da coluna `senha` estiver em texto simples, ele compara em texto simples. Se estiver em bcrypt, ele compara como hash.
+Hoje o sistema endurece a coluna `senha` sem alterar o schema da planilha. Se um usuario ainda estiver com senha em texto simples, o sistema converte esse valor para bcrypt no primeiro login valido ou na troca obrigatoria de senha.
 
-Isso preserva a estrutura atual e prepara o caminho para endurecer seguranca depois, sem quebrar a planilha.
+Isso preserva a estrutura atual sem manter o fallback inseguro em operacao normal.
 
 ## Rotas de autenticacao
 
@@ -96,7 +96,7 @@ Isso preserva a estrutura atual e prepara o caminho para endurecer seguranca dep
 - `GET /api/auth/me`
 - `POST /api/auth/password`
 
-As areas `/dashboard`, `/admin` e `/painel` exigem autenticacao. Quando `trocar_senha = SIM`, o usuario so pode seguir para `/trocar-senha` ate concluir a atualizacao.
+As areas `/dashboard`, `/admin` e `/painel` exigem autenticacao. Quando `trocar_senha = SIM`, o usuario so pode seguir para `/trocar-senha` ate concluir a atualizacao. Rotas privilegiadas tambem respeitam o `perfil` da planilha.
 
 ## Deploy no Vercel
 

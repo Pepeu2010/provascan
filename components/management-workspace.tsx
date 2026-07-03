@@ -59,7 +59,7 @@ function openPrintWindow(title: string, body: string) {
   printWindow.document.write(`
     <html>
       <head>
-        <title>${title}</title>
+        <title>${title.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
           .sheet { position: relative; width: ${ANSWER_SHEET_TEMPLATE.page.width}px; min-height: ${ANSWER_SHEET_TEMPLATE.page.height}px; page-break-inside: avoid; border: 1px solid #111827; padding: 24px; margin: 0 auto 24px; box-sizing: border-box; }
