@@ -17,7 +17,7 @@ export async function GET() {
     });
   } catch {
     return NextResponse.json(
-      { error: "Nao foi possivel carregar o resumo operacional." },
+      { error: "Não foi possível carregar o resumo operacional." },
       {
         headers: {
           "Cache-Control": "no-store",

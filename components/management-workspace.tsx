@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { getClassLabel } from "@/lib/app-data";
 import { formatDate } from "@/lib/utils";
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
@@ -29,13 +31,12 @@ function FieldSelect({
   children: React.ReactNode;
 }) {
   return (
-    <select
+    <Select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-11 rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] px-4 text-sm text-[var(--foreground)] outline-none"
     >
       {children}
-    </select>
+    </Select>
   );
 }
 
@@ -93,7 +94,7 @@ export function ClassesManager() {
   const [form, setForm] = useState({
     ano: "2026",
     nome: "",
-    periodo: "Manha",
+    periodo: "Manhã",
     professor: data.teacherProfile.nome,
   });
 
@@ -113,7 +114,7 @@ export function ClassesManager() {
         <Input placeholder="Professor" value={form.professor} onChange={(event) => setForm((prev) => ({ ...prev, professor: event.target.value }))} />
         <Input placeholder="Ano letivo" value={form.ano} onChange={(event) => setForm((prev) => ({ ...prev, ano: event.target.value }))} />
         <FieldSelect value={form.periodo} onChange={(periodo) => setForm((prev) => ({ ...prev, periodo }))}>
-          <option>Manha</option>
+          <option>Manhã</option>
           <option>Tarde</option>
           <option>Noite</option>
           <option>Integral</option>
@@ -141,7 +142,7 @@ export function ClassesManager() {
             variant="secondary"
             onClick={() => {
               setEditingId(null);
-              setForm({ ano: "2026", nome: "", periodo: "Manha", professor: data.teacherProfile.nome });
+              setForm({ ano: "2026", nome: "", periodo: "Manhã", professor: data.teacherProfile.nome });
             }}
           >
             Cancelar edicao
@@ -204,13 +205,13 @@ export function StudentsManager() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)]">Gerenciamento de alunos</h2>
-            <p className="text-sm text-[var(--muted-foreground)]">Cadastre alunos e mantenha a base pronta para correcao imediata.</p>
+            <p className="text-sm text-[var(--muted-foreground)]">Cadastre alunos e mantenha a base pronta para correção imediata.</p>
           </div>
           <Badge tone="accent">{data.students.length} alunos salvos</Badge>
         </div>
         <div className="mt-6 grid gap-3 lg:grid-cols-4">
           <Input placeholder="Nome do aluno" value={student.nome} onChange={(event) => setStudent((prev) => ({ ...prev, nome: event.target.value }))} />
-          <Input placeholder="Matricula" value={student.matricula} onChange={(event) => setStudent((prev) => ({ ...prev, matricula: event.target.value }))} />
+          <Input placeholder="Matrícula" value={student.matricula} onChange={(event) => setStudent((prev) => ({ ...prev, matricula: event.target.value }))} />
           <FieldSelect value={student.turma} onChange={(turma) => setStudent((prev) => ({ ...prev, turma }))}>
             {data.classes.map((item) => (
               <option key={item.id} value={item.id}>
@@ -388,7 +389,7 @@ export function ExamsManager() {
                   <div><strong>Escola/Professor:</strong> ${item.teacherSchool} - ${item.teacherName}</div>
                   <div><strong>Turma:</strong> ${item.turmaName}</div>
                   <div><strong>Aluno:</strong> ${item.studentName}</div>
-                  <div><strong>Matricula:</strong> ${item.studentRegistration}</div>
+                  <div><strong>Matrícula:</strong> ${item.studentRegistration}</div>
                 </div>
               </div>
               <div>
@@ -428,9 +429,9 @@ export function ExamsManager() {
     const html = htmlParts.join("");
 
     if (openPrintWindow(`Cartoes ${activeExam.titulo}`, html)) {
-      setMessage("Cartoes-resposta abertos para impressao ou salvamento em PDF.");
+      setMessage("Cartões-resposta abertos para impressão ou salvamento em PDF.");
     } else {
-      setMessage("Nao foi possivel abrir a janela de impressao neste navegador.");
+      setMessage("Não foi possível abrir a janela de impressão neste navegador.");
     }
   };
 
@@ -440,7 +441,7 @@ export function ExamsManager() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)]">Gerenciamento de provas</h2>
-            <p className="text-sm text-[var(--muted-foreground)]">Crie provas, defina regras e gere cartoes padrao do proprio sistema.</p>
+            <p className="text-sm text-[var(--muted-foreground)]">Crie provas, defina regras e gere cartões padrão do próprio sistema.</p>
           </div>
           <Badge tone="accent">{data.exams.length} provas salvas</Badge>
         </div>
@@ -517,7 +518,7 @@ export function ExamsManager() {
                     {formatDate(item.data)} • {getClassLabel(data.classes, item.turma)}
                   </p>
                 </div>
-                <Badge tone="neutral">{item.quantidadeQuestoes} questoes</Badge>
+                <Badge tone="neutral">{item.quantidadeQuestoes} questões</Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge tone="accent">{item.codigo}</Badge>
@@ -564,7 +565,7 @@ export function ExamsManager() {
           <Card className="p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">Regras de correcao</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Regras de correção</p>
                 <h3 className="text-xl font-semibold text-[var(--foreground)]">{activeExam.titulo}</h3>
               </div>
               <FieldSelect value={activeExam.id} onChange={syncRuleForm}>
@@ -585,16 +586,16 @@ export function ExamsManager() {
               </FieldSelect>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <textarea
+              <Textarea
                 value={ruleForm.questoesAnuladasRaw}
                 onChange={(event) => setRuleForm((prev) => ({ ...prev, questoesAnuladasRaw: event.target.value }))}
-                className="min-h-28 rounded-[24px] border border-[var(--border)] bg-[var(--input-bg)] p-4 text-sm text-[var(--foreground)] outline-none"
-                placeholder="Questoes anuladas: 3,7,11"
+                className="min-h-28"
+                placeholder="Questões anuladas: 3,7,11"
               />
-              <textarea
+              <Textarea
                 value={ruleForm.pesosPorQuestaoRaw}
                 onChange={(event) => setRuleForm((prev) => ({ ...prev, pesosPorQuestaoRaw: event.target.value }))}
-                className="min-h-28 rounded-[24px] border border-[var(--border)] bg-[var(--input-bg)] p-4 text-sm text-[var(--foreground)] outline-none"
+                className="min-h-28"
                 placeholder={"Pesos por questao\n5=1.5\n12=2"}
               />
             </div>
@@ -640,10 +641,10 @@ export function ExamsManager() {
           <Card className="p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">Cartao-resposta padrao</p>
-                <h3 className="text-xl font-semibold text-[var(--foreground)]">Gerar para impressao</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">Cartão-resposta padrão</p>
+                <h3 className="text-xl font-semibold text-[var(--foreground)]">Gerar para impressão</h3>
               </div>
-              <Badge tone="accent">QR + codigo unico</Badge>
+              <Badge tone="accent">QR + código único</Badge>
             </div>
             <div className="mt-6 grid gap-3">
               <FieldSelect value={sheetMode} onChange={(value) => setSheetMode(value as "blank" | "class" | "student")}>
@@ -673,8 +674,8 @@ export function ExamsManager() {
                 <QrCode className="size-6 text-[var(--accent)]" />
               </div>
               <div className="mt-4 grid gap-3 text-sm text-[var(--muted-foreground)]">
-                <p>Modelo proprio do sistema para reduzir variacao do OCR e padronizar identificacao.</p>
-                <p>Inclui codigo unico da prova, aluno, turma e payload para leitura QR antes do OCR nominal.</p>
+                <p>Modelo próprio do sistema para reduzir variação do OCR e padronizar a identificação.</p>
+                <p>Inclui código único da prova, aluno, turma e payload para leitura de QR antes do OCR nominal.</p>
               </div>
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -794,7 +795,7 @@ export function AnswerKeyEditor() {
               </div>
               <div className="rounded-[20px] border border-[var(--border)] p-3">
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Gabarito salvo</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{selected || "Nao definido"}</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{selected || "Não definido"}</p>
               </div>
             </div>
           </Card>
@@ -841,7 +842,7 @@ export function AnswerKeyEditor() {
           <Save className="size-4" />
           Salvar gabarito
         </Button>
-        <Badge tone="accent">{exam.quantidadeQuestoes} questoes</Badge>
+        <Badge tone="accent">{exam.quantidadeQuestoes} questões</Badge>
       </div>
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
     </Card>
@@ -913,7 +914,7 @@ export function ReportsWorkspace() {
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{filteredCorrections.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-sm text-[var(--muted-foreground)]">Media filtrada</p>
+            <p className="text-sm text-[var(--muted-foreground)]">Média filtrada</p>
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{filteredAverage}%</p>
           </Card>
           <Card className="p-4">
@@ -964,7 +965,7 @@ export function SettingsWorkspace() {
     <div className="grid gap-5 xl:grid-cols-2">
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Modo operacional local</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Ideal para uso imediato no Vercel sem backend obrigatorio. Tudo fica salvo no navegador do professor.</p>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Ideal para uso imediato no Vercel sem backend obrigatório. Tudo fica salvo no navegador do professor.</p>
         <div className="mt-6 rounded-[24px] bg-[var(--surface)] p-5">
           <p className="text-sm text-[var(--muted-foreground)]">Resumo atual</p>
           <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
@@ -1004,12 +1005,12 @@ export function SettingsWorkspace() {
         </div>
       </Card>
       <Card className="p-6">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Importacao e restauracao</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Importe um backup JSON colando o conteudo abaixo ou escolhendo um arquivo salvo anteriormente.</p>
-        <textarea
+        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Importação e restauração</h2>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Importe um backup JSON colando o conteúdo abaixo ou escolhendo um arquivo salvo anteriormente.</p>
+        <Textarea
           value={payload}
           onChange={(event) => setPayload(event.target.value)}
-          className="mt-6 min-h-56 w-full rounded-[24px] border border-[var(--border)] bg-[var(--input-bg)] p-4 text-sm text-[var(--foreground)] outline-none"
+          className="mt-6 min-h-56"
           placeholder="Cole aqui o JSON de backup do ProvaScan."
         />
         <div className="mt-4 flex flex-wrap gap-3">

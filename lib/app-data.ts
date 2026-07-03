@@ -83,15 +83,15 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
           trend: "Modo operacional local",
         },
         {
-          label: "Correcoes salvas",
+          label: "Correções salvas",
           value: "0",
-          helper: "Ainda sem historico",
-          trend: "Pronto para comecar",
+          helper: "Ainda sem histórico",
+          trend: "Pronto para começar",
         },
         {
-          label: "Media geral",
+          label: "Média geral",
           value: "0%",
-          helper: "Sem correcoes concluidas",
+          helper: "Sem correções concluídas",
           trend: "Aguardando uso",
         },
       ],
@@ -127,7 +127,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
       );
 
       return {
-        turma: item.nome.replace(" Ensino Medio", "").replace(" Ano", ""),
+        turma: item.nome.replace(" Ensino Médio", "").replace("º Ano", "").replace(" Ano", ""),
         media,
       };
     })
@@ -194,15 +194,15 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
         trend: `${data.correctionRules.length} regras salvas`,
       },
       {
-        label: "Correcoes salvas",
+        label: "Correções salvas",
         value: String(correctionsToday),
-        helper: `Historico total ${data.corrections.length}`,
-        trend: `Tempo medio ${avgTimeSeconds || 0}s`,
+        helper: `Histórico total ${data.corrections.length}`,
+        trend: `Tempo médio ${avgTimeSeconds || 0}s`,
       },
       {
-        label: "Media geral",
+        label: "Média geral",
         value: `${avgPercent}%`,
-        helper: "Com base nas correcoes registradas",
+        helper: "Com base nas correções registradas",
         trend: "Atualizado em tempo real",
       },
     ],

@@ -1,242 +1,399 @@
+import { google, sheets_v4 } from "googleapis";
 import { z } from "zod";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
+import type { ClassRoom, Student } from "@/types/domain";
+import type { SheetsUserRecord } from "@/types/auth";
+
+const USERS_RANGE_COLUMNS = "A:G";
+const STUDENTS_RANGE_COLUMNS = "A:E";
+const REQUIRED_HEADERS = ["id", "nome", "email", "senha", "perfil", "ativo", "trocar_senha"] as const;
+const REQUIRED_STUDENT_HEADERS = ["id", "nome", "turma", "ra", "ativo"] as const;
 
 const envSchema = z.object({
-  GOOGLE_SHEETS_CLIENT_EMAIL: z.string().min(1).optional(),
-  GOOGLE_SHEETS_PRIVATE_KEY: z.string().min(1).optional(),
-  GOOGLE_SHEETS_SPREADSHEET_ID: z.string().min(1).optional(),
+  GOOGLE_SHEETS_CLIENT_EMAIL: z.string().email(),
+  GOOGLE_SHEETS_PRIVATE_KEY: z.string().min(1),
+  GOOGLE_SHEETS_SPREADSHEET_ID: z.string().min(1),
+  GOOGLE_SHEETS_USERS_TAB: z.string().trim().min(1).default("usuarios"),
+  GOOGLE_SHEETS_STUDENTS_TAB: z.string().trim().min(1).default("alunos"),
 });
+
+type GoogleSheetsEnv = z.infer<typeof envSchema>;
+
+export class GoogleSheetsConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GoogleSheetsConfigError";
+  }
+}
+
+export class GoogleSheetsSchemaError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GoogleSheetsSchemaError";
+  }
+}
+
+export class GoogleSheetsConnectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GoogleSheetsConnectionError";
+  }
+}
 
 export type SheetsStatus = {
   configured: boolean;
   mode: "mock" | "google-sheets";
+  studentsTab: string;
+  usersTab: string;
 };
 
-export type SheetsUser = {
+type SheetsStudentRecord = {
   id: string;
   nome: string;
-  email: string;
-  senha: string;
-  perfil: string;
+  turma: string;
+  ra: string;
   ativo: string;
-  trocar_senha: string;
 };
 
-function parseEnv() {
-  return envSchema.parse({
+function readEnv(): GoogleSheetsEnv | null {
+  const parsed = envSchema.safeParse({
     GOOGLE_SHEETS_CLIENT_EMAIL: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
     GOOGLE_SHEETS_PRIVATE_KEY: process.env.GOOGLE_SHEETS_PRIVATE_KEY,
     GOOGLE_SHEETS_SPREADSHEET_ID: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+    GOOGLE_SHEETS_USERS_TAB: process.env.GOOGLE_SHEETS_USERS_TAB,
+    GOOGLE_SHEETS_STUDENTS_TAB: process.env.GOOGLE_SHEETS_STUDENTS_TAB,
+  });
+
+  return parsed.success ? parsed.data : null;
+}
+
+function requireEnv() {
+  const env = readEnv();
+  if (!env) {
+    throw new GoogleSheetsConfigError("Credenciais do Google Sheets ausentes ou invalidas.");
+  }
+
+  return {
+    ...env,
+    GOOGLE_SHEETS_PRIVATE_KEY: env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  };
+}
+
+function normalizeHeader(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizeCell(value: string | null | undefined) {
+  return (value ?? "").trim();
+}
+
+function normalizeFlag(value: string) {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase();
+}
+
+function getUsersTabRange(usersTab: string) {
+  return `${usersTab}!${USERS_RANGE_COLUMNS}`;
+}
+
+function getStudentsTabRange(studentsTab: string) {
+  return `${studentsTab}!${STUDENTS_RANGE_COLUMNS}`;
+}
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function isUsableUserRecord(user: SheetsUserRecord) {
+  return Boolean(user.id && user.nome && user.email && user.senha && user.perfil && user.ativo);
+}
+
+function mapStudentStatus(value: string) {
+  return isActiveUser(value) ? "Ativo" : "Inativo";
+}
+
+function buildClassId(turma: string) {
+  const slug = slugify(turma);
+  return `TURMA-${slug || "sem-nome"}`;
+}
+
+async function createSheetsApiClient() {
+  const env = requireEnv();
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: env.GOOGLE_SHEETS_CLIENT_EMAIL,
+      private_key: env.GOOGLE_SHEETS_PRIVATE_KEY,
+    },
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  return {
+    env,
+    sheets: google.sheets({
+      version: "v4",
+      auth,
+    }),
+  };
+}
+
+async function readUsersSheet() {
+  const { env, sheets } = await createSheetsApiClient();
+
+  let response: sheets_v4.Schema$ValueRange;
+  try {
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      range: getUsersTabRange(env.GOOGLE_SHEETS_USERS_TAB),
+    });
+    response = result.data;
+  } catch {
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+
+  const rows = response.values ?? [];
+  if (rows.length === 0) {
+    throw new GoogleSheetsSchemaError("A aba de usuarios esta vazia.");
+  }
+
+  const headerRow = rows[0].map((cell) => normalizeHeader(String(cell)));
+  const missingHeaders = REQUIRED_HEADERS.filter((header) => !headerRow.includes(header));
+
+  if (missingHeaders.length > 0) {
+    throw new GoogleSheetsSchemaError(
+      `A aba de usuarios esta sem as colunas obrigatorias: ${missingHeaders.join(", ")}.`,
+    );
+  }
+
+  const users = rows.slice(1).map((row, index) => {
+    const cells = new Map<string, string>();
+    headerRow.forEach((header, columnIndex) => {
+      cells.set(header, normalizeCell(String(row[columnIndex] ?? "")));
+    });
+
+    return {
+      rowNumber: index + 2,
+      record: {
+        id: cells.get("id") ?? "",
+        nome: cells.get("nome") ?? "",
+        email: (cells.get("email") ?? "").toLowerCase(),
+        senha: cells.get("senha") ?? "",
+        perfil: cells.get("perfil") ?? "",
+        ativo: cells.get("ativo") ?? "",
+        trocar_senha: cells.get("trocar_senha") ?? "",
+      } satisfies SheetsUserRecord,
+    };
+  });
+
+  return { env, sheets, users };
+}
+
+async function readStudentsSheet() {
+  const { env, sheets } = await createSheetsApiClient();
+
+  let response: sheets_v4.Schema$ValueRange;
+  try {
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      range: getStudentsTabRange(env.GOOGLE_SHEETS_STUDENTS_TAB),
+    });
+    response = result.data;
+  } catch {
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+
+  const rows = response.values ?? [];
+  if (rows.length === 0) {
+    throw new GoogleSheetsSchemaError("A aba de alunos esta vazia.");
+  }
+
+  const headerRow = rows[0].map((cell) => normalizeHeader(String(cell)));
+  const missingHeaders = REQUIRED_STUDENT_HEADERS.filter((header) => !headerRow.includes(header));
+
+  if (missingHeaders.length > 0) {
+    throw new GoogleSheetsSchemaError(
+      `A aba de alunos esta sem as colunas obrigatorias: ${missingHeaders.join(", ")}.`,
+    );
+  }
+
+  return rows.slice(1).map((row) => {
+    const cells = new Map<string, string>();
+    headerRow.forEach((header, columnIndex) => {
+      cells.set(header, normalizeCell(String(row[columnIndex] ?? "")));
+    });
+
+    return {
+      id: cells.get("id") ?? "",
+      nome: cells.get("nome") ?? "",
+      turma: cells.get("turma") ?? "",
+      ra: cells.get("ra") ?? "",
+      ativo: cells.get("ativo") ?? "",
+    } satisfies SheetsStudentRecord;
   });
 }
 
 export function getSheetsStatus(): SheetsStatus {
-  const parsed = parseEnv();
-
-  if (
-    parsed.GOOGLE_SHEETS_CLIENT_EMAIL &&
-    parsed.GOOGLE_SHEETS_PRIVATE_KEY &&
-    parsed.GOOGLE_SHEETS_SPREADSHEET_ID
-  ) {
+  const env = readEnv();
+  if (!env) {
     return {
-      configured: true,
-      mode: "google-sheets",
+      configured: false,
+      mode: "mock",
+      studentsTab: process.env.GOOGLE_SHEETS_STUDENTS_TAB?.trim() || "alunos",
+      usersTab: process.env.GOOGLE_SHEETS_USERS_TAB?.trim() || "usuarios",
     };
   }
 
-  return { configured: false, mode: "mock" };
-}
-
-// --- JWT assertion for service account ---
-
-function encodeBase64Url(value: string): string {
-  return Buffer.from(value)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function decodeBase64Url(value: string): string {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
-  return `${normalized}${padding}`;
-}
-
-async function getAccessToken(): Promise<string | null> {
-  const env = parseEnv();
-  if (!env.GOOGLE_SHEETS_CLIENT_EMAIL || !env.GOOGLE_SHEETS_PRIVATE_KEY) {
-    return null;
-  }
-
-  const privateKeyRaw = env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/^"|"$/g, "").replace(/\\n/g, "\n");
-
-  const now = Math.floor(Date.now() / 1000);
-  const jwtHeader = { alg: "RS256", typ: "JWT" };
-  const jwtPayload = {
-    iss: env.GOOGLE_SHEETS_CLIENT_EMAIL,
-    scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
+  return {
+    configured: true,
+    mode: "google-sheets",
+    studentsTab: env.GOOGLE_SHEETS_STUDENTS_TAB,
+    usersTab: env.GOOGLE_SHEETS_USERS_TAB,
   };
-
-  const headerB64 = encodeBase64Url(JSON.stringify(jwtHeader));
-  const payloadB64 = encodeBase64Url(JSON.stringify(jwtPayload));
-  const signatureInput = `${headerB64}.${payloadB64}`;
-
-  // Import the private key
-  const pemHeader = "-----BEGIN PRIVATE KEY-----";
-  const pemFooter = "-----END PRIVATE KEY-----";
-  const pemContents = privateKeyRaw
-    .replace(pemHeader, "")
-    .replace(pemFooter, "")
-    .replace(/\s/g, "");
-  const binaryKey = Buffer.from(pemContents, "base64");
-
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    binaryKey,
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256",
-    },
-    false,
-    ["sign"],
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    privateKey,
-    new TextEncoder().encode(signatureInput),
-  );
-
-  const signatureB64 = encodeBase64Url(
-    Buffer.from(new Uint8Array(signature)).toString("base64"),
-  );
-
-  const assertion = `${signatureInput}.${signatureB64}`;
-
-  try {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Failed to get access token:", errorText);
-      return null;
-    }
-
-    const data = (await response.json()) as { access_token?: string };
-    return data.access_token ?? null;
-  } catch (error) {
-    console.error("Failed to get access token:", error);
-    return null;
-  }
 }
 
-// --- Sheets API calls ---
-
-async function fetchSheetData(range: string): Promise<string[][] | null> {
-  const env = parseEnv();
-  if (!env.GOOGLE_SHEETS_SPREADSHEET_ID) {
-    return null;
-  }
-
-  const token = await getAccessToken();
-  if (!token) {
-    return null;
-  }
-
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEETS_SPREADSHEET_ID}/values/${encodeURIComponent(range)}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      console.error("Failed to fetch sheet data:", await response.text());
-      return null;
-    }
-
-    const data = (await response.json()) as { values?: string[][] };
-    return data.values ?? null;
-  } catch (error) {
-    console.error("Failed to fetch sheet data:", error);
-    return null;
-  }
+export function isActiveUser(value: string) {
+  return normalizeFlag(value) === "SIM";
 }
 
-/**
- * Fetches users from the "usuarios" sheet.
- * Expects columns: id, nome, email, senha, perfil, ativo, trocar_senha
- */
-export async function fetchUsers(): Promise<SheetsUser[]> {
-  const raw = await fetchSheetData("usuarios!A:G");
-
-  if (!raw || raw.length < 2) {
-    return [];
-  }
-
-  // Skip header row
-  return raw.slice(1).map((row) => ({
-    id: row[0] ?? "",
-    nome: row[1] ?? "",
-    email: (row[2] ?? "").trim().toLowerCase(),
-    senha: row[3] ?? "",
-    perfil: row[4] ?? "",
-    ativo: (row[5] ?? "").trim().toLowerCase(),
-    trocar_senha: (row[6] ?? "").trim().toLowerCase(),
-  }));
+export function shouldForcePasswordChange(value: string) {
+  return normalizeFlag(value) === "SIM";
 }
 
-/**
- * Validates credentials against the Google Sheets "usuarios" sheet.
- */
-export async function validateCredentials(
-  email: string,
-  password: string,
-): Promise<SheetsUser | null> {
-  const users = await fetchUsers();
-
+export async function getUserByEmail(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
+  const { users } = await readUsersSheet();
+  const match = users.find((item) => item.record.email === normalizedEmail);
 
-  const user = users.find(
-    (u) => u.email === normalizedEmail && u.senha === password && u.ativo === "sim",
-  );
-
-  return user ?? null;
-}
-
-export async function createSheetsClient() {
-  const status = getSheetsStatus();
-  if (status.mode === "mock") {
+  if (!match) {
     return null;
   }
+
+  if (!isUsableUserRecord(match.record)) {
+    throw new GoogleSheetsSchemaError(`A linha do usuario ${normalizedEmail} esta incompleta.`);
+  }
+
+  return match.record;
+}
+
+async function findUserRowById(userId: string) {
+  const { env, sheets, users } = await readUsersSheet();
+  const match = users.find((item) => item.record.id === userId);
+
+  if (!match) {
+    return null;
+  }
+
+  return { env, sheets, match };
+}
+
+export async function updateUserPassword(userId: string, nextStoredPassword: string) {
+  const found = await findUserRowById(userId);
+  if (!found) {
+    throw new GoogleSheetsSchemaError("Usuario nao encontrado para atualizar senha.");
+  }
+
+  try {
+    await found.sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: found.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      requestBody: {
+        data: [
+          {
+            range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!D${found.match.rowNumber}`,
+            values: [[nextStoredPassword]],
+          },
+          {
+            range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!G${found.match.rowNumber}`,
+            values: [["NAO"]],
+          },
+        ],
+        valueInputOption: "USER_ENTERED",
+      },
+    });
+  } catch {
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+}
+
+export async function getUsersSheetHealth() {
+  const { users } = await readUsersSheet();
+  return {
+    status: getSheetsStatus(),
+    usersCount: users.length,
+  };
+}
+
+export async function getSchoolRoster() {
+  const rows = await readStudentsSheet();
+  const filteredRows = rows.filter((row) => row.nome && row.turma);
+  const currentYear = new Date().getFullYear().toString();
+  const teacherName = "Professor responsavel";
+
+  const classesByName = new Map<string, ClassRoom>();
+  filteredRows.forEach((row) => {
+    if (classesByName.has(row.turma)) {
+      return;
+    }
+
+    classesByName.set(row.turma, {
+      id: buildClassId(row.turma),
+      nome: row.turma,
+      professor: teacherName,
+      ano: currentYear,
+      periodo: "Nao informado",
+    });
+  });
+
+  const mappedClasses = [...classesByName.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const mappedStudents: Student[] = filteredRows.map((row) => ({
+    id: row.id ? `ALUNO-${row.id}` : `ALUNO-${slugify(`${row.nome}-${row.ra || row.turma}`)}`,
+    matricula: row.ra || row.id,
+    nome: row.nome,
+    status: mapStudentStatus(row.ativo),
+    turma: classesByName.get(row.turma)?.id ?? buildClassId(row.turma),
+  }));
 
   return {
-    baseUrl: `https://sheets.googleapis.com/v4/spreadsheets/${process.env.GOOGLE_SHEETS_SPREADSHEET_ID}`,
+    classes: mappedClasses,
+    students: mappedStudents,
   };
 }
 
 export async function getSystemSnapshot() {
+  const status = getSheetsStatus();
+
+  if (!status.configured) {
+    return {
+      status,
+      totals: {
+        alunos: students.length,
+        turmas: classes.length,
+        provas: exams.length,
+        correcoes: correctionSessions.length,
+        usuarios: 0,
+      },
+    };
+  }
+
+  const health = await getUsersSheetHealth();
+  const roster = await getSchoolRoster();
+
   return {
-    status: getSheetsStatus(),
+    status: health.status,
     totals: {
-      alunos: students.length,
-      turmas: classes.length,
+      alunos: roster.students.length,
+      turmas: roster.classes.length,
       provas: exams.length,
       correcoes: correctionSessions.length,
+      usuarios: health.usersCount,
     },
   };
 }

@@ -9,8 +9,11 @@ export async function GET() {
   const user = await parseSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
   if (!user) {
-    return NextResponse.json({ session: null }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      { error: "Autenticacao necessaria." },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
-  return NextResponse.json({ session: user }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ user }, { headers: { "Cache-Control": "no-store" } });
 }

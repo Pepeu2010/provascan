@@ -15,6 +15,7 @@ import {
   createId,
   type AppDataState,
 } from "@/lib/app-data";
+import type { AuthSessionUser } from "@/types/auth";
 import {
   buildCorrectionSession,
   buildDefaultCorrectionRule,
@@ -31,6 +32,11 @@ import type {
   Student,
   StudentStatus,
 } from "@/types/domain";
+
+type RemoteSchoolData = {
+  classes: ClassRoom[];
+  students: Student[];
+};
 
 type CreateClassInput = {
   ano: string;
@@ -75,17 +81,11 @@ type SaveCorrectionRuleInput = {
   totalQuestions: number;
 };
 
-type TeacherSession = {
-  email: string;
-  loggedInAt: string;
-  remember: boolean;
-};
-
 type AppDataContextValue = {
   analytics: ReturnType<typeof calculateAnalytics>;
   data: AppDataState;
   isHydrated: boolean;
-  session: TeacherSession | null;
+  session: AuthSessionUser | null;
   createClass: (input: CreateClassInput) => void;
   createExam: (input: CreateExamInput) => void;
   createStudent: (input: CreateStudentInput) => void;
@@ -95,8 +95,17 @@ type AppDataContextValue = {
   exportData: () => string;
   getOperationalCsv: () => string;
   importData: (payload: string) => { ok: boolean; message: string };
-  loginTeacher: (input: { email: string; password: string; remember: boolean }) => Promise<{ ok: boolean; message: string }>;
+  loginTeacher: (input: {
+    email: string;
+    password: string;
+    remember: boolean;
+  }) => Promise<{ ok: boolean; message: string; redirectTo?: string }>;
   logoutTeacher: () => Promise<void>;
+  changeTeacherPassword: (input: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) => Promise<{ ok: boolean; message: string; redirectTo?: string }>;
   resetData: () => void;
   saveAnswerKey: (examId: string, answers: string[]) => void;
   saveCorrection: (input: SaveCorrectionInput) => { ok: boolean; message: string };
@@ -124,6 +133,18 @@ function normalizeImportedData(value: unknown): AppDataState | null {
     return null;
   }
 
+  const teacherProfile =
+    candidate.teacherProfile && typeof candidate.teacherProfile === "object"
+      ? {
+          ...cloneDefaultAppData().teacherProfile,
+          ...candidate.teacherProfile,
+          escola:
+            candidate.teacherProfile.escola === "Instituto Monte Azul"
+              ? "E.E Professor Fabio Fanucchi"
+              : (candidate.teacherProfile.escola ?? cloneDefaultAppData().teacherProfile.escola),
+        }
+      : cloneDefaultAppData().teacherProfile;
+
   return {
     answerKeys: candidate.answerKeys as AnswerKey[],
     classes: candidate.classes as ClassRoom[],
@@ -133,24 +154,35 @@ function normalizeImportedData(value: unknown): AppDataState | null {
     corrections: candidate.corrections as CorrectionSession[],
     exams: candidate.exams as Exam[],
     students: candidate.students as Student[],
-    teacherProfile: candidate.teacherProfile ?? cloneDefaultAppData().teacherProfile,
+    teacherProfile,
   };
 }
 
-function normalizeSession(value: unknown): TeacherSession | null {
+function normalizeSession(value: unknown): AuthSessionUser | null {
   if (!value || typeof value !== "object") {
     return null;
   }
 
-  const candidate = value as Partial<TeacherSession>;
-  if (typeof candidate.email !== "string" || typeof candidate.loggedInAt !== "string") {
+  const candidate = value as Partial<AuthSessionUser>;
+  if (
+    typeof candidate.id !== "string" ||
+    typeof candidate.nome !== "string" ||
+    typeof candidate.email !== "string" ||
+    typeof candidate.role !== "string" ||
+    typeof candidate.forcePasswordChange !== "boolean" ||
+    typeof candidate.loggedInAt !== "string"
+  ) {
     return null;
   }
 
   return {
+    id: candidate.id,
+    nome: candidate.nome,
     email: candidate.email,
+    forcePasswordChange: candidate.forcePasswordChange,
     loggedInAt: candidate.loggedInAt,
     remember: Boolean(candidate.remember),
+    role: candidate.role,
   };
 }
 
@@ -167,6 +199,51 @@ function buildOperationalCsv(data: AppDataState) {
   ];
 
   return rows.map((row) => row.join(",")).join("\n");
+}
+
+function isSeedDemoData(data: AppDataState) {
+  return (
+    data.classes.some((item) => item.id === "T-101") ||
+    data.students.some((item) => item.id === "A-001") ||
+    data.exams.some((item) => item.id === "P-301")
+  );
+}
+
+function applyRemoteSchoolData(
+  previous: AppDataState,
+  remote: RemoteSchoolData,
+  session: AuthSessionUser | null,
+): AppDataState {
+  const validClassIds = new Set(remote.classes.map((item) => item.id));
+  const shouldResetAcademicMocks = isSeedDemoData(previous);
+  const nextExams = shouldResetAcademicMocks
+    ? []
+    : previous.exams.filter((item) => validClassIds.has(item.turma));
+  const nextExamIds = new Set(nextExams.map((item) => item.id));
+  const nextStudentIds = new Set(remote.students.map((item) => item.id));
+
+  return {
+    ...previous,
+    answerKeys: shouldResetAcademicMocks
+      ? []
+      : previous.answerKeys.filter((item) => nextExamIds.has(item.provaId)),
+    classes: remote.classes,
+    correctionRules: shouldResetAcademicMocks
+      ? []
+      : previous.correctionRules.filter((item) => nextExamIds.has(item.provaId)),
+    corrections: shouldResetAcademicMocks
+      ? []
+      : previous.corrections.filter(
+          (item) => nextStudentIds.has(item.correction.alunoId) && nextExamIds.has(item.correction.provaId),
+        ),
+    exams: nextExams,
+    students: remote.students,
+    teacherProfile: {
+      ...previous.teacherProfile,
+      email: session?.email ?? previous.teacherProfile.email,
+      nome: session?.nome ?? previous.teacherProfile.nome,
+    },
+  };
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
@@ -189,7 +266,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  const [session, setSession] = useState<TeacherSession | null>(null);
+  const [session, setSession] = useState<AuthSessionUser | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(APP_DATA_STORAGE_KEY, JSON.stringify(data));
@@ -204,7 +281,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     const syncSession = async () => {
       try {
-        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
         if (!response.ok) {
           if (!cancelled) {
             setSession(null);
@@ -212,9 +289,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const payload = (await response.json()) as { session: TeacherSession | null };
+        const payload = (await response.json()) as { user?: AuthSessionUser | null };
         if (!cancelled) {
-          setSession(normalizeSession(payload.session));
+          setSession(normalizeSession(payload.user));
         }
       } catch {
         if (!cancelled) {
@@ -229,6 +306,45 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !session) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncSchoolData = async () => {
+      try {
+        const response = await fetch("/api/school-data", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as Partial<RemoteSchoolData>;
+        if (!Array.isArray(payload.classes) || !Array.isArray(payload.students)) {
+          return;
+        }
+
+        if (!cancelled) {
+          setData((previous) =>
+            applyRemoteSchoolData(previous, {
+              classes: payload.classes as ClassRoom[],
+              students: payload.students as Student[],
+            }, session),
+          );
+        }
+      } catch {
+        // Mantem a base local se a sincronizacao remota falhar.
+      }
+    };
+
+    void syncSchoolData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   const value = useMemo<AppDataContextValue>(() => {
     const createClassHandler = (input: CreateClassInput) => {
@@ -373,7 +489,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       return {
         ok: true,
-        message: "Prova atualizada. Correcoes antigas dessa prova foram removidas para manter consistencia.",
+        message: "Prova atualizada. Correções antigas dessa prova foram removidas para manter consistência.",
       };
     };
 
@@ -386,7 +502,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         exams: previous.exams.filter((item) => item.id !== examId),
       }));
 
-      return { ok: true, message: "Prova, gabarito, regras e correcoes vinculadas foram removidos." };
+      return { ok: true, message: "Prova, gabarito, regras e correções vinculadas foram removidos." };
     };
 
     const saveAnswerKeyHandler = (examId: string, answers: string[]) => {
@@ -425,7 +541,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         ],
       }));
 
-      return { ok: true, message: "Regras de correcao salvas com sucesso." };
+      return { ok: true, message: "Regras de correção salvas com sucesso." };
     };
 
     const saveCorrectionHandler = (input: SaveCorrectionInput) => {
@@ -435,11 +551,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         .sort((a, b) => a.questao - b.questao);
 
       if (!student) {
-        return { ok: false, message: "Selecione um aluno valido." };
+        return { ok: false, message: "Selecione um aluno válido." };
       }
 
       if (!answerKey.length) {
-        return { ok: false, message: "Esta prova ainda nao possui gabarito salvo." };
+        return { ok: false, message: "Esta prova ainda não possui gabarito salvo." };
       }
 
       const sessionToSave = buildCorrectionSession({
@@ -460,7 +576,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         corrections: [sessionToSave, ...previous.corrections],
       }));
 
-      return { ok: true, message: "Correcao salva com sucesso no historico local." };
+      return { ok: true, message: "Correção salva com sucesso no histórico local." };
     };
 
     const exportDataHandler = () => JSON.stringify(data, null, 2);
@@ -470,13 +586,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       try {
         const parsed = normalizeImportedData(JSON.parse(payload));
         if (!parsed) {
-          return { ok: false, message: "Arquivo JSON invalido para importacao." };
+          return { ok: false, message: "Arquivo JSON inválido para importação." };
         }
 
         setData(parsed);
         return { ok: true, message: "Dados importados com sucesso." };
       } catch {
-        return { ok: false, message: "Nao foi possivel ler o JSON informado." };
+        return { ok: false, message: "Não foi possível ler o JSON informado." };
       }
     };
 
@@ -486,7 +602,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     const loginTeacherHandler = async (input: { email: string; password: string; remember: boolean }) => {
       if (!input.email.trim()) {
-        return { ok: false, message: "Informe um e-mail para entrar no painel." };
+        return { ok: false, message: "Informe o nome de acesso para entrar no painel." };
       }
 
       if (!input.password.trim()) {
@@ -509,17 +625,58 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         const payload = (await response.json()) as {
           error?: string;
           message?: string;
-          session?: TeacherSession | null;
+          redirectTo?: string;
+          user?: AuthSessionUser | null;
         };
 
-        if (!response.ok || !payload.session) {
-          return { ok: false, message: payload.error ?? "Nao foi possivel iniciar a sessao segura." };
+        if (!response.ok || !payload.user) {
+          return { ok: false, message: payload.error ?? "Não foi possível iniciar a sessão segura." };
         }
 
-        setSession(normalizeSession(payload.session));
-        return { ok: true, message: payload.message ?? "Sessao segura iniciada no navegador." };
+        setSession(normalizeSession(payload.user));
+        return {
+          ok: true,
+          message: payload.message ?? "Login realizado com sucesso.",
+          redirectTo: payload.redirectTo,
+        };
       } catch {
-        return { ok: false, message: "Falha ao iniciar a sessao segura." };
+        return { ok: false, message: "Falha ao iniciar a sessão segura." };
+      }
+    };
+
+    const changeTeacherPasswordHandler = async (input: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) => {
+      try {
+        const response = await fetch("/api/auth/password", {
+          body: JSON.stringify(input),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        });
+
+        const payload = (await response.json()) as {
+          error?: string;
+          message?: string;
+          redirectTo?: string;
+          user?: AuthSessionUser | null;
+        };
+
+        if (!response.ok || !payload.user) {
+          return { ok: false, message: payload.error ?? "Não foi possível alterar a senha." };
+        }
+
+        setSession(normalizeSession(payload.user));
+        return {
+          ok: true,
+          message: payload.message ?? "Senha alterada com sucesso.",
+          redirectTo: payload.redirectTo,
+        };
+      } catch {
+        return { ok: false, message: "Falha ao alterar a senha." };
       }
     };
 
@@ -534,6 +691,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return {
       analytics: calculateAnalytics(data),
       createClass: createClassHandler,
+      changeTeacherPassword: changeTeacherPasswordHandler,
       createExam: createExamHandler,
       createStudent: createStudentHandler,
       data,

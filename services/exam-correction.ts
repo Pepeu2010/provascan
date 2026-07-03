@@ -93,8 +93,8 @@ export function buildAnswerSheetModel(params: {
     instructions: [
       "Use caneta azul ou preta.",
       "Preencha completamente a bolinha.",
-      "Nao marque mais de uma alternativa por questao.",
-      "Nao dobre a area do codigo de identificacao.",
+      "Não marque mais de uma alternativa por questão.",
+      "Não dobre a área do código de identificação.",
     ],
     qrPayload: student ? buildQrPayload(exam, student, turma) : "",
     questionNumbers: Array.from({ length: exam.quantidadeQuestoes }, (_, index) => index + 1),
@@ -169,7 +169,7 @@ export function buildCorrectionSession(params: {
   const turma = classes.find((item) => item.id === student.turma);
 
   if (!exam || !turma) {
-    throw new Error("Nao foi possivel localizar prova ou turma para salvar a correcao.");
+    throw new Error("Não foi possível localizar prova ou turma para salvar a correção.");
   }
 
   const rule = getCorrectionRule(exam, rules);
@@ -248,7 +248,7 @@ export function buildCorrectionSession(params: {
       uniqueCode,
     },
     imagemProcessada: "Leitura revisada manualmente antes do salvamento final.",
-    observacoes: notes.length ? notes : ["Correcao salva manualmente pelo professor."],
+    observacoes: notes.length ? notes : ["Correção salva manualmente pelo professor."],
     prova: exam,
     respostas: normalizedAnswers,
     turma,

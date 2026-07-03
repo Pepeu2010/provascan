@@ -12,13 +12,13 @@ import type {
 export const teacherProfile: TeacherProfile = {
   nome: "Prof. Helena Duarte",
   email: "helena@escolaexemplo.com",
-  escola: "Instituto Monte Azul",
+  escola: "E.E Professor Fabio Fanucchi",
 };
 
 export const classes: ClassRoom[] = [
-  { id: "T-101", nome: "3A Ensino Medio", professor: teacherProfile.nome, ano: "2026", periodo: "Manha" },
-  { id: "T-102", nome: "2B Ensino Medio", professor: teacherProfile.nome, ano: "2026", periodo: "Tarde" },
-  { id: "T-103", nome: "9 Ano A", professor: teacherProfile.nome, ano: "2026", periodo: "Manha" },
+  { id: "T-101", nome: "3A Ensino Médio", professor: teacherProfile.nome, ano: "2026", periodo: "Manhã" },
+  { id: "T-102", nome: "2B Ensino Médio", professor: teacherProfile.nome, ano: "2026", periodo: "Tarde" },
+  { id: "T-103", nome: "9º Ano A", professor: teacherProfile.nome, ano: "2026", periodo: "Manhã" },
 ];
 
 export const students: Student[] = [
@@ -42,7 +42,7 @@ export const exams: Exam[] = [
   },
   {
     id: "P-302",
-    titulo: "Revisao de Quimica",
+    titulo: "Revisão de Química",
     turma: "T-102",
     quantidadeQuestoes: 15,
     alternativas: ["A", "B", "C", "D", "E"],
@@ -52,7 +52,7 @@ export const exams: Exam[] = [
   },
   {
     id: "P-303",
-    titulo: "Avaliacao de Ciencias",
+    titulo: "Avaliação de Ciências",
     turma: "T-103",
     quantidadeQuestoes: 10,
     alternativas: ["A", "B", "C", "D"],
@@ -146,7 +146,7 @@ export const correctionSessions: CorrectionSession[] = [
     imagemProcessada: "foto corrigida com contraste ajustado e grade identificada",
     observacoes: [
       "QR Code validou aluno e prova antes do OCR.",
-      "Questao 5 ficou ambigua e exigiu revisao manual.",
+      "Questão 5 ficou ambígua e exigiu revisão manual.",
     ],
     respostas: [
       { questao: 1, marcacoes: ["B"], respostaAluno: "B", respostaCorreta: "B", status: "acerto", pontuacao: 1, peso: 1 },
@@ -187,7 +187,7 @@ export const correctionSessions: CorrectionSession[] = [
       uniqueCode: "QUI-2B-2026-2026003-A-003",
     },
     imagemProcessada: "upload do computador com perspectiva retificada",
-    observacoes: ["Matricula foi usada para validar o aluno automaticamente."],
+    observacoes: ["Matrícula foi usada para validar o aluno automaticamente."],
     respostas: [
       { questao: 1, marcacoes: ["A"], respostaAluno: "A", respostaCorreta: "A", status: "acerto", pontuacao: 1, peso: 1 },
       { questao: 2, marcacoes: ["C"], respostaAluno: "C", respostaCorreta: "D", status: "erro", pontuacao: 0, peso: 1 },
@@ -199,10 +199,10 @@ export const correctionSessions: CorrectionSession[] = [
 ];
 
 export const dashboardMetrics: DashboardMetric[] = [
-  { label: "Alunos ativos", value: "4", helper: "1 transferido na base local", trend: "Base pronta para correcao" },
-  { label: "Provas criadas", value: "3", helper: "3 com regras de correcao", trend: "Cartao padrao disponivel" },
-  { label: "Correcoes hoje", value: "2", helper: "Tempo medio 15s", trend: "Revisao manual ativa" },
-  { label: "Media geral", value: "73%", helper: "Entre todas as turmas", trend: "Atualizado pelo store local" },
+  { label: "Alunos ativos", value: "4", helper: "1 transferido na base local", trend: "Base pronta para correção" },
+  { label: "Provas criadas", value: "3", helper: "3 com regras de correção", trend: "Cartão padrão disponível" },
+  { label: "Correções hoje", value: "2", helper: "Tempo médio 15s", trend: "Revisão manual ativa" },
+  { label: "Média geral", value: "73%", helper: "Entre todas as turmas", trend: "Atualizado pelo armazenamento local" },
 ];
 
 export const classAverages = [

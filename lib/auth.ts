@@ -1,80 +1,58 @@
+import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
+import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
 
 export const AUTH_COOKIE_NAME = "provascan-auth";
 const AUTH_MAX_AGE = 60 * 60 * 12;
 const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30;
-const FALLBACK_AUTH_SECRET = "change-this-auth-secret-in-production";
 
-const sessionSchema = z.object({
-  email: z.string().email(),
-  exp: z.number().int().positive(),
-  iat: z.number().int().positive(),
+const sessionPayloadSchema = z.object({
+  sub: z.string().min(1),
+  nome: z.string().min(1),
+  email: z.string().min(1),
+  role: z.string().min(1),
+  forcePasswordChange: z.boolean(),
   remember: z.boolean(),
+  loggedInAt: z.string().datetime(),
 });
 
-export type AuthSession = z.infer<typeof sessionSchema>;
+function getSessionSecret() {
+  const secret = process.env.AUTH_SECRET ?? process.env.AUTH_SESSION_SECRET;
+  if (!secret || secret.trim().length < 32) {
+    throw new Error("AUTH_SECRET deve existir e ter pelo menos 32 caracteres.");
+  }
+
+  return new TextEncoder().encode(secret);
+}
 
 export function getSessionDuration(remember: boolean) {
   return remember ? REMEMBER_MAX_AGE : AUTH_MAX_AGE;
 }
 
-function getAuthSecret() {
-  return process.env.AUTH_SESSION_SECRET ?? FALLBACK_AUTH_SECRET;
+export function buildSessionUser(user: SafeAuthUser, remember: boolean, loggedInAt: string): AuthSessionUser {
+  return {
+    ...user,
+    loggedInAt,
+    remember,
+  };
 }
 
-function encodeBase64Url(value: Uint8Array) {
-  return Buffer.from(value)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
+export async function createSessionToken(input: { user: SafeAuthUser; remember: boolean; loggedInAt: string }) {
+  const maxAge = getSessionDuration(input.remember);
 
-function decodeBase64Url(value: string) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
-  return new Uint8Array(Buffer.from(`${normalized}${padding}`, "base64"));
-}
-
-async function importSigningKey() {
-  return crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(getAuthSecret()),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign", "verify"],
-  );
-}
-
-async function signValue(value: string) {
-  const key = await importSigningKey();
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
-  return encodeBase64Url(new Uint8Array(signature));
-}
-
-async function verifyValue(value: string, signature: string) {
-  const key = await importSigningKey();
-  return crypto.subtle.verify(
-    "HMAC",
-    key,
-    decodeBase64Url(signature),
-    new TextEncoder().encode(value),
-  );
-}
-
-export async function createSessionToken(input: { email: string; remember: boolean }) {
-  const now = Math.floor(Date.now() / 1000);
-  const payload = sessionSchema.parse({
-    email: input.email.trim().toLowerCase(),
-    exp: now + getSessionDuration(input.remember),
-    iat: now,
+  return new SignJWT({
+    email: input.user.email.trim().toLowerCase(),
+    forcePasswordChange: input.user.forcePasswordChange,
+    loggedInAt: input.loggedInAt,
+    nome: input.user.nome,
     remember: input.remember,
-  });
-
-  const serialized = JSON.stringify(payload);
-  const encodedPayload = encodeBase64Url(new TextEncoder().encode(serialized));
-  const signature = await signValue(encodedPayload);
-  return `${encodedPayload}.${signature}`;
+    role: input.user.role,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(input.user.id)
+    .setIssuedAt()
+    .setExpirationTime(`${maxAge}s`)
+    .sign(getSessionSecret());
 }
 
 export async function parseSessionToken(token: string | undefined) {
@@ -82,24 +60,23 @@ export async function parseSessionToken(token: string | undefined) {
     return null;
   }
 
-  const [payloadPart, signaturePart] = token.split(".");
-  if (!payloadPart || !signaturePart) {
-    return null;
-  }
-
-  const valid = await verifyValue(payloadPart, signaturePart);
-  if (!valid) {
-    return null;
-  }
-
   try {
-    const payloadText = new TextDecoder().decode(decodeBase64Url(payloadPart));
-    const parsed = sessionSchema.parse(JSON.parse(payloadText));
-    const now = Math.floor(Date.now() / 1000);
-    if (parsed.exp <= now) {
-      return null;
-    }
-    return parsed;
+    const { payload } = await jwtVerify(token, getSessionSecret(), {
+      algorithms: ["HS256"],
+    });
+
+    const parsed = sessionPayloadSchema.parse(payload);
+    return buildSessionUser(
+      {
+        id: parsed.sub,
+        nome: parsed.nome,
+        email: parsed.email,
+        role: parsed.role,
+        forcePasswordChange: parsed.forcePasswordChange,
+      },
+      parsed.remember,
+      parsed.loggedInAt,
+    );
   } catch {
     return null;
   }

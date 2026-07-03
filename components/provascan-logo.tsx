@@ -109,7 +109,7 @@ export function ProvaScanLogo({
           </p>
           <p className="text-xl font-semibold leading-5 text-[#39c6ff]">de Provas</p>
           <p className="mt-1.5 text-xs leading-5 text-[var(--muted-foreground)]">
-            Correcao inteligente
+            Correção inteligente
           </p>
         </div>
       </div>
@@ -134,7 +134,7 @@ export function ProvaScanLogo({
         <div className="mt-2 flex items-center gap-2">
           <ScanSearch className="size-4 text-cyan-300" />
           <p className={cn("leading-5 text-[var(--muted-foreground)]", styles.subtitle)}>
-            Correcao inteligente para professores
+            Correção inteligente para professores
           </p>
         </div>
       </div>

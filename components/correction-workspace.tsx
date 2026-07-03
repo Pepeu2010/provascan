@@ -21,15 +21,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
+  analyzeAnswerSheetCanvas,
   decodeQrFromCanvas,
-  detectAnswersFromCanvas,
   detectIdentityWithOcr,
   resolveIdentityFromQr,
 } from "@/services/scan-pipeline";
 import { cn } from "@/lib/utils";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const MIN_CONFIDENCE_REVIEW = 75;
 const PROCESSING_STEPS = [
@@ -37,7 +39,7 @@ const PROCESSING_STEPS = [
   { label: "Lendo QR Code...", progress: 34 },
   { label: "Tentando OCR...", progress: 54 },
   { label: "Detectando respostas...", progress: 78 },
-  { label: "Preparando revisao...", progress: 100 },
+  { label: "Preparando revisão...", progress: 100 },
 ] as const;
 
 type ScanPhase = "idle" | "processing" | "review" | "error";
@@ -58,6 +60,7 @@ type ScanReview = {
   identificationMethod: "qr" | "ocr" | "manual";
   matchedStudentId: string;
   notes: string[];
+  pageType: string;
   processingLabel: string;
   qrStatus: "success" | "invalid" | "not-found" | "unreadable";
   qualitySummary: {
@@ -68,6 +71,7 @@ type ScanReview = {
     orientation: string;
     shadowRisk: boolean;
   };
+  templateId: string;
 };
 
 type PreprocessResult = {
@@ -102,7 +106,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const [errorMessage, setErrorMessage] = useState("");
   const [screenMessage, setScreenMessage] = useState("");
   const [review, setReview] = useState<ScanReview | null>(null);
-  const [notes, setNotes] = useState("Revisao manual obrigatoria antes da confirmacao final.");
+  const [notes, setNotes] = useState("Revisão manual obrigatória antes da confirmação final.");
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
   const [previewZoom, setPreviewZoom] = useState(1);
 
@@ -169,13 +173,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
   const processSelectedImage = async () => {
     if (!selectedFile) {
-      setErrorMessage("Selecione uma foto JPG, PNG ou WebP antes de iniciar o OCR.");
+      setErrorMessage("Selecione uma imagem ou PDF antes de iniciar a leitura.");
       setPhase("error");
       return;
     }
 
     if (!answerKey.length) {
-      setErrorMessage("Esta prova ainda nao possui gabarito salvo.");
+      setErrorMessage("Esta prova ainda não possui gabarito salvo.");
       setPhase("error");
       return;
     }
@@ -240,11 +244,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       setProgress(PROCESSING_STEPS[3].progress);
       await waitWithCancel(90, cancelProcessingRef);
 
-      const detectedAnswers = detectAnswersFromCanvas({
-        alternatives: exam.alternativas,
+      const omrAnalysis = await analyzeAnswerSheetCanvas({
+        answerKeyLength: answerKey.length,
         canvas: preprocessing.processedCanvas,
-        correctAnswers: answerKey.map((item) => ({ correctAnswer: item.respostaCorreta, question: item.questao })),
-      }).map((item) => ({
+        expectedTemplateId: exam.templateVersion,
+      });
+
+      const detectedAnswers = omrAnalysis.answers.slice(0, answerKey.length).map((item) => ({
         ...item,
         correctAnswer: answerKey.find((answer) => answer.questao === item.question)?.respostaCorreta ?? exam.alternativas[0] ?? "A",
       }));
@@ -268,26 +274,37 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         identificationMethod: identity.method,
         matchedStudentId: identity.matchedStudentId,
         notes: [
+          `Template identificado: ${omrAnalysis.templateId} (${omrAnalysis.modelDisplayName}).`,
+          `Tipo da pagina: ${omrAnalysis.pageType}.`,
+          `Questoes detectadas no layout: ${omrAnalysis.totalQuestions}.`,
+          omrAnalysis.usedExpectedTemplate
+            ? "O scanner priorizou o template esperado da prova antes da leitura do cabecalho."
+            : `Classificacao do modelo pelo cabecalho com confianca ${omrAnalysis.modelConfidence}%.`,
+          omrAnalysis.headerText ? `Cabecalho OCR: ${omrAnalysis.headerText.slice(0, 140)}` : "Cabecalho OCR indisponivel nesta imagem.",
           qrResult.status === "success"
             ? "QR Code lido com sucesso e validado contra a base local."
             : qrResult.status === "invalid"
-              ? "QR Code encontrado, mas os dados nao bateram com a prova atual."
-              : qrResult.status === "unreadable"
-                ? "QR Code ilegivel nesta imagem."
-                : "QR Code nao encontrado. Fluxo caiu para OCR/manual.",
+              ? "QR Code encontrado, mas os dados não bateram com a prova atual."
+                : qrResult.status === "unreadable"
+                ? "QR Code ilegível nesta imagem."
+                : "QR Code não encontrado. O fluxo caiu para OCR/manual.",
           identity.invalidMessage || "",
           preprocessing.processedLabel,
-          preprocessing.cropApplied ? "Recorte automatico da area util aplicado." : "Recorte automatico manteve a imagem inteira.",
-          preprocessing.lowLight ? "Imagem com pouca luz: revisar nome e respostas manualmente." : "Iluminacao dentro do esperado.",
-          preprocessing.shadowRisk ? "Sombra detectada: marcacoes foram sinalizadas para revisao." : "Sem sombra relevante no cartao.",
+          preprocessing.cropApplied ? "Recorte automático da área útil aplicado." : "O recorte automático manteve a imagem inteira.",
+          preprocessing.lowLight ? "Imagem com pouca luz: revise nome e respostas manualmente." : "Iluminação dentro do esperado.",
+          preprocessing.shadowRisk ? "Sombra detectada: marcações foram sinalizadas para revisão." : "Sem sombra relevante no cartão.",
           ocrIdentity?.rawText ? `OCR bruto: ${ocrIdentity.rawText.slice(0, 120)}` : "",
-          needsManualReview ? "Fluxo marcado para revisao manual obrigatoria." : "Leitura automatica consistente, mas ainda exige conferencia final.",
+          needsManualReview ? "Fluxo marcado para revisão manual obrigatória." : "Leitura automática consistente, mas ainda exige conferência final.",
+          omrAnalysis.totalQuestions !== answerKey.length
+            ? `Atencao: a prova atual tem ${answerKey.length} respostas cadastradas, mas o template identificado possui ${omrAnalysis.totalQuestions} questoes.`
+            : "",
         ].filter(Boolean),
+        pageType: omrAnalysis.pageType,
         processingLabel:
           identity.method === "qr"
             ? "QR validado e leitura pronta para conferencia"
             : needsManualReview
-              ? "Revisao manual obrigatoria"
+              ? "Revisão manual obrigatória"
               : "Leitura pronta para conferencia",
         qrStatus: qrResult.status,
         qualitySummary: {
@@ -298,8 +315,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           orientation: preprocessing.orientation,
           shadowRisk: preprocessing.shadowRisk,
         },
+        templateId: omrAnalysis.templateId,
       });
-      setNotes("Revisao manual obrigatoria antes da confirmacao final.");
+      setNotes("Revisão manual obrigatória antes da confirmação final.");
       setPhase("review");
       setPreviewZoom(1);
       setScreenMessage(
@@ -339,16 +357,18 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         "A imagem foi mantida para conferencia visual.",
         "Preencha ou ajuste todas as respostas antes de confirmar.",
       ],
+      pageType: "MANUAL",
       processingLabel: "Preenchimento manual",
       qrStatus: "not-found",
-        qualitySummary: {
-        brightness: "Nao avaliada",
+      qualitySummary: {
+        brightness: "Não avaliada",
         cropApplied: false,
         dimensions: selectedFile ? `${selectedFile.name}` : "Sem imagem",
         lowLight: false,
         orientation: "Manual",
         shadowRisk: false,
-        },
+      },
+      templateId: "MANUAL",
     });
     setPhase("review");
     setPreviewZoom(1);
@@ -393,13 +413,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     }
 
     if (!review.matchedStudentId) {
-      setErrorMessage("Selecione manualmente o aluno antes de confirmar a correcao.");
+      setErrorMessage("Selecione manualmente o aluno antes de confirmar a correção.");
       return;
     }
 
     const unanswered = review.answers.some((item) => !item.markedAnswers.length);
     if (unanswered) {
-      setErrorMessage("Preencha todas as respostas ou marque explicitamente em branco antes de confirmar a correcao.");
+      setErrorMessage("Preencha todas as respostas ou marque explicitamente em branco antes de confirmar a correção.");
       return;
     }
 
@@ -413,7 +433,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         notes,
         `Confianca geral do OCR: ${review.confidence}%`,
         `Nome detectado: ${review.detectedName}`,
-        `Matricula detectada: ${review.detectedRegistration}`,
+        `Matrícula detectada: ${review.detectedRegistration}`,
         ...review.notes,
       ],
       studentId: review.matchedStudentId,
@@ -430,16 +450,16 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
               <ScanSearch className="size-4 text-[var(--accent)]" />
-              Scanner OCR responsivo
+              Scanner OMR responsivo
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              No celular, priorize a camera. No desktop, envie o arquivo e revise a imagem processada antes de confirmar.
+              No celular, priorize a camera. No desktop, envie imagem ou PDF e revise a pagina processada antes de confirmar.
             </p>
           </div>
 
           <div className="grid gap-3">
             <FieldLabel label="Prova para corrigir">
-              <select
+              <Select
                 value={examId}
                 onChange={(event) => {
                   const nextExamId = event.target.value;
@@ -452,28 +472,26 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   setReview(null);
                   setScreenMessage("");
                 }}
-                className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] px-4 text-sm text-[var(--foreground)] outline-none"
               >
                 {data.exams.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.titulo}
                   </option>
                 ))}
-              </select>
+              </Select>
             </FieldLabel>
 
             <FieldLabel label="Aluno preferencial para busca">
-              <select
+              <Select
                 value={activePreferredStudentId}
                 onChange={(event) => setPreferredStudentId(event.target.value)}
-                className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] px-4 text-sm text-[var(--foreground)] outline-none"
               >
                 {studentsForExam.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.nome}
                   </option>
                 ))}
-              </select>
+              </Select>
             </FieldLabel>
           </div>
 
@@ -494,14 +512,14 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Button>
             </div>
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
-              Aceita JPG, PNG e WebP ate 12 MB. Fotos horizontais, verticais e imagens pequenas ou grandes sao ajustadas automaticamente.
+              Aceita JPG, PNG, WebP e PDF ate 12 MB. Fotos horizontais, verticais e PDFs de uma pagina sao ajustados automaticamente.
             </p>
           </div>
 
           <input
             ref={cameraInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             capture="environment"
             className="hidden"
             onChange={(event) => {
@@ -512,7 +530,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <input
             ref={uploadInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             className="hidden"
             onChange={(event) => {
               void handleFileSelected(event.target.files?.[0] ?? null);
@@ -532,7 +550,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="grid gap-3 sm:grid-cols-2">
             <MetricCard label="Turma" value={selectedClass?.nome ?? "Sem turma"} helper="base atual da prova" />
             <MetricCard
-              label="Questoes"
+              label="Questões"
               value={String(answerKey.length)}
               helper="alternativas A, B, C, D e E"
             />
@@ -548,7 +566,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               disabled={!selectedFile || phase === "processing"}
             >
               {phase === "processing" ? <LoaderCircle className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
-              Ler QR + OCR
+              Ler QR + OMR
             </Button>
             <div className="grid gap-3 sm:grid-cols-2">
               <Button
@@ -589,7 +607,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           ) : null}
 
           {errorMessage ? (
-            <StatusCard tone="error" title="Nao foi possivel concluir o OCR">
+            <StatusCard tone="error" title="Não foi possível concluir o OCR">
               {errorMessage}
             </StatusCard>
           ) : null}
@@ -609,7 +627,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="grid gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">Revisao manual obrigatoria</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Revisão manual obrigatória</p>
                 <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Conferencia da leitura OCR</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
                   Ajuste nome, matricula, aluno encontrado na planilha Google e todas as respostas antes de confirmar.
@@ -623,14 +641,16 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   {review.qrStatus === "success"
                     ? "QR lido com sucesso"
                     : review.qrStatus === "invalid"
-                      ? "Dados do QR invalidos"
+                      ? "Dados do QR inválidos"
                       : review.qrStatus === "unreadable"
-                        ? "QR ilegivel"
-                        : "QR nao encontrado"}
+                        ? "QR ilegível"
+                        : "QR não encontrado"}
                 </Badge>
                 <Badge tone={review.confidence >= MIN_CONFIDENCE_REVIEW ? "accent" : "warning"}>
-                  {review.confidence}% de confianca
+                  {review.confidence}% de confiança
                 </Badge>
+                <Badge tone="neutral">{review.templateId}</Badge>
+                <Badge tone="neutral">{review.pageType}</Badge>
                 <Badge tone="neutral">{review.processingLabel}</Badge>
               </div>
             </div>
@@ -639,7 +659,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               <MetricCard label="Acertos" value={String(summary.acertos)} helper="comparado com o gabarito" />
               <MetricCard label="Erros" value={String(summary.erros)} helper="pedem conferencia" />
               <MetricCard label="Percentual" value={`${summary.percentual}%`} helper="resultado atual" />
-              <MetricCard label="Baixa confianca" value={String(summary.revisao)} helper="marcados para revisar" />
+              <MetricCard label="Baixa confiança" value={String(summary.revisao)} helper="marcados para revisar" />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -656,7 +676,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                       }
                     />
                   </FieldLabel>
-                  <FieldLabel label="Matricula detectada">
+                  <FieldLabel label="Matrícula detectada">
                     <Input
                       value={review.detectedRegistration}
                       onChange={(event) =>
@@ -667,21 +687,20 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                     />
                   </FieldLabel>
                   <FieldLabel label="Aluno encontrado na planilha Google">
-                    <select
+                    <Select
                       value={review.matchedStudentId}
                       onChange={(event) =>
                         setReview((previous) =>
                           previous ? { ...previous, matchedStudentId: event.target.value } : previous,
                         )
                       }
-                      className="h-12 rounded-2xl border border-[var(--border)] bg-[var(--input-bg)] px-4 text-sm text-[var(--foreground)] outline-none"
                     >
                       {studentsForExam.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.nome} - {item.matricula}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </FieldLabel>
                 </div>
               </Card>
@@ -694,7 +713,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   <InfoPanel label="Dimensoes" value={review.qualitySummary.dimensions} />
                   <InfoPanel
                     label="Recorte automatico"
-                    value={review.qualitySummary.cropApplied ? "Aplicado" : "Nao necessario"}
+                    value={review.qualitySummary.cropApplied ? "Aplicado" : "Não necessário"}
                   />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -717,11 +736,11 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
             <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold text-[var(--foreground)]">Filtros de revisao</p>
+                <p className="text-sm font-semibold text-[var(--foreground)]">Filtros de revisão</p>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { key: "all", label: "Todas" },
-                    { key: "review", label: "Baixa confianca" },
+                    { key: "review", label: "Baixa confiança" },
                     { key: "wrong", label: "Apenas erros" },
                   ].map((item) => (
                     <button
@@ -903,11 +922,11 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </div>
             </div>
 
-            <FieldLabel label="Observacoes finais da revisao">
-              <textarea
+            <FieldLabel label="Observações finais da revisão">
+              <Textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                className="min-h-28 w-full rounded-[24px] border border-[var(--border)] bg-[var(--input-bg)] p-4 text-sm text-[var(--foreground)] outline-none"
+                className="min-h-28"
                 placeholder="Anote ajustes manuais, observacoes de camera, sombra, baixa luz ou necessidade de nova captura."
               />
             </FieldLabel>
@@ -915,7 +934,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <div className="grid gap-3 sm:grid-cols-2">
               <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" onClick={confirmCorrection}>
                 <Save className="size-4" />
-                Confirmar correcao
+                Confirmar correção
               </Button>
               <Button
                 size="lg"
@@ -946,16 +965,16 @@ function EmptyReviewState() {
       <div className="grid size-16 place-items-center rounded-3xl bg-[var(--accent-soft)] text-[var(--accent)]">
         <FileImage className="size-7" />
       </div>
-      <h3 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">Tela especifica de correcao por foto</h3>
+      <h3 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">Tela específica de correção por foto</h3>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">
-        Envie uma foto, visualize o pre-processamento, acompanhe o OCR por etapas e faca a revisao manual obrigatoria
+        Envie uma foto, visualize o pré-processamento, acompanhe o OCR por etapas e faça a revisão manual obrigatória
         antes de salvar. O layout se adapta de 360px ate telas grandes sem estourar a imagem.
       </p>
       <div className="mt-6 grid w-full max-w-3xl gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[
           "Preview responsivo sem sobreposicao",
           "Camera no celular e upload no desktop",
-          "Revisao manual de nome, matricula e respostas",
+          "Revisão manual de nome, matrícula e respostas",
           "Resultado em cards no mobile e grade no desktop",
         ].map((item) => (
           <div key={item} className="rounded-[22px] border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-sm text-[var(--foreground)]">
@@ -1051,7 +1070,7 @@ function MobileAnswerCard({
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
             {needsReview ? <AlertTriangle className="size-4 text-[var(--warning)]" /> : <CheckCircle2 className="size-4 text-[var(--success)]" />}
-            <span>{needsReview ? "Baixa confianca: revisar manualmente." : `Confianca de ${answer.confidence}%.`}</span>
+            <span>{needsReview ? "Baixa confiança: revise manualmente." : `Confiança de ${answer.confidence}%.`}</span>
           </div>
         </div>
       </div>
@@ -1085,7 +1104,7 @@ function ImagePreviewCard({
       />
       <PreviewPane
         label="Imagem processada"
-        helper={phase === "processing" ? "Ajustando brilho, contraste, escala de cinza e binarizacao." : "Pronta para OCR e revisao visual."}
+        helper={phase === "processing" ? "Ajustando brilho, contraste, escala de cinza e binarização." : "Pronta para OCR e revisão visual."}
         src={processedPreviewUrl}
         emptyText="O preview tratado aparece aqui sem estourar o layout."
         zoom={zoom}
@@ -1256,7 +1275,7 @@ function InfoPanel({ label, value }: { label: string; value: string }) {
 
 async function validateImageFile(file: File) {
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return { ok: false, message: "Formato invalido. Envie JPG, PNG ou WebP." };
+    return { ok: false, message: "Formato inválido. Envie JPG, PNG, WebP ou PDF." };
   }
 
   if (file.size > MAX_FILE_SIZE) {
@@ -1283,11 +1302,16 @@ async function validateImageFile(file: File) {
     signature[9] === 0x45 &&
     signature[10] === 0x42 &&
     signature[11] === 0x50;
+  const isPdf =
+    signature[0] === 0x25 &&
+    signature[1] === 0x50 &&
+    signature[2] === 0x44 &&
+    signature[3] === 0x46;
 
-  if (!isJpeg && !isPng && !isWebp) {
+  if (!isJpeg && !isPng && !isWebp && !isPdf) {
     return {
       ok: false,
-      message: "Arquivo rejeitado. A assinatura binaria nao corresponde a uma imagem JPG, PNG ou WebP valida.",
+      message: "Arquivo rejeitado. A assinatura binária não corresponde a um JPG, PNG, WebP ou PDF válido.",
     };
   }
 
@@ -1312,7 +1336,7 @@ async function waitWithCancel(duration: number, cancelRef: React.MutableRefObjec
 }
 
 async function preprocessImage(file: File): Promise<PreprocessResult> {
-  const image = await loadImage(file);
+  const image = await loadRenderableSource(file);
   const maxSide = Math.max(image.width, image.height);
   const scale = maxSide > 1600 ? 1600 / maxSide : 1;
   const sourceWidth = Math.max(1, Math.round(image.width * scale));
@@ -1327,7 +1351,7 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
   const baseContext = baseCanvas.getContext("2d", { willReadFrequently: true });
 
   if (!baseContext) {
-    throw new Error("Nao foi possivel preparar o canvas do scanner.");
+    throw new Error("Não foi possível preparar o canvas do scanner.");
   }
 
   if (shouldRotate) {
@@ -1354,7 +1378,7 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
     const cropContext = cropCanvas.getContext("2d", { willReadFrequently: true });
 
     if (!cropContext) {
-      throw new Error("Nao foi possivel aplicar o recorte automatico.");
+      throw new Error("Não foi possível aplicar o recorte automático.");
     }
 
     cropContext.putImageData(adjusted, -cropBounds.left, -cropBounds.top);
@@ -1365,7 +1389,7 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
 
   const targetContext = targetCanvas.getContext("2d", { willReadFrequently: true });
   if (!targetContext) {
-    throw new Error("Nao foi possivel finalizar a imagem processada.");
+    throw new Error("Não foi possível finalizar a imagem processada.");
   }
 
   const finalImage = targetContext.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
@@ -1398,10 +1422,18 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
     processedCanvas: targetCanvas,
     previewUrl: targetCanvas.toDataURL("image/jpeg", 0.88),
     processedLabel:
-      "Escala de cinza, contraste, binarizacao, reducao de ruido e rotacao automatica quando necessaria foram aplicados.",
+      "Escala de cinza, contraste, binarização, redução de ruído e rotação automática, quando necessária, foram aplicados.",
     shadowRisk,
     width: targetCanvas.width,
   };
+}
+
+async function loadRenderableSource(file: File) {
+  if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    return renderPdfPage(file);
+  }
+
+  return loadImage(file);
 }
 
 async function loadImage(file: File) {
@@ -1411,13 +1443,46 @@ async function loadImage(file: File) {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const element = new Image();
       element.onload = () => resolve(element);
-      element.onerror = () => reject(new Error("Nao foi possivel abrir a imagem selecionada."));
+      element.onerror = () => reject(new Error("Não foi possível abrir a imagem selecionada."));
       element.src = objectUrl;
     });
     return image;
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+async function renderPdfPage(file: File) {
+  const { getDocument, GlobalWorkerOptions } = await import("pdfjs-dist");
+  GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+
+  const buffer = await file.arrayBuffer();
+  const pdfDocument = await getDocument({ data: buffer }).promise;
+  const page = await pdfDocument.getPage(1);
+  const viewport = page.getViewport({ scale: 2 });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!context) {
+    throw new Error("Nao foi possivel renderizar a primeira pagina do PDF.");
+  }
+
+  await page.render({
+    canvas,
+    canvasContext: context,
+    viewport,
+  }).promise;
+
+  const image = new Image();
+  image.src = canvas.toDataURL("image/png");
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Nao foi possivel abrir a pagina renderizada do PDF."));
+  });
+
+  return image;
 }
 
 function getLuminanceStats(data: Uint8ClampedArray) {
