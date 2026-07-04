@@ -1466,7 +1466,7 @@ async function renderPdfPage(file: File) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
 
   if (!context) {
-    throw new Error("Nao foi possivel renderizar a primeira pagina do PDF.");
+    throw new Error("Não foi possível renderizar a primeira página do PDF.");
   }
 
   await page.render({
@@ -1479,7 +1479,7 @@ async function renderPdfPage(file: File) {
   image.src = canvas.toDataURL("image/png");
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve();
-    image.onerror = () => reject(new Error("Nao foi possivel abrir a pagina renderizada do PDF."));
+    image.onerror = () => reject(new Error("Não foi possível abrir a página renderizada do PDF."));
   });
 
   return image;

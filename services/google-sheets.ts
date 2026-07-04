@@ -170,7 +170,7 @@ async function readUsersSheet() {
 
   if (missingHeaders.length > 0) {
     throw new GoogleSheetsSchemaError(
-      `A aba de usuarios esta sem as colunas obrigatorias: ${missingHeaders.join(", ")}.`,
+      `A aba de usuários está sem as colunas obrigatórias: ${missingHeaders.join(", ")}.`,
     );
   }
 
@@ -221,7 +221,7 @@ async function readStudentsSheet() {
 
   if (missingHeaders.length > 0) {
     throw new GoogleSheetsSchemaError(
-      `A aba de alunos esta sem as colunas obrigatorias: ${missingHeaders.join(", ")}.`,
+      `A aba de alunos está sem as colunas obrigatórias: ${missingHeaders.join(", ")}.`,
     );
   }
 
@@ -323,6 +323,67 @@ export async function updateUserPassword(userId: string, nextStoredPassword: str
   }
 }
 
+export async function updateUserPasswordChangeFlag(userId: string, shouldForce: boolean) {
+  const found = await findUserRowById(userId);
+  if (!found) {
+    throw new GoogleSheetsSchemaError("Usuario nao encontrado para atualizar status de troca de senha.");
+  }
+
+  try {
+    await found.sheets.spreadsheets.values.update({
+      spreadsheetId: found.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!G${found.match.rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [[shouldForce ? "SIM" : "NAO"]],
+      },
+    });
+  } catch {
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+}
+
+export async function updateAllUsersPasswordChangeFlag(shouldForce: boolean) {
+  const { env, sheets, users } = await readUsersSheet();
+  const rows = users.filter((item) => item.record.id && item.record.nome);
+
+  if (!rows.length) {
+    return { updated: 0 };
+  }
+
+  try {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      requestBody: {
+        data: rows.map((item) => ({
+          range: `${env.GOOGLE_SHEETS_USERS_TAB}!G${item.rowNumber}`,
+          values: [[shouldForce ? "SIM" : "NAO"]],
+        })),
+        valueInputOption: "USER_ENTERED",
+      },
+    });
+  } catch {
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+
+  return { updated: rows.length };
+}
+
+export async function listUsersForAdmin() {
+  const { users } = await readUsersSheet();
+
+  return users
+    .filter((item) => item.record.id && item.record.nome)
+    .map((item) => ({
+      id: item.record.id,
+      nome: item.record.nome,
+      email: item.record.email,
+      perfil: item.record.perfil,
+      ativo: item.record.ativo,
+      trocar_senha: item.record.trocar_senha,
+    }));
+}
+
 export async function getUsersSheetHealth() {
   const { users } = await readUsersSheet();
   return {
@@ -348,7 +409,7 @@ export async function getSchoolRoster() {
       nome: row.turma,
       professor: teacherName,
       ano: currentYear,
-      periodo: "Nao informado",
+      periodo: "Não informado",
     });
   });
 

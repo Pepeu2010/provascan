@@ -1,18 +1,19 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import { analyzeAnswerSheet } from "@/services/exam-correction";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
   const cookieStore = await cookies();
   const validation = await validateSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
   if (!validation.ok) {
     const response = NextResponse.json(
-      { error: "Autenticacao necessaria." },
+      { error: "Autenticação necessária." },
       {
         headers: {
           "Cache-Control": "no-store",
@@ -25,6 +26,26 @@ export async function POST() {
   }
 
   try {
+    const rateLimit = consumeRateLimit({
+      bucket: "scan-analysis",
+      key: buildRateLimitKey(getClientIp(new Headers(request.headers)), validation.session.id, validation.session.email),
+      limit: 20,
+      windowMs: 5 * 60 * 1000,
+    });
+
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "Muitas análises seguidas. Aguarde alguns minutos e tente novamente." },
+        {
+          headers: {
+            "Cache-Control": "no-store",
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+          },
+          status: 429,
+        },
+      );
+    }
+
     const session = await analyzeAnswerSheet();
     const response = NextResponse.json(session, {
       headers: {
@@ -44,7 +65,7 @@ export async function POST() {
     return response;
   } catch {
     return NextResponse.json(
-      { error: "Falha ao analisar o cartao-resposta." },
+      { error: "Falha ao analisar o cartão-resposta." },
       {
         headers: {
           "Cache-Control": "no-store",

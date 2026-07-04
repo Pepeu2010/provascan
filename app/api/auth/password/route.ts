@@ -1,8 +1,10 @@
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { applyAuthCookie, AUTH_COOKIE_NAME, buildSessionUser, createSessionToken, parseSessionToken } from "@/lib/auth";
+import { applyAuthCookie, AUTH_COOKIE_NAME, buildSessionUser, createSessionToken } from "@/lib/auth";
 import { createPasswordStamp, createStoredPassword, verifyPassword } from "@/lib/passwords";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
+import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
   GoogleSheetsConnectionError,
   GoogleSheetsSchemaError,
@@ -46,23 +48,44 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  const session = await parseSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const validation = await validateSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
-  if (!session) {
-    return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+  if (!validation.ok) {
+    const response = NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+    clearInvalidSessionCookie(response);
+    return response;
   }
 
   try {
     const payload = changePasswordSchema.parse(await request.json());
-    const user = await getUserByEmail(session.email);
+    const rateLimit = consumeRateLimit({
+      bucket: "auth-password-change",
+      key: buildRateLimitKey(getClientIp(headersList), validation.session.id, validation.session.email),
+      limit: 6,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "Muitas tentativas de alteração de senha. Aguarde alguns minutos e tente novamente." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+          },
+        },
+      );
+    }
+
+    const user = await getUserByEmail(validation.session.email);
 
     if (!user) {
-      return NextResponse.json({ error: "Email ou senha inválidos." }, { status: 401 });
+      return NextResponse.json({ error: "Nome ou senha inválidos." }, { status: 401 });
     }
 
     const currentPasswordMatches = await verifyPassword(payload.currentPassword, user.senha);
     if (!currentPasswordMatches) {
-      return NextResponse.json({ error: "Email ou senha inválidos." }, { status: 401 });
+      return NextResponse.json({ error: "Nome ou senha inválidos." }, { status: 401 });
     }
 
     const nextStoredPassword = await createStoredPassword(payload.newPassword);
@@ -79,7 +102,7 @@ export async function POST(request: Request) {
 
     const token = await createSessionToken({
       user: safeUser,
-      remember: session.remember,
+      remember: validation.session.remember,
       loggedInAt,
       passwordStamp: createPasswordStamp(nextStoredPassword),
     });
@@ -87,9 +110,9 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       message: "Senha alterada com sucesso.",
       redirectTo: "/dashboard",
-      user: buildSessionUser(safeUser, session.remember, loggedInAt),
+      user: buildSessionUser(safeUser, validation.session.remember, loggedInAt),
     });
-    applyAuthCookie(response, token, session.remember);
+    applyAuthCookie(response, token, validation.session.remember);
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -214,7 +214,7 @@ export async function analyzeAnswerSheetCanvas(params: {
   const { answerKeyLength, canvas, expectedTemplateId } = params;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) {
-    throw new Error("Nao foi possivel analisar as marcacoes da imagem.");
+    throw new Error("Não foi possível analisar as marcações da imagem.");
   }
 
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);

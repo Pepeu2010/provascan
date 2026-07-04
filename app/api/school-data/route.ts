@@ -17,7 +17,7 @@ export async function GET() {
 
   if (!validation.ok) {
     const response = NextResponse.json(
-      { error: "Autenticacao necessaria." },
+      { error: "Autenticação necessária." },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
     clearInvalidSessionCookie(response);

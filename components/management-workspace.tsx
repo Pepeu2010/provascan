@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Download, Edit3, FileUp, Printer, QrCode, RotateCcw, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, Edit3, FileUp, KeyRound, Printer, QrCode, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
 import { StudentTable } from "@/components/student-table";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getClassLabel } from "@/lib/app-data";
+import { canManageUsers } from "@/lib/access-control";
 import { formatDate } from "@/lib/utils";
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
 import {
@@ -20,6 +21,27 @@ import {
   getCorrectionRule,
 } from "@/services/exam-correction";
 import type { StudentStatus } from "@/types/domain";
+
+type AdminUserRow = {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: string;
+  ativo: string;
+  trocar_senha: string;
+};
+
+function getRoleBadgeTone(role: string) {
+  if (role === "admin") {
+    return "accent" as const;
+  }
+
+  if (role === "vice_diretor") {
+    return "warning" as const;
+  }
+
+  return "neutral" as const;
+}
 
 function FieldSelect({
   value,
@@ -50,16 +72,17 @@ function downloadTextFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function openPrintWindow(title: string, body: string) {
-  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=980,height=720");
-  if (!printWindow) {
-    return false;
-  }
+function escapeForHtml(value: string) {
+  const span = document.createElement("span");
+  span.textContent = value;
+  return span.innerHTML;
+}
 
-  printWindow.document.write(`
+function openPrintWindow(title: string, body: string) {
+  const html = `
     <html>
       <head>
-        <title>${title.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</title>
+        <title>ProvaScan - Impressão</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
           .sheet { position: relative; width: ${ANSWER_SHEET_TEMPLATE.page.width}px; min-height: ${ANSWER_SHEET_TEMPLATE.page.height}px; page-break-inside: avoid; border: 1px solid #111827; padding: 24px; margin: 0 auto 24px; box-sizing: border-box; }
@@ -80,10 +103,29 @@ function openPrintWindow(title: string, body: string) {
       </head>
       <body>${body}</body>
     </html>
-  `);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
+  `;
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const printWindow = window.open(url, "_blank", "noopener,noreferrer,width=980,height=720");
+  if (!printWindow) {
+    URL.revokeObjectURL(url);
+    return false;
+  }
+
+  printWindow.addEventListener(
+    "load",
+    () => {
+      try {
+        printWindow.document.title = title;
+        printWindow.focus();
+        printWindow.print();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    },
+    { once: true },
+  );
+
   return true;
 }
 
@@ -145,7 +187,7 @@ export function ClassesManager() {
               setForm({ ano: "2026", nome: "", periodo: "Manhã", professor: data.teacherProfile.nome });
             }}
           >
-            Cancelar edicao
+            Cancelar edição
           </Button>
         ) : null}
       </div>
@@ -251,7 +293,7 @@ export function StudentsManager() {
                 setStatus("Ativo");
               }}
             >
-              Cancelar edicao
+              Cancelar edição
             </Button>
           ) : null}
         </div>
@@ -384,26 +426,26 @@ export function ExamsManager() {
           <section class="sheet">
             <div class="header">
               <div>
-                <div class="title">${item.examTitle}</div>
+                <div class="title">${escapeForHtml(item.examTitle)}</div>
                 <div class="meta">
-                  <div><strong>Escola/Professor:</strong> ${item.teacherSchool} - ${item.teacherName}</div>
-                  <div><strong>Turma:</strong> ${item.turmaName}</div>
-                  <div><strong>Aluno:</strong> ${item.studentName}</div>
-                  <div><strong>Matrícula:</strong> ${item.studentRegistration}</div>
+                  <div><strong>Escola/Professor:</strong> ${escapeForHtml(item.teacherSchool)} - ${escapeForHtml(item.teacherName)}</div>
+                  <div><strong>Turma:</strong> ${escapeForHtml(item.turmaName)}</div>
+                  <div><strong>Aluno:</strong> ${escapeForHtml(item.studentName)}</div>
+                  <div><strong>Matrícula:</strong> ${escapeForHtml(item.studentRegistration)}</div>
                 </div>
               </div>
               <div>
-                <div class="code">${item.uniqueCode}</div>
+                <div class="code">${escapeForHtml(item.uniqueCode)}</div>
                 <div class="meta" style="margin-top: 12px;">
-                  <div><strong>Codigo da prova:</strong> ${item.examCode}</div>
+                  <div><strong>Código da prova:</strong> ${escapeForHtml(item.examCode)}</div>
                   <div><strong>Template:</strong> ${ANSWER_SHEET_TEMPLATE.version}</div>
-                  <div><strong>Turma:</strong> ${item.turmaName}</div>
+                  <div><strong>Turma:</strong> ${escapeForHtml(item.turmaName)}</div>
                 </div>
               </div>
             </div>
             <div class="qr-block">
-              ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR Code do cartao-resposta" />` : ""}
-              <div class="meta"><strong>ID:</strong> ${item.uniqueCode}</div>
+              ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR Code do cartão-resposta" />` : ""}
+              <div class="meta"><strong>ID:</strong> ${escapeForHtml(item.uniqueCode)}</div>
             </div>
             <div class="questions">
               ${item.questionNumbers
@@ -418,7 +460,7 @@ export function ExamsManager() {
                 .join("")}
             </div>
             <div class="footer">
-              ${item.instructions.map((instruction) => `<div>${instruction}</div>`).join("")}
+              ${item.instructions.map((instruction) => `<div>${escapeForHtml(instruction)}</div>`).join("")}
             </div>
             <div class="signature">Assinatura / nome adicional</div>
           </section>
@@ -428,7 +470,7 @@ export function ExamsManager() {
 
     const html = htmlParts.join("");
 
-    if (openPrintWindow(`Cartoes ${activeExam.titulo}`, html)) {
+    if (openPrintWindow(`Cartões ${activeExam.titulo}`, html)) {
       setMessage("Cartões-resposta abertos para impressão ou salvamento em PDF.");
     } else {
       setMessage("Não foi possível abrir a janela de impressão neste navegador.");
@@ -503,7 +545,7 @@ export function ExamsManager() {
                 });
               }}
             >
-              Cancelar edicao
+              Cancelar edição
             </Button>
           ) : null}
         </div>
@@ -648,9 +690,9 @@ export function ExamsManager() {
             </div>
             <div className="mt-6 grid gap-3">
               <FieldSelect value={sheetMode} onChange={(value) => setSheetMode(value as "blank" | "class" | "student")}>
-                <option value="blank">Gerar cartao em branco</option>
-                <option value="class">Gerar cartao por turma</option>
-                <option value="student">Gerar cartao por aluno</option>
+                <option value="blank">Gerar cartão em branco</option>
+                <option value="class">Gerar cartão por turma</option>
+                <option value="student">Gerar cartão por aluno</option>
               </FieldSelect>
               {sheetMode === "student" ? (
                 <FieldSelect value={selectedStudentId} onChange={setSelectedStudentId}>
@@ -957,12 +999,174 @@ export function ReportsWorkspace() {
 
 export function SettingsWorkspace() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data, exportData, getOperationalCsv, importData, resetData } = useAppData();
+  const { data, exportData, getOperationalCsv, importData, resetData, session } = useAppData();
   const [payload, setPayload] = useState("");
   const [message, setMessage] = useState("");
+  const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
+  const [adminMessage, setAdminMessage] = useState("");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const canManagePasswordPolicy = canManageUsers(session?.role ?? "");
+
+  useEffect(() => {
+    if (!canManagePasswordPolicy) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadUsers = async () => {
+      setAdminLoading(true);
+      try {
+        const response = await fetch("/api/admin/users/password-reset", { cache: "no-store" });
+        const payload = (await response.json()) as { error?: string; users?: AdminUserRow[] };
+        if (!cancelled) {
+          setAdminUsers(Array.isArray(payload.users) ? payload.users : []);
+          setAdminMessage(payload.error ?? "");
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminMessage("Não foi possível carregar os usuários da planilha.");
+        }
+      } finally {
+        if (!cancelled) {
+          setAdminLoading(false);
+        }
+      }
+    };
+
+    void loadUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManagePasswordPolicy]);
+
+  const refreshAdminUsers = async () => {
+    if (!canManagePasswordPolicy) {
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      const response = await fetch("/api/admin/users/password-reset", { cache: "no-store" });
+      const payload = (await response.json()) as { error?: string; users?: AdminUserRow[] };
+      setAdminUsers(Array.isArray(payload.users) ? payload.users : []);
+      setAdminMessage(payload.error ?? "");
+    } catch {
+      setAdminMessage("Não foi possível carregar os usuários da planilha.");
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const updatePasswordResetMode = async (body: { mode: "all"; shouldForce: boolean } | { mode: "single"; shouldForce: boolean; userId: string }) => {
+    if (!canManagePasswordPolicy) {
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      const response = await fetch("/api/admin/users/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json()) as { error?: string; message?: string };
+      setAdminMessage(payload.error ?? payload.message ?? "");
+      if (response.ok) {
+        await refreshAdminUsers();
+        return;
+      }
+    } catch {
+      setAdminMessage("Não foi possível atualizar a política de senha.");
+    } finally {
+      setAdminLoading(false);
+    }
+  };
 
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="grid gap-5">
+      {canManagePasswordPolicy ? (
+        <Card className="p-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge tone="accent">Controle administrativo</Badge>
+                <Badge tone="neutral">{adminUsers.length} usuários encontrados</Badge>
+                <Badge tone="warning">Perfis de gestão: admin e vice_diretor</Badge>
+              </div>
+              <h2 className="mt-4 text-2xl font-semibold text-[var(--foreground)]">Reset de primeiro acesso</h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted-foreground)]">
+                Aqui você controla a coluna `trocar_senha` da planilha. Marcar `SIM` obriga cada usuário a entrar com a senha atual e definir uma nova senha pessoal antes de acessar o painel.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button variant="secondary" onClick={() => void refreshAdminUsers()} disabled={adminLoading}>
+                <ShieldCheck className="size-4" />
+                Atualizar lista
+              </Button>
+              <Button onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: true })} disabled={adminLoading}>
+                <KeyRound className="size-4" />
+                Forçar troca para todos
+              </Button>
+              <Button variant="ghost" onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: false })} disabled={adminLoading}>
+                Liberar todos
+              </Button>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-3">
+            {adminLoading && !adminUsers.length ? (
+              <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 text-sm text-[var(--muted-foreground)]">
+                Carregando usuários da planilha...
+              </div>
+            ) : null}
+            {!adminLoading && !adminUsers.length ? (
+              <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 text-sm text-[var(--muted-foreground)]">
+                Nenhum usuário elegível foi encontrado na aba `usuarios`.
+              </div>
+            ) : null}
+            {adminUsers.map((user) => (
+              <div
+                key={user.id}
+                className="flex flex-col gap-3 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4 lg:flex-row lg:items-center lg:justify-between"
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-semibold text-[var(--foreground)]">{user.nome}</p>
+                    <Badge tone={user.ativo.toUpperCase() === "SIM" ? "success" : "error"}>{user.ativo}</Badge>
+                    <Badge tone={user.trocar_senha.toUpperCase() === "SIM" ? "warning" : "neutral"}>
+                      troca: {user.trocar_senha || "NÃO"}
+                    </Badge>
+                    <Badge tone={getRoleBadgeTone(user.perfil)}>{user.perfil || "sem perfil"}</Badge>
+                  </div>
+                  <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+                    {user.email || "Sem identificador de acesso"} • perfil {user.perfil || "sem perfil"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void updatePasswordResetMode({ mode: "single", userId: user.id, shouldForce: true })}
+                    disabled={adminLoading}
+                  >
+                    Forçar troca
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => void updatePasswordResetMode({ mode: "single", userId: user.id, shouldForce: false })}
+                    disabled={adminLoading}
+                  >
+                    Liberar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {adminMessage ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{adminMessage}</p> : null}
+        </Card>
+      ) : null}
+
+      <div className="grid gap-5 xl:grid-cols-2">
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Modo operacional local</h2>
         <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Ideal para uso imediato no Vercel sem backend obrigatório. Tudo fica salvo no navegador do professor.</p>
@@ -1039,6 +1243,10 @@ export function SettingsWorkspace() {
           }}
         />
       </Card>
+      </div>
     </div>
   );
 }
+
+
+

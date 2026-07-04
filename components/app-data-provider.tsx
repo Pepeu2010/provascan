@@ -202,41 +202,24 @@ function buildOperationalCsv(data: AppDataState) {
   return rows.map((row) => row.join(",")).join("\n");
 }
 
-function isSeedDemoData(data: AppDataState) {
-  return (
-    data.classes.some((item) => item.id === "T-101") ||
-    data.students.some((item) => item.id === "A-001") ||
-    data.exams.some((item) => item.id === "P-301")
-  );
-}
-
 function applyRemoteSchoolData(
   previous: AppDataState,
   remote: RemoteSchoolData,
   session: AuthSessionUser | null,
 ): AppDataState {
   const validClassIds = new Set(remote.classes.map((item) => item.id));
-  const shouldResetAcademicMocks = isSeedDemoData(previous);
-  const nextExams = shouldResetAcademicMocks
-    ? []
-    : previous.exams.filter((item) => validClassIds.has(item.turma));
+  const nextExams = previous.exams.filter((item) => validClassIds.has(item.turma));
   const nextExamIds = new Set(nextExams.map((item) => item.id));
   const nextStudentIds = new Set(remote.students.map((item) => item.id));
 
   return {
     ...previous,
-    answerKeys: shouldResetAcademicMocks
-      ? []
-      : previous.answerKeys.filter((item) => nextExamIds.has(item.provaId)),
+    answerKeys: previous.answerKeys.filter((item) => nextExamIds.has(item.provaId)),
     classes: remote.classes,
-    correctionRules: shouldResetAcademicMocks
-      ? []
-      : previous.correctionRules.filter((item) => nextExamIds.has(item.provaId)),
-    corrections: shouldResetAcademicMocks
-      ? []
-      : previous.corrections.filter(
-          (item) => nextStudentIds.has(item.correction.alunoId) && nextExamIds.has(item.correction.provaId),
-        ),
+    correctionRules: previous.correctionRules.filter((item) => nextExamIds.has(item.provaId)),
+    corrections: previous.corrections.filter(
+      (item) => nextStudentIds.has(item.correction.alunoId) && nextExamIds.has(item.correction.provaId),
+    ),
     exams: nextExams,
     students: remote.students,
     teacherProfile: {

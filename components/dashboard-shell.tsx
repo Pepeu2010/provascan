@@ -32,9 +32,9 @@ const items = [
   { href: "/dashboard/alunos", label: "Alunos", icon: Users },
   { href: "/dashboard/provas", label: "Provas", icon: BookCheck },
   { href: "/dashboard/gabaritos", label: "Gabaritos", icon: ClipboardCheck },
-  { href: "/dashboard/correcao", label: "Correcao por foto", icon: ScanLine },
-  { href: "/dashboard/relatorios", label: "Relatorios", icon: BarChart3 },
-  { href: "/dashboard/configuracoes", label: "Configuracoes", icon: Settings, privileged: true },
+  { href: "/dashboard/correcao", label: "Correção por foto", icon: ScanLine },
+  { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
+  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings, privileged: true },
 ];
 
 export function DashboardShell({
@@ -54,7 +54,7 @@ export function DashboardShell({
         `${data.classes.length} turmas`,
         `${data.students.length} alunos`,
         `${data.exams.length} provas`,
-        `${data.corrections.length} correcoes`,
+        `${data.corrections.length} correções`,
       ].join(" • "),
     [data.classes.length, data.corrections.length, data.exams.length, data.students.length],
   );
@@ -69,12 +69,12 @@ export function DashboardShell({
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
         <Card className="w-full max-w-xl p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">Sessao necessaria</p>
+          <p className="text-sm text-[var(--muted-foreground)]">Sessão necessária</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
             Redirecionando para o login do professor
           </h1>
           <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-            O painel exige uma sessao ativa neste navegador para reduzir exposicao acidental do workspace.
+            O painel exige uma sessão ativa neste navegador para reduzir exposição acidental do workspace.
           </p>
         </Card>
       </div>
@@ -117,7 +117,7 @@ export function DashboardShell({
               </p>
               <p className="mt-2 text-base font-semibold text-[var(--foreground)]">Painel operacional pronto</p>
               <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                O painel esta pronto para uso. Backup e restauracao continuam disponiveis em Configuracoes.
+                O painel está pronto para uso. Backup e restauração continuam disponíveis em Configurações.
               </p>
             </div>
           </div>
@@ -158,7 +158,7 @@ export function DashboardShell({
               <ThemeSwitcher />
               <div className="hidden min-w-[150px] rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),transparent)] px-4 py-3 text-right sm:block">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  Sessao atual
+                  Sessão atual
                 </p>
                 <p className="text-sm font-semibold text-[var(--foreground)]">
                   {session?.nome ?? data.teacherProfile.nome}

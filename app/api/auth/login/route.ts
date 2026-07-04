@@ -7,6 +7,7 @@ import {
   createSessionToken,
 } from "@/lib/auth";
 import { createPasswordStamp, createStoredPassword, isBcryptHash, verifyPassword } from "@/lib/passwords";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
   GoogleSheetsConfigError,
   GoogleSheetsConnectionError,
@@ -25,14 +26,6 @@ const loginSchema = z.object({
   remember: z.boolean().optional().default(false),
 });
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
-const MAX_ATTEMPTS = 8;
-const WINDOW_MS = 10 * 60 * 1000;
-
-function getClientKey(forwardedFor: string | null) {
-  return forwardedFor?.split(",")[0]?.trim() || "unknown";
-}
-
 function isSameOrigin(originHeader: string | null, hostHeader: string | null) {
   if (!originHeader || !hostHeader) {
     return false;
@@ -47,7 +40,7 @@ function isSameOrigin(originHeader: string | null, hostHeader: string | null) {
 }
 
 function invalidCredentialsResponse(status = 401) {
-  return NextResponse.json({ error: "Nome ou senha invalidos." }, { status });
+  return NextResponse.json({ error: "Nome ou senha inválidos." }, { status });
 }
 
 export async function POST(request: Request) {
@@ -56,38 +49,42 @@ export async function POST(request: Request) {
   const host = headersList.get("host");
 
   if (!isSameOrigin(origin, host)) {
-    return NextResponse.json({ error: "Origem da requisicao nao autorizada." }, { status: 403 });
-  }
-
-  const clientKey = getClientKey(headersList.get("x-forwarded-for"));
-  const current = attempts.get(clientKey);
-  const now = Date.now();
-
-  if (current && current.resetAt > now && current.count >= MAX_ATTEMPTS) {
-    return NextResponse.json(
-      { error: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente." },
-      { status: 429 },
-    );
+    return NextResponse.json({ error: "Origem da requisição não autorizada." }, { status: 403 });
   }
 
   try {
     const payload = loginSchema.parse(await request.json());
+    const rateLimit = consumeRateLimit({
+      bucket: "auth-login",
+      key: buildRateLimitKey(getClientIp(headersList), payload.email),
+      limit: 8,
+      windowMs: 10 * 60 * 1000,
+    });
+
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+          },
+        },
+      );
+    }
+
     const user = await getUserByEmail(payload.email);
 
     if (!user) {
-      const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
-      attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
       return invalidCredentialsResponse();
     }
 
     if (!isActiveUser(user.ativo)) {
-      return NextResponse.json({ error: "Usuario inativo." }, { status: 403 });
+      return NextResponse.json({ error: "Usuário inativo." }, { status: 403 });
     }
 
     const passwordMatches = await verifyPassword(payload.password, user.senha);
     if (!passwordMatches) {
-      const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
-      attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
       return invalidCredentialsResponse();
     }
 
@@ -113,8 +110,6 @@ export async function POST(request: Request) {
       passwordStamp: createPasswordStamp(storedPassword),
     });
 
-    attempts.delete(clientKey);
-
     const response = NextResponse.json({
       message: "Login realizado com sucesso.",
       redirectTo: safeUser.forcePasswordChange ? "/trocar-senha" : "/dashboard",
@@ -124,8 +119,6 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const nextCount = current && current.resetAt > now ? current.count + 1 : 1;
-      attempts.set(clientKey, { count: nextCount, resetAt: now + WINDOW_MS });
       return invalidCredentialsResponse(400);
     }
 

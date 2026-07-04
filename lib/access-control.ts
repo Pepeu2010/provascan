@@ -30,3 +30,7 @@ export function canAccessPath(role: UserRole, pathname: string) {
 export function canAccessSensitiveSettings(role: UserRole) {
   return isPrivilegedRole(role);
 }
+
+export function canManageUsers(role: UserRole) {
+  return isPrivilegedRole(role);
+}

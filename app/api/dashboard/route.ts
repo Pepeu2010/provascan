@@ -13,7 +13,7 @@ export async function GET() {
 
   if (!validation.ok) {
     const response = NextResponse.json(
-      { error: "Autenticacao necessaria." },
+      { error: "Autenticação necessária." },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
     clearInvalidSessionCookie(response);
@@ -47,7 +47,7 @@ export async function GET() {
     return response;
   } catch {
     return NextResponse.json(
-      { error: "Nao foi possivel carregar o resumo operacional." },
+      { error: "Não foi possível carregar o resumo operacional." },
       {
         headers: {
           "Cache-Control": "no-store",

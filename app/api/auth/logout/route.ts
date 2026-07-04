@@ -23,10 +23,10 @@ export async function POST() {
   const host = headersList.get("host");
 
   if (!isSameOrigin(origin, host)) {
-    return NextResponse.json({ error: "Origem da requisicao nao autorizada." }, { status: 403 });
+    return NextResponse.json({ error: "Origem da requisição não autorizada." }, { status: 403 });
   }
 
-  const response = NextResponse.json({ message: "Sessao encerrada com sucesso." });
+  const response = NextResponse.json({ message: "Sessão encerrada com sucesso." });
   clearAuthCookie(response);
   return response;
 }

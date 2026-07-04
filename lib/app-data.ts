@@ -8,18 +8,7 @@ import type {
   Student,
   TeacherProfile,
 } from "@/types/domain";
-import {
-  answerKeys,
-  classAverages,
-  classes,
-  correctionRules,
-  correctionSessions,
-  errorRanking,
-  exams,
-  gradeEvolution,
-  students,
-  teacherProfile,
-} from "@/lib/mock-data";
+import { teacherProfile } from "@/lib/mock-data";
 
 export const APP_DATA_STORAGE_KEY = "provascan-app-data";
 export const APP_SESSION_STORAGE_KEY = "provascan-session";
@@ -35,12 +24,12 @@ export type AppDataState = {
 };
 
 export const defaultAppData: AppDataState = {
-  answerKeys,
-  classes,
-  correctionRules,
-  corrections: correctionSessions,
-  exams,
-  students,
+  answerKeys: [],
+  classes: [],
+  correctionRules: [],
+  corrections: [],
+  exams: [],
+  students: [],
   teacherProfile,
 };
 
@@ -68,7 +57,7 @@ export function getClassLabel(classesList: ClassRoom[], classId: string) {
 export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
   if (!data.corrections.length) {
     return {
-      classAverages,
+      classAverages: [],
       dashboardMetrics: [
         {
           label: "Alunos ativos",
@@ -95,13 +84,13 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
           trend: "Aguardando uso",
         },
       ],
-      errorRanking,
-      gradeEvolution,
+      errorRanking: [],
+      gradeEvolution: [],
       outcomeBreakdown: [
         { label: "Acertos", total: 0 },
         { label: "Erros", total: 0 },
         { label: "Em branco", total: 0 },
-        { label: "Multiplas", total: 0 },
+        { label: "Múltiplas", total: 0 },
         { label: "Anuladas", total: 0 },
       ],
       studentRanking: [],
@@ -179,7 +168,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
   );
 
   return {
-    classAverages: correctionsByClass.length ? correctionsByClass : classAverages,
+    classAverages: correctionsByClass,
     dashboardMetrics: [
       {
         label: "Alunos ativos",
@@ -206,8 +195,8 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
         trend: "Atualizado em tempo real",
       },
     ],
-    errorRanking: computedErrorRanking.length ? computedErrorRanking : errorRanking,
-    gradeEvolution: computedGradeEvolution.length ? computedGradeEvolution : gradeEvolution,
+    errorRanking: computedErrorRanking,
+    gradeEvolution: computedGradeEvolution,
     outcomeBreakdown: [
       {
         label: "Acertos",
@@ -222,7 +211,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
         total: data.corrections.reduce((sum, item) => sum + item.correction.emBranco, 0),
       },
       {
-        label: "Multiplas",
+        label: "Múltiplas",
         total: data.corrections.reduce((sum, item) => sum + item.correction.multiplasMarcacoes, 0),
       },
       {

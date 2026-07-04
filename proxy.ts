@@ -20,7 +20,7 @@ export async function proxy(request: NextRequest) {
 
   if (!session) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Autenticacao necessaria." }, { status: 401 });
+      return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
     }
 
     const loginUrl = new URL("/login", request.url);
@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
 
   if (session.forcePasswordChange && !pathname.startsWith("/trocar-senha")) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Troca de senha obrigatoria." }, { status: 403 });
+      return NextResponse.json({ error: "Troca de senha obrigatória." }, { status: 403 });
     }
 
     return NextResponse.redirect(new URL("/trocar-senha", request.url));
