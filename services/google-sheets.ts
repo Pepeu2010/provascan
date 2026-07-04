@@ -67,6 +67,19 @@ function readEnv(): GoogleSheetsEnv | null {
   return parsed.success ? parsed.data : null;
 }
 
+function unwrapEnvValue(value: string) {
+  const trimmed = value.trim();
+
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+
+  return trimmed;
+}
+
 function requireEnv() {
   const env = readEnv();
   if (!env) {
@@ -75,7 +88,11 @@ function requireEnv() {
 
   return {
     ...env,
-    GOOGLE_SHEETS_PRIVATE_KEY: env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    GOOGLE_SHEETS_CLIENT_EMAIL: unwrapEnvValue(env.GOOGLE_SHEETS_CLIENT_EMAIL),
+    GOOGLE_SHEETS_PRIVATE_KEY: unwrapEnvValue(env.GOOGLE_SHEETS_PRIVATE_KEY).replace(/\\n/g, "\n"),
+    GOOGLE_SHEETS_SPREADSHEET_ID: unwrapEnvValue(env.GOOGLE_SHEETS_SPREADSHEET_ID),
+    GOOGLE_SHEETS_USERS_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_USERS_TAB),
+    GOOGLE_SHEETS_STUDENTS_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_STUDENTS_TAB),
   };
 }
 
