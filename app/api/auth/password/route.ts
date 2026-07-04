@@ -2,7 +2,7 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { applyAuthCookie, AUTH_COOKIE_NAME, buildSessionUser, createSessionToken } from "@/lib/auth";
-import { createPasswordStamp, createStoredPassword, verifyPassword } from "@/lib/passwords";
+import { createPasswordStamp, verifyPassword } from "@/lib/passwords";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
@@ -88,8 +88,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nome ou senha inválidos." }, { status: 401 });
     }
 
-    const nextStoredPassword = await createStoredPassword(payload.newPassword);
-    await updateUserPassword(user.id, nextStoredPassword);
+    const nextStoredPassword = payload.newPassword;
+    await updateUserPassword(user.id, nextStoredPassword, { clearPasswordChangeFlag: true });
 
     const loggedInAt = new Date().toISOString();
     const safeUser = {

@@ -63,6 +63,12 @@ const featureList = [
   "Integração com Google Sheets",
 ];
 
+const mobileEntryPoints = [
+  { href: "/dashboard/correcao", label: "Corrigir agora" },
+  { href: "/login", label: "Entrar no painel" },
+  { href: "#fluxo", label: "Ver fluxo" },
+];
+
 const MOTION_EASE = [0.22, 1, 0.36, 1] as const;
 
 const containerVariants = {
@@ -106,12 +112,7 @@ export default function HomePage() {
       <div className="ambient-orb ambient-orb-c" aria-hidden="true" />
 
       <div className="mx-auto max-w-[1280px] px-4 pt-4 lg:px-6">
-        <motion.header
-          initial={reducedMotion ? false : { opacity: 0, y: -18 }}
-          animate={reducedMotion ? {} : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.72, ease: MOTION_EASE }}
-          className="relative z-40 flex flex-col gap-4 rounded-[30px] border border-[var(--border)] bg-[var(--card)] px-5 py-4 backdrop-blur md:flex-row md:items-center md:justify-between"
-        >
+        <header className="mobile-top-shell relative z-40 flex flex-col gap-4 rounded-[30px] border border-[var(--border)] bg-[var(--card)] px-4 py-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-5">
           <ProvaScanLogo size="sm" priority />
           <nav className="hidden items-center gap-6 text-sm text-[var(--muted-foreground)] md:flex">
             {[
@@ -128,58 +129,91 @@ export default function HomePage() {
               </a>
             ))}
           </nav>
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
             <ThemeSwitcher compact />
             <Link href="/login">
-              <Button variant="ghost" className="w-auto">
+              <Button variant="ghost" className="min-w-[96px]">
                 Entrar
               </Button>
             </Link>
             <Link href="/dashboard">
-              <Button className="w-auto">Criar conta</Button>
+              <Button className="min-w-[124px]">Criar conta</Button>
             </Link>
           </div>
-        </motion.header>
+          <div className="mobile-nav-scroller -mx-1 flex gap-2 overflow-x-auto pb-1 md:hidden">
+            {mobileEntryPoints.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="inline-flex shrink-0 items-center rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_76%,transparent)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </header>
       </div>
 
-      <motion.section
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="relative mx-auto grid max-w-[1280px] gap-8 px-4 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-6 lg:pt-14"
-      >
-        <div className="relative py-6">
+      <section className="relative mx-auto grid max-w-[1280px] gap-6 px-4 pt-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:px-6 lg:pt-14">
+        <div className="relative py-2 lg:py-6">
           <motion.div variants={fadeUp}>
-            <Badge tone="neutral">Exclusivo para professores</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="neutral">Exclusivo para professores</Badge>
+              <span className="rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_86%,transparent)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                Mobile first
+              </span>
+            </div>
           </motion.div>
 
           <motion.h1
             variants={fadeUp}
-            className="text-sheen mt-6 max-w-3xl text-5xl font-semibold tracking-[-0.06em] text-[var(--foreground)] sm:text-6xl"
+            className="text-sheen mt-5 max-w-3xl text-[2.5rem] font-semibold leading-[0.92] tracking-[-0.07em] text-[var(--foreground)] sm:text-6xl"
           >
             Corrija cartões-resposta em segundos, com revisão visual e histórico salvo na sua planilha.
           </motion.h1>
 
           <motion.p
             variants={fadeUp}
-            className="mt-6 max-w-2xl text-lg leading-8 text-[var(--muted-foreground)]"
+            className="mt-5 max-w-2xl text-base leading-7 text-[var(--muted-foreground)] sm:text-lg sm:leading-8"
           >
             O ProvaScan organiza turmas, provas e gabaritos em um só lugar. Depois, lê a foto do cartão,
             identifica o aluno, compara com o gabarito oficial e entrega relatórios claros para a turma.
           </motion.p>
 
-          <motion.div variants={fadeUp} className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <motion.div variants={fadeUp} className="mt-7 flex flex-col gap-3 sm:flex-row">
             <Link href="/dashboard">
-              <Button size="lg">
+              <Button size="lg" className="w-full sm:w-auto">
                 Abrir painel do professor
                 <ArrowRight className="size-4 transition-transform duration-300 group-hover/button:translate-x-1" />
               </Button>
             </Link>
             <Link href="/dashboard/correcao">
-              <Button size="lg" variant="secondary">
+              <Button size="lg" variant="secondary" className="w-full sm:w-auto">
                 Testar correção por foto
               </Button>
             </Link>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="mobile-signal-panel mt-6 rounded-[28px] border border-[var(--border)] p-4 sm:p-5 lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                  Entrada rapida
+                </p>
+                <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">Tudo o que o professor precisa na primeira dobra.</p>
+              </div>
+              <Badge tone="accent">{latest.confiancaOcr}% OCR</Badge>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted-foreground)]">Aluno</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{latest.aluno.nome}</p>
+              </div>
+              <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted-foreground)]">Acerto</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{latest.correction.percentual}% na revisao</p>
+              </div>
+            </div>
           </motion.div>
 
           <motion.div variants={containerVariants} className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -198,7 +232,7 @@ export default function HomePage() {
           </motion.div>
         </div>
 
-        <motion.div variants={fadeScale}>
+        <motion.div variants={fadeScale} className="hidden lg:block">
           <Card className="hero-monitor overflow-hidden p-5">
             <div className="scan-sweep" aria-hidden="true" />
             <div className="grid gap-4 rounded-[26px] border border-[var(--hero-border)] bg-[linear-gradient(180deg,var(--hero-bg),var(--hero-bg-end))] p-5 text-[var(--hero-foreground)]">
@@ -288,7 +322,7 @@ export default function HomePage() {
             </div>
           </Card>
         </motion.div>
-      </motion.section>
+      </section>
 
       <RevealSection id="beneficios" className="mx-auto mt-10 grid max-w-[1280px] gap-5 px-4 lg:grid-cols-3 lg:px-6">
         {benefits.map((item, index) => (

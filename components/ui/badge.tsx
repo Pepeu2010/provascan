@@ -3,9 +3,11 @@ import { cn } from "@/lib/utils";
 
 export function Badge({
   children,
+  className,
   tone = "neutral",
 }: {
   children: ReactNode;
+  className?: string;
   tone?: "neutral" | "accent" | "success" | "error" | "warning";
 }) {
   return (
@@ -17,6 +19,7 @@ export function Badge({
         tone === "success" && "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--success)]",
         tone === "error" && "border-[var(--error-border)] bg-[var(--error-soft)] text-[var(--error)]",
         tone === "warning" && "border-[var(--warning-border)] bg-[var(--warning-soft)] text-[var(--warning)]",
+        className,
       )}
     >
       {children}

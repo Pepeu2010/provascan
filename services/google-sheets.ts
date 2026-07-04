@@ -312,26 +312,37 @@ async function findUserRowById(userId: string) {
   return { env, sheets, match };
 }
 
-export async function updateUserPassword(userId: string, nextStoredPassword: string) {
+export async function updateUserPassword(
+  userId: string,
+  nextStoredPassword: string,
+  options?: {
+    clearPasswordChangeFlag?: boolean;
+  },
+) {
   const found = await findUserRowById(userId);
   if (!found) {
     throw new GoogleSheetsSchemaError("Usuario nao encontrado para atualizar senha.");
   }
 
   try {
+    const data: sheets_v4.Schema$ValueRange[] = [
+      {
+        range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!D${found.match.rowNumber}`,
+        values: [[nextStoredPassword]],
+      },
+    ];
+
+    if (options?.clearPasswordChangeFlag) {
+      data.push({
+        range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!G${found.match.rowNumber}`,
+        values: [["NAO"]],
+      });
+    }
+
     await found.sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: found.env.GOOGLE_SHEETS_SPREADSHEET_ID,
       requestBody: {
-        data: [
-          {
-            range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!D${found.match.rowNumber}`,
-            values: [[nextStoredPassword]],
-          },
-          {
-            range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!G${found.match.rowNumber}`,
-            values: [["NAO"]],
-          },
-        ],
+        data,
         valueInputOption: "USER_ENTERED",
       },
     });

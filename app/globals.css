@@ -377,6 +377,36 @@ a:focus-visible {
     linear-gradient(180deg, color-mix(in srgb, var(--card-solid) 96%, transparent), color-mix(in srgb, var(--surface) 68%, transparent));
 }
 
+.mobile-top-shell {
+  box-shadow: 0 24px 54px -42px rgba(15, 23, 42, 0.38);
+}
+
+.mobile-nav-scroller {
+  scrollbar-width: none;
+}
+
+.mobile-nav-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-signal-panel {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 14%, transparent), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, var(--card-solid) 96%, transparent), color-mix(in srgb, var(--surface) 76%, transparent));
+  box-shadow: var(--shadow-soft);
+}
+
+.login-hero-panel {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in srgb, var(--card-solid) 98%, transparent), color-mix(in srgb, var(--surface) 74%, transparent));
+}
+
+.login-form-panel {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card-solid) 94%, transparent), color-mix(in srgb, var(--surface) 68%, transparent));
+}
+
 .dashboard-stat-card {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--card-solid) 96%, transparent), color-mix(in srgb, var(--surface) 78%, transparent));
@@ -481,5 +511,13 @@ a:focus-visible {
   .ambient-orb,
   .scan-sweep {
     animation: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-shell-panel {
+    background:
+      radial-gradient(circle at top right, rgba(107, 231, 216, 0.12), transparent 26%),
+      linear-gradient(180deg, color-mix(in srgb, var(--card-solid) 98%, transparent), color-mix(in srgb, var(--surface) 72%, transparent));
   }
 }

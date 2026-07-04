@@ -6,7 +6,7 @@ import {
   buildSessionUser,
   createSessionToken,
 } from "@/lib/auth";
-import { createPasswordStamp, createStoredPassword, isBcryptHash, verifyPassword } from "@/lib/passwords";
+import { createPasswordStamp, verifyPassword } from "@/lib/passwords";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
   GoogleSheetsConfigError,
@@ -15,7 +15,6 @@ import {
   getUserByEmail,
   isActiveUser,
   shouldForcePasswordChange,
-  updateUserPassword,
 } from "@/services/google-sheets";
 
 export const runtime = "nodejs";
@@ -88,11 +87,7 @@ export async function POST(request: Request) {
       return invalidCredentialsResponse();
     }
 
-    let storedPassword = user.senha;
-    if (!isBcryptHash(storedPassword)) {
-      storedPassword = await createStoredPassword(payload.password);
-      await updateUserPassword(user.id, storedPassword);
-    }
+    const storedPassword = user.senha;
 
     const loggedInAt = new Date().toISOString();
     const safeUser = {

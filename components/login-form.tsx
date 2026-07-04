@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
@@ -15,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 const highlights = [
   "Acesso seguro por perfil",
   "Planilha protegida no servidor",
-  "Fluxo rápido para primeiro acesso",
+  "Fluxo rapido para primeiro acesso",
 ];
 
 export function LoginForm() {
@@ -47,31 +46,39 @@ export function LoginForm() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(8,15,28,0.58),transparent)]" />
 
       <div className="absolute right-4 top-4 z-20 lg:right-6 lg:top-6">
-        <ThemeSwitcher />
+        <ThemeSwitcher compact />
       </div>
 
       <div className="relative mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1480px] items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, y: 18, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.38, ease: "easeOut" }}
-          className="w-full max-w-xl"
-        >
-          <Card className="relative overflow-hidden p-6 sm:p-8">
+        <div className="w-full max-w-xl">
+          <Card className="relative overflow-hidden p-4 sm:p-5">
             <div className="absolute inset-x-10 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(96,165,250,0.7),transparent)]" />
 
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <ProvaScanLogo size="md" />
-                <p className="mt-6 text-sm text-[var(--muted-foreground)]">Professor, faça seu login</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--foreground)] sm:text-[2.15rem]">
-                  Acesse o painel ProvaScan
-                </h1>
+            <div className="login-hero-panel rounded-[28px] border border-[var(--border)] p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <ProvaScanLogo size="md" />
+                  <p className="mt-5 text-sm text-[var(--muted-foreground)]">Professor, faca seu login</p>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[var(--foreground)] sm:text-[2.3rem]">
+                    Acesse o painel ProvaScan
+                  </h1>
+                </div>
+                <Badge tone="neutral" className="hidden sm:inline-flex">Login seguro</Badge>
               </div>
-              <Badge tone="neutral">Login seguro</Badge>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_82%,transparent)] p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Acesso</p>
+                  <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">Professor e equipe autorizada</p>
+                </div>
+                <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_82%,transparent)] p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Fluxo</p>
+                  <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">Entrar, revisar, corrigir e salvar</p>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               {highlights.map((item) => (
                 <div
                   key={item}
@@ -84,7 +91,7 @@ export function LoginForm() {
             </div>
 
             <form
-              className="mt-8 grid gap-4"
+              className="login-form-panel mt-4 grid gap-4 rounded-[28px] border border-[var(--border)] p-5 sm:p-6"
               onSubmit={(event) => {
                 event.preventDefault();
                 void handleLogin();
@@ -125,7 +132,7 @@ export function LoginForm() {
                 </button>
               </div>
 
-              <Button size="lg" className="mt-2 w-full" type="submit" disabled={isSubmitting}>
+              <Button size="lg" className="mt-2 h-[54px] w-full rounded-[20px]" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Entrando..." : "Entrar"}
               </Button>
             </form>
@@ -137,13 +144,13 @@ export function LoginForm() {
             ) : null}
 
             {showRecovery ? (
-              <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5">
+              <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 size-5 text-[var(--accent)]" />
                   <div>
-                    <p className="text-sm font-semibold text-[var(--foreground)]">Primeiro acesso e troca obrigatória</p>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">Primeiro acesso e troca obrigatoria</p>
                     <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                      O acesso depende da aba `usuarios` no Google Sheets. Se `trocar_senha = SIM`, o usuário será
+                      O acesso depende da aba `usuarios` no Google Sheets. Se `trocar_senha = SIM`, o usuario sera
                       redirecionado para definir uma nova senha antes de entrar no painel.
                     </p>
                   </div>
@@ -151,7 +158,7 @@ export function LoginForm() {
               </div>
             ) : null}
           </Card>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

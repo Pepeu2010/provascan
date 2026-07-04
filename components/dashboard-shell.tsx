@@ -125,19 +125,14 @@ export function DashboardShell({
       </aside>
 
       <main className="min-w-0 flex-1">
-        <motion.header
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-          className="dashboard-shell-panel relative z-40 mb-6 overflow-hidden rounded-[32px] border border-[var(--border)] p-5"
-        >
+        <header className="dashboard-shell-panel relative z-40 mb-6 overflow-hidden rounded-[32px] border border-[var(--border)] p-4 sm:p-5">
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
           <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="flex items-start justify-between gap-3 xl:block">
               <button
                 type="button"
                 onClick={() => setMenuOpen(true)}
-                className="inline-flex size-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] lg:hidden"
+                className="inline-flex size-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_94%,transparent)] text-[var(--foreground)] lg:hidden"
                 aria-label="Abrir menu"
               >
                 <Menu className="size-5" />
@@ -151,6 +146,20 @@ export function DashboardShell({
                   {data.teacherProfile.escola}
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:hidden">
+              <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Sessao</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
+              </div>
+              <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Perfil</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold capitalize text-[var(--foreground)]">{session?.role ?? "professor"}</p>
+                  <Badge tone="accent">Online</Badge>
+                </div>
               </div>
             </div>
 
@@ -176,7 +185,7 @@ export function DashboardShell({
               </Button>
             </div>
           </div>
-        </motion.header>
+        </header>
 
         {children}
       </main>
@@ -209,6 +218,11 @@ export function DashboardShell({
               </div>
               <div className="mt-6 space-y-1.5">
                 {renderNavItems(active, session?.role ?? "professor", () => setMenuOpen(false))}
+              </div>
+              <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface)_88%,transparent),transparent)] p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Workspace ativo</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
+                <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
               </div>
               <div className="mt-6">
                 <ThemeSwitcher compact />
