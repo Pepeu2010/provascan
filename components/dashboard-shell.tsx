@@ -45,7 +45,7 @@ export function DashboardShell({
   active: string;
 }) {
   const router = useRouter();
-  const { data, isHydrated, logoutTeacher, session } = useAppData();
+  const { authResolved, data, isHydrated, logoutTeacher, session } = useAppData();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const summary = useMemo(
@@ -60,12 +60,12 @@ export function DashboardShell({
   );
 
   useEffect(() => {
-    if (isHydrated && !session) {
+    if (isHydrated && authResolved && !session) {
       router.replace("/login");
     }
-  }, [isHydrated, router, session]);
+  }, [authResolved, isHydrated, router, session]);
 
-  if (isHydrated && !session) {
+  if (isHydrated && authResolved && !session) {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
         <Card className="w-full max-w-xl p-6">
@@ -75,6 +75,22 @@ export function DashboardShell({
           </h1>
           <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
             O painel exige uma sessão ativa neste navegador para reduzir exposição acidental do workspace.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isHydrated && !authResolved) {
+    return (
+      <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
+        <Card className="w-full max-w-xl p-6">
+          <p className="text-sm text-[var(--muted-foreground)]">Validando sessao</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
+            Confirmando acesso ao painel
+          </h1>
+          <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
+            O painel aguarda a validacao da sessao antes de decidir qualquer redirecionamento.
           </p>
         </Card>
       </div>

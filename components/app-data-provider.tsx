@@ -89,6 +89,7 @@ type SaveCorrectionRuleInput = {
 
 type AppDataContextValue = {
   analytics: ReturnType<typeof calculateAnalytics>;
+  authResolved: boolean;
   data: AppDataState;
   isHydrated: boolean;
   session: AuthSessionUser | null;
@@ -256,6 +257,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
   const [data, setData] = useState<AppDataState>(() => cloneDefaultAppData());
 
+  const [authResolved, setAuthResolved] = useState(false);
   const [session, setSession] = useState<AuthSessionUser | null>(null);
 
   useEffect(() => {
@@ -271,6 +273,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         if (!response.ok) {
           if (!cancelled) {
             setSession(null);
+            setAuthResolved(true);
           }
           return;
         }
@@ -278,10 +281,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         const payload = (await response.json()) as { user?: AuthSessionUser | null };
         if (!cancelled) {
           setSession(normalizeSession(payload.user));
+          setAuthResolved(true);
         }
       } catch {
         if (!cancelled) {
           setSession(null);
+          setAuthResolved(true);
         }
       }
     };
@@ -616,6 +621,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }
 
         setSession(normalizeSession(payload.user));
+        setAuthResolved(true);
         return {
           ok: true,
           message: payload.message ?? "Login realizado com sucesso.",
@@ -652,6 +658,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }
 
         setSession(normalizeSession(payload.user));
+        setAuthResolved(true);
         return {
           ok: true,
           message: payload.message ?? "Senha alterada com sucesso.",
@@ -667,11 +674,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         await fetch("/api/auth/logout", { method: "POST" });
       } finally {
         setSession(null);
+        setAuthResolved(true);
       }
     };
 
     return {
       analytics: calculateAnalytics(data),
+      authResolved,
       createClass: createClassHandler,
       changeTeacherPassword: changeTeacherPasswordHandler,
       createExam: createExamHandler,
@@ -695,7 +704,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateExam: updateExamHandler,
       updateStudent: updateStudentHandler,
     };
-  }, [data, isHydrated, session]);
+  }, [authResolved, data, isHydrated, session]);
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }

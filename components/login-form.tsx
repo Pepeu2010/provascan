@@ -18,7 +18,7 @@ const highlights = [
 ];
 
 export function LoginForm() {
-  const { loginTeacher, session } = useAppData();
+  const { authResolved, loginTeacher, session } = useAppData();
   const [email, setEmail] = useState(session?.email ?? "");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(Boolean(session?.remember));
@@ -27,7 +27,7 @@ export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!session) {
+    if (!authResolved || !session) {
       return;
     }
 
@@ -37,7 +37,7 @@ export function LoginForm() {
       ? "/trocar-senha"
       : getSafePostAuthRedirect(redirect, "/dashboard");
     navigateAfterAuth(target);
-  }, [session]);
+  }, [authResolved, session]);
 
   const handleLogin = async () => {
     setIsSubmitting(true);

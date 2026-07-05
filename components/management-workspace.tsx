@@ -339,6 +339,9 @@ export function ExamsManager() {
     quantidadeQuestoes: "10",
     titulo: "",
   });
+  const selectedAudienceId = audienceOptions.some((option) => option.id === form.audienceId)
+    ? form.audienceId
+    : (fallbackAudience?.id ?? "");
 
   const activeExam = data.exams.find((item) => item.id === selectedExamId) ?? data.exams[0];
   const activeClass = getRepresentativeClassForExam(activeExam, data.classes);
@@ -349,18 +352,6 @@ export function ExamsManager() {
   );
   const hasYearTwoAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "2"), [data.classes]);
   const hasYearThreeAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "3"), [data.classes]);
-
-  useEffect(() => {
-    if (!audienceOptions.length) {
-      return;
-    }
-
-    setForm((previous) =>
-      audienceOptions.some((option) => option.id === previous.audienceId)
-        ? previous
-        : { ...previous, audienceId: audienceOptions[0].id },
-    );
-  }, [audienceOptions]);
 
   const [ruleForm, setRuleForm] = useState(() => {
     if (!activeExam || !rule) {
@@ -523,7 +514,7 @@ export function ExamsManager() {
         </div>
         <div className="mt-6 grid gap-3 lg:grid-cols-5">
           <Input placeholder="Titulo da prova" value={form.titulo} onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))} />
-          <FieldSelect value={form.audienceId} onChange={(audienceId) => setForm((prev) => ({ ...prev, audienceId }))}>
+          <FieldSelect value={selectedAudienceId} onChange={(audienceId) => setForm((prev) => ({ ...prev, audienceId }))}>
             {audienceOptions.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -540,10 +531,10 @@ export function ExamsManager() {
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
-          <Button
-            onClick={() => {
-              if (!form.titulo.trim() || !form.audienceId) return;
-              const audience = audienceOptions.find((item) => item.id === form.audienceId);
+            <Button
+              onClick={() => {
+              if (!form.titulo.trim() || !selectedAudienceId) return;
+              const audience = audienceOptions.find((item) => item.id === selectedAudienceId);
               if (!audience) return;
               const payload = {
                 alternativas: form.alternativas.split(",").map((item) => item.trim()).filter(Boolean),
