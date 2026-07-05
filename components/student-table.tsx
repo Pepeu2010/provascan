@@ -22,7 +22,7 @@ export function StudentTable({
         <div>
           <h3 className="text-lg font-semibold text-[var(--foreground)]">Últimos alunos</h3>
           <p className="text-sm text-[var(--muted-foreground)]">
-            Cadastros organizados por turma e prontos para correção local.
+            Cadastros organizados por turma e prontos para correção com persistência em planilha.
           </p>
         </div>
         <Badge tone="accent">Modo operacional</Badge>

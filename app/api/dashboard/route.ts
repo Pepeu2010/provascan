@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { calculateAnalytics } from "@/lib/app-data";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
-import { correctionSessions, dashboardMetrics } from "@/lib/mock-data";
-import { getSystemSnapshot } from "@/services/google-sheets";
+import { getOperationalAppData, getSystemSnapshot } from "@/services/google-sheets";
 
 export const runtime = "nodejs";
 
@@ -21,11 +21,12 @@ export async function GET() {
   }
 
   try {
-    const snapshot = await getSystemSnapshot();
+    const [snapshot, data] = await Promise.all([getSystemSnapshot(), getOperationalAppData()]);
+    const analytics = calculateAnalytics(data);
     const response = NextResponse.json(
       {
-        metrics: dashboardMetrics,
-        latestCorrection: correctionSessions[0],
+        metrics: analytics.dashboardMetrics,
+        latestCorrection: data.corrections[0] ?? null,
         storage: snapshot,
       },
       {

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -35,11 +36,6 @@ import type {
   AudienceGroupType,
   YearSegment,
 } from "@/types/domain";
-
-type RemoteSchoolData = {
-  classes: ClassRoom[];
-  students: Student[];
-};
 
 type CreateClassInput = {
   ano: string;
@@ -225,32 +221,17 @@ function normalizeAppDataState(state: AppDataState): AppDataState {
   };
 }
 
-function applyRemoteSchoolData(
-  previous: AppDataState,
-  remote: RemoteSchoolData,
-  session: AuthSessionUser | null,
-): AppDataState {
-  const normalizedClasses = normalizeClasses(remote.classes);
-  const nextExams = normalizeExams(previous.exams, normalizedClasses);
-  const nextExamIds = new Set(nextExams.map((item) => item.id));
-  const nextStudentIds = new Set(remote.students.map((item) => item.id));
+function applyRemoteAppData(remote: AppDataState, session: AuthSessionUser | null) {
+  const normalized = normalizeAppDataState(remote);
 
-  return normalizeAppDataState({
-    ...previous,
-    answerKeys: previous.answerKeys.filter((item) => nextExamIds.has(item.provaId)),
-    classes: normalizedClasses,
-    correctionRules: previous.correctionRules.filter((item) => nextExamIds.has(item.provaId)),
-    corrections: previous.corrections.filter(
-      (item) => nextStudentIds.has(item.correction.alunoId) && nextExamIds.has(item.correction.provaId),
-    ),
-    exams: nextExams,
-    students: remote.students,
+  return {
+    ...normalized,
     teacherProfile: {
-      ...previous.teacherProfile,
-      email: session?.email ?? previous.teacherProfile.email,
-      nome: session?.nome ?? previous.teacherProfile.nome,
+      ...normalized.teacherProfile,
+      email: session?.email ?? normalized.teacherProfile.email,
+      nome: session?.nome ?? normalized.teacherProfile.nome,
     },
-  });
+  } satisfies AppDataState;
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
@@ -259,6 +240,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const [authResolved, setAuthResolved] = useState(false);
   const [session, setSession] = useState<AuthSessionUser | null>(null);
+  const hasLoadedRemoteDataRef = useRef(false);
+  const lastSyncedPayloadRef = useRef("");
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -300,42 +283,81 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !session) {
+      hasLoadedRemoteDataRef.current = false;
+      lastSyncedPayloadRef.current = "";
       return;
     }
 
     let cancelled = false;
 
-    const syncSchoolData = async () => {
+    const syncAppData = async () => {
       try {
-        const response = await fetch("/api/school-data", { cache: "no-store" });
+        const response = await fetch("/api/app-data", { cache: "no-store" });
         if (!response.ok) {
           return;
         }
 
-        const payload = (await response.json()) as Partial<RemoteSchoolData>;
-        if (!Array.isArray(payload.classes) || !Array.isArray(payload.students)) {
+        const payload = normalizeImportedData(await response.json());
+        if (!payload) {
           return;
         }
 
         if (!cancelled) {
-          setData((previous) =>
-            applyRemoteSchoolData(previous, {
-              classes: payload.classes as ClassRoom[],
-              students: payload.students as Student[],
-            }, session),
-          );
+          const nextData = applyRemoteAppData(payload, session);
+          setData(nextData);
+          lastSyncedPayloadRef.current = JSON.stringify(nextData);
+          hasLoadedRemoteDataRef.current = true;
         }
       } catch {
-        // Mantem a base local se a sincronizacao remota falhar.
+        // Evita sobrescrever a planilha com estado vazio quando a carga remota falha.
       }
     };
 
-    void syncSchoolData();
+    void syncAppData();
 
     return () => {
       cancelled = true;
     };
   }, [session]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !session || !hasLoadedRemoteDataRef.current) {
+      return;
+    }
+
+    const payload = JSON.stringify(data);
+    if (payload === lastSyncedPayloadRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch("/api/app-data", {
+            body: JSON.stringify({ data }),
+            headers: {
+              "Content-Type": "application/json",
+            },
+            method: "PUT",
+          });
+
+          if (!response.ok || cancelled) {
+            return;
+          }
+
+          lastSyncedPayloadRef.current = payload;
+        } catch {
+          // Mantem o estado local; a proxima alteracao tenta persistir novamente.
+        }
+      })();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [data, session]);
 
   const value = useMemo<AppDataContextValue>(() => {
     const createClassHandler = (input: CreateClassInput) => {
@@ -563,7 +585,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         corrections: [sessionToSave, ...previous.corrections],
       }));
 
-      return { ok: true, message: "Correção salva com sucesso no histórico local." };
+      return { ok: true, message: "Correção salva com sucesso na planilha operacional." };
     };
 
     const exportDataHandler = () => JSON.stringify(data, null, 2);

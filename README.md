@@ -1,6 +1,6 @@
 # ProvaScan
 
-Sistema web para professores corrigirem provas objetivas, organizarem turmas e alunos, salvarem gabaritos e registrarem correcoes com historico local. A autenticacao usa Google Sheets como base inicial de usuarios.
+Sistema web para professores corrigirem provas objetivas, organizarem turmas e alunos, salvarem gabaritos e registrarem correcoes com persistencia operacional em Google Planilhas. A autenticacao usa Google Sheets como base inicial de usuarios.
 
 ## Estado atual
 
@@ -15,15 +15,15 @@ Funciona hoje:
 - Cadastro, edicao e exclusao de alunos
 - Cadastro, edicao e exclusao de provas
 - Editor de gabarito com salvamento real
-- Fluxo de correcao com revisao manual e historico local
+- Fluxo de correcao com revisao manual e historico persistido em planilha
 - UX mobile especifica para gabarito e correcao
 - Exportacao operacional em JSON e CSV
 - Importacao e restauracao por JSON
 
 Limitacoes atuais:
 
-- Os dados operacionais sensiveis nao sao mais persistidos automaticamente no navegador
-- O painel administrativo de usuarios ainda nao foi implementado
+- Google Planilhas continua sendo a camada de persistencia, entao concorrencia pesada nao e o foco
+- O painel administrativo de usuarios ainda nao foi implementado por completo
 - OCR continua opcional
 
 ## Stack
@@ -56,6 +56,13 @@ GOOGLE_SHEETS_CLIENT_EMAIL=
 GOOGLE_SHEETS_PRIVATE_KEY=
 GOOGLE_SHEETS_SPREADSHEET_ID=
 GOOGLE_SHEETS_USERS_TAB=usuarios
+GOOGLE_SHEETS_STUDENTS_TAB=alunos
+GOOGLE_SHEETS_CLASSES_TAB=turmas
+GOOGLE_SHEETS_EXAMS_TAB=provas
+GOOGLE_SHEETS_ANSWER_KEYS_TAB=gabaritos
+GOOGLE_SHEETS_CORRECTION_RULES_TAB=regras_correcao
+GOOGLE_SHEETS_CORRECTIONS_TAB=correcoes
+GOOGLE_SHEETS_CONFIG_TAB=provascan_config
 ENABLE_TESSERACT_OCR=
 AUTH_SECRET=
 ```
@@ -95,6 +102,8 @@ Isso preserva a estrutura atual sem manter o fallback inseguro em operacao norma
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `POST /api/auth/password`
+- `GET /api/app-data`
+- `PUT /api/app-data`
 
 As areas `/dashboard`, `/admin` e `/painel` exigem autenticacao. Quando `trocar_senha = SIM`, o usuario so pode seguir para `/trocar-senha` ate concluir a atualizacao. Rotas privilegiadas tambem respeitam o `perfil` da planilha.
 
@@ -110,7 +119,7 @@ As areas `/dashboard`, `/admin` e `/painel` exigem autenticacao. Quando `trocar_
 
 - `app/`: rotas e paginas
 - `components/`: shell, UI e areas operacionais
-- `lib/`: store local, utilitarios e autenticacao
+- `lib/`: estado base, utilitarios e autenticacao
 - `services/`: integracoes opcionais e acesso ao Google Sheets
 - `types/`: contratos de dominio
 
@@ -120,5 +129,7 @@ As areas `/dashboard`, `/admin` e `/painel` exigem autenticacao. Quando `trocar_
 - Rode `npm run lint`
 - Rode `npm run build`
 - Teste `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` e `POST /api/auth/password`
+- Teste `GET /api/app-data` e `PUT /api/app-data`
 - Confirme que a aba `usuarios` tem exatamente as colunas esperadas
+- Confirme que as abas operacionais (`turmas`, `alunos`, `provas`, `gabaritos`, `regras_correcao`, `correcoes`, `provascan_config`) foram criadas ou inicializadas
 - Abra o app e teste login normal, login inativo e fluxo de troca obrigatoria

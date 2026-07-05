@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, Edit3, FileUp, KeyRound, Printer, QrCode, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
@@ -55,13 +55,10 @@ function FieldSelect({
 }: {
   value: string;
   onChange: (value: string) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <Select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    >
+    <Select value={value} onChange={(event) => onChange(event.target.value)}>
       {children}
     </Select>
   );
@@ -1206,8 +1203,8 @@ export function SettingsWorkspace() {
 
       <div className="grid gap-5 xl:grid-cols-2">
       <Card className="p-6">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Modo operacional local</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Ideal para uso imediato no Vercel sem backend obrigatório. Tudo fica salvo no navegador do professor.</p>
+        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Persistência operacional</h2>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Os dados do painel agora são lidos e gravados nas abas operacionais do Google Planilhas. O backup JSON continua disponível como contingência manual.</p>
         <div className="mt-6 rounded-[24px] bg-[var(--surface)] p-5">
           <p className="text-sm text-[var(--muted-foreground)]">Resumo atual</p>
           <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
@@ -1238,7 +1235,7 @@ export function SettingsWorkspace() {
             variant="ghost"
             onClick={() => {
               resetData();
-              setMessage("Base local restaurada para o conjunto inicial.");
+              setMessage("Base operacional restaurada para o conjunto inicial e pronta para sincronizar.");
             }}
           >
             <RotateCcw className="size-4" />

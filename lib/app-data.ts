@@ -69,7 +69,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
           label: "Provas criadas",
           value: String(data.exams.length),
           helper: `${data.answerKeys.length} respostas no gabarito`,
-          trend: "Modo operacional local",
+          trend: "Persistencia em planilha",
         },
         {
           label: "Correções salvas",
