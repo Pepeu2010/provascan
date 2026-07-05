@@ -11,25 +11,12 @@ type DerivedAudience = ExamAudienceOption & {
   requiresManualGrouping: boolean;
 };
 
-const MANUAL_TRACKS: Array<Pick<ExamAudienceOption, "groupType" | "label">> = [
-  { groupType: "EXATAS", label: "Exatas" },
-  { groupType: "HUMANAS", label: "Humanas" },
-  { groupType: "TECNICO", label: "Técnico" },
-  { groupType: "CIENCIA_DE_DADOS", label: "Ciência de Dados" },
-  { groupType: "ADS", label: "ADS" },
-  { groupType: "MISTO", label: "Exatas e Humanas" },
-];
-
 function normalizeText(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-}
-
-function normalizeCompact(value: string) {
-  return normalizeText(value).replace(/[^a-z0-9]/g, "");
 }
 
 function slugify(value: string) {
@@ -43,41 +30,12 @@ function createAudienceId(yearSegment: YearSegment, groupType: AudienceGroupType
   return suffix ? `${base}-${suffix}` : base;
 }
 
-function getTrackLabel(groupType: AudienceGroupType) {
-  switch (groupType) {
-    case "GERAL":
-      return "";
-    case "EXATAS":
-      return "Exatas";
-    case "HUMANAS":
-      return "Humanas";
-    case "TECNICO":
-      return "Técnico";
-    case "CIENCIA_DE_DADOS":
-      return "Ciência de Dados";
-    case "ADS":
-      return "ADS";
-    case "MISTO":
-      return "Exatas e Humanas";
-    case "INDEFINIDO":
-      return "Revisar agrupamento";
-    default:
-      return "Turma individual";
-  }
-}
-
-function createAudienceLabel(yearSegment: YearSegment, groupType: AudienceGroupType, className?: string) {
-  if (groupType === "TURMA") {
-    return className || "Turma individual";
+function createAudienceLabel(yearSegment: YearSegment, className?: string) {
+  if (yearSegment === "1") {
+    return "1º ano";
   }
 
-  if (yearSegment === "OUTROS") {
-    return className || getTrackLabel(groupType);
-  }
-
-  const base = `${yearSegment}º ano`;
-  const trackLabel = getTrackLabel(groupType);
-  return trackLabel ? `${base} - ${trackLabel}` : base;
+  return className || "Turma individual";
 }
 
 function detectYearSegment(className: string): YearSegment {
@@ -93,77 +51,24 @@ function detectYearSegment(className: string): YearSegment {
   return matched?.year ?? "OUTROS";
 }
 
-function detectSectionCode(compactName: string) {
-  const patterns = ["3de", "3bc", "3a", "2acd", "2abd", "2ad", "2c", "2b", "1a", "1b", "1c", "1d", "1e"];
-  return patterns.find((pattern) => compactName.startsWith(pattern)) ?? "";
-}
-
-function detectGroupType(className: string, yearSegment: YearSegment): AudienceGroupType {
-  if (yearSegment === "1") {
-    return "GERAL";
-  }
-
-  const normalized = normalizeText(className);
-  const compact = normalizeCompact(className);
-  const sectionCode = detectSectionCode(compact);
-
-  if (
-    compact.includes("analiseedesenvolvimentodesistemas") ||
-    compact.includes("desenvolvimentodesistemas") ||
-    /\bads\b/.test(normalized)
-  ) {
-    return "ADS";
-  }
-
-  if (compact.includes("cienciadedados") || compact.includes("cienciasdedados")) {
-    return "CIENCIA_DE_DADOS";
-  }
-
-  if (compact.includes("tecnico")) {
-    return "TECNICO";
-  }
-
-  if (compact.includes("exatasehumanas") || compact.includes("misto")) {
-    return "MISTO";
-  }
-
-  if (compact.includes("humanas")) {
-    return "HUMANAS";
-  }
-
-  if (compact.includes("exatas")) {
-    return "EXATAS";
-  }
-
-  if (yearSegment === "2") {
-    if (sectionCode === "2ad") return "TECNICO";
-    if (sectionCode === "2b" || sectionCode === "2acd") return "HUMANAS";
-    if (sectionCode === "2c" || sectionCode === "2abd") return "EXATAS";
-  }
-
-  return "INDEFINIDO";
-}
-
 export function deriveClassAudience(classroom: Pick<ClassRoom, "id" | "nome">): DerivedAudience {
   const yearSegment = detectYearSegment(classroom.nome);
-  if (yearSegment === "OUTROS") {
+
+  if (yearSegment === "1") {
     return {
-      id: createAudienceId("OUTROS", "TURMA", slugify(classroom.id || classroom.nome)),
-      label: createAudienceLabel("OUTROS", "TURMA", classroom.nome),
-      groupType: "TURMA",
+      id: createAudienceId("1", "GERAL"),
+      label: createAudienceLabel("1"),
+      groupType: "GERAL",
       requiresManualGrouping: false,
-      yearSegment: "OUTROS",
+      yearSegment: "1",
     };
   }
 
-  const groupType = detectGroupType(classroom.nome, yearSegment);
-  const suffix = groupType === "INDEFINIDO" ? slugify(classroom.id || classroom.nome) : "";
-
   return {
-    id: createAudienceId(yearSegment, groupType, suffix),
-    label: createAudienceLabel(yearSegment, groupType, classroom.nome),
-    groupType,
-    requiresManualGrouping: groupType === "INDEFINIDO" && (yearSegment === "2" || yearSegment === "3"),
+    id: createAudienceId(yearSegment, "TURMA", slugify(classroom.id || classroom.nome)),
+    label: createAudienceLabel(yearSegment, classroom.nome),
+    groupType: "TURMA",
+    requiresManualGrouping: false,
     yearSegment,
   };
 }
@@ -207,7 +112,7 @@ export function normalizeExam(exam: Exam | (Omit<Exam, "audienceId" | "audienceL
   if ("audienceId" in exam && typeof exam.audienceId === "string" && exam.audienceId.trim()) {
     return {
       ...exam,
-      audienceLabel: exam.audienceLabel || createAudienceLabel(exam.yearSegment, exam.groupType),
+      audienceLabel: exam.audienceLabel || createAudienceLabel(exam.yearSegment),
     };
   }
 
@@ -260,48 +165,22 @@ export function getRepresentativeClassForExam(exam: Exam | undefined, classes: C
 }
 
 export function buildExamAudienceOptions(classes: ClassRoom[]) {
-  const yearsPresent = new Set(
-    classes.map((item) => deriveClassAudience(item).yearSegment).filter((item) => item === "1" || item === "2" || item === "3"),
-  );
-
-  if (!yearsPresent.size) {
-    yearsPresent.add("1");
-    yearsPresent.add("2");
-    yearsPresent.add("3");
-  }
-
-  const options: ExamAudienceOption[] = [];
-  if (yearsPresent.has("1")) {
-    options.push({
-      id: createAudienceId("1", "GERAL"),
-      label: createAudienceLabel("1", "GERAL"),
-      groupType: "GERAL",
-      yearSegment: "1",
-    });
-  }
-
-  (["2", "3"] as const).forEach((yearSegment) => {
-    if (!yearsPresent.has(yearSegment)) {
-      return;
-    }
-
-    MANUAL_TRACKS.forEach((track) => {
-      options.push({
-        id: createAudienceId(yearSegment, track.groupType),
-        label: `${yearSegment}º ano - ${track.label}`,
-        groupType: track.groupType,
-        yearSegment,
-      });
-    });
-  });
+  const options = normalizeClasses(classes)
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    .map((item) => ({
+      id: item.audienceId ?? createAudienceId(item.yearSegment ?? "OUTROS", "TURMA", slugify(item.id || item.nome)),
+      label: item.audienceLabel ?? createAudienceLabel(item.yearSegment ?? "OUTROS", item.nome),
+      groupType: (item.groupType ?? "TURMA") as "GERAL" | "TURMA",
+      yearSegment: item.yearSegment ?? "OUTROS",
+    }));
 
   const uniqueOptions = new Map(options.map((item) => [item.id, item] as const));
   return [...uniqueOptions.values()];
 }
 
 export function hasAmbiguousClasses(classes: ClassRoom[], yearSegment: Extract<YearSegment, "2" | "3">) {
-  return classes.some((item) => {
-    const audience = deriveClassAudience(item);
-    return audience.yearSegment === yearSegment && audience.requiresManualGrouping;
-  });
+  void classes;
+  void yearSegment;
+  return false;
 }

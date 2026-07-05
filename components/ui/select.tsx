@@ -68,6 +68,7 @@ export function Select({ children, className, disabled, onChange, value, ...prop
   const [position, setPosition] = useState<FloatingPosition | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const portalTarget = typeof document === "undefined" ? null : document.body;
 
   const options = useMemo<SelectOption[]>(
@@ -105,7 +106,11 @@ export function Select({ children, className, disabled, onChange, value, ...prop
     syncPosition();
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedInsideTrigger = rootRef.current?.contains(target);
+      const clickedInsideMenu = menuRef.current?.contains(target);
+
+      if (!clickedInsideTrigger && !clickedInsideMenu) {
         setOpen(false);
       }
     };
@@ -133,6 +138,7 @@ export function Select({ children, className, disabled, onChange, value, ...prop
     open && portalTarget && position
       ? createPortal(
           <div
+            ref={menuRef}
             className="fixed z-[9999] overflow-hidden rounded-[22px] border border-[color-mix(in_srgb,var(--border-strong)_82%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),color-mix(in_srgb,var(--surface)_94%,transparent))] p-2 shadow-[0_30px_70px_-34px_rgba(0,0,0,0.55)] backdrop-blur-xl"
             style={{
               left: position.left,
@@ -142,7 +148,12 @@ export function Select({ children, className, disabled, onChange, value, ...prop
               width: position.width,
             }}
           >
-            <div className="max-h-full overflow-y-auto pr-1">
+            <div
+              className="overflow-y-auto pr-1"
+              style={{
+                maxHeight: Math.max(96, position.maxHeight - 16),
+              }}
+            >
               {options.map((option) => (
                 <button
                   key={`${option.value}-${option.label}`}
