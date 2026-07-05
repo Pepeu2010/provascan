@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { ProvaScanLogo } from "@/components/provascan-logo";
@@ -10,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getSafePostAuthRedirect, navigateAfterAuth } from "@/lib/client-auth-navigation";
 
 export function ChangePasswordForm() {
-  const router = useRouter();
   const { changeTeacherPassword, session } = useAppData();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -58,7 +57,7 @@ export function ChangePasswordForm() {
     setMessage(result.message);
 
     if (result.ok) {
-      router.push(result.redirectTo || "/dashboard");
+      navigateAfterAuth(getSafePostAuthRedirect(result.redirectTo, "/dashboard"));
     }
   };
 

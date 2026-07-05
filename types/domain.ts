@@ -1,5 +1,18 @@
 export type StudentStatus = "Ativo" | "Transferido" | "Inativo";
 
+export type YearSegment = "1" | "2" | "3" | "OUTROS";
+
+export type AudienceGroupType =
+  | "GERAL"
+  | "EXATAS"
+  | "HUMANAS"
+  | "TECNICO"
+  | "CIENCIA_DE_DADOS"
+  | "ADS"
+  | "MISTO"
+  | "TURMA"
+  | "INDEFINIDO";
+
 export type Student = {
   id: string;
   nome: string;
@@ -14,12 +27,20 @@ export type ClassRoom = {
   professor: string;
   ano: string;
   periodo: string;
+  audienceId?: string;
+  audienceLabel?: string;
+  groupType?: AudienceGroupType;
+  requiresManualGrouping?: boolean;
+  yearSegment?: YearSegment;
 };
 
 export type Exam = {
   id: string;
   titulo: string;
-  turma: string;
+  audienceId: string;
+  audienceLabel: string;
+  groupType: AudienceGroupType;
+  yearSegment: YearSegment;
   quantidadeQuestoes: number;
   alternativas: string[];
   data: string;

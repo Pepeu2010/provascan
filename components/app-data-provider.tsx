@@ -15,6 +15,7 @@ import {
   createId,
   type AppDataState,
 } from "@/lib/app-data";
+import { normalizeClasses, normalizeExams } from "@/lib/exam-audience";
 import type { AuthSessionUser } from "@/types/auth";
 import {
   buildCorrectionSession,
@@ -31,6 +32,8 @@ import type {
   ExamCorrectionRule,
   Student,
   StudentStatus,
+  AudienceGroupType,
+  YearSegment,
 } from "@/types/domain";
 
 type RemoteSchoolData = {
@@ -54,10 +57,13 @@ type CreateStudentInput = {
 
 type CreateExamInput = {
   alternativas: string[];
+  audienceId: string;
+  audienceLabel: string;
   data: string;
+  groupType: AudienceGroupType;
   quantidadeQuestoes: number;
   titulo: string;
-  turma: string;
+  yearSegment: YearSegment;
 };
 
 type SaveCorrectionInput = {
@@ -146,7 +152,7 @@ function normalizeImportedData(value: unknown): AppDataState | null {
         }
       : cloneDefaultAppData().teacherProfile;
 
-  return {
+  const nextState = {
     answerKeys: candidate.answerKeys as AnswerKey[],
     classes: candidate.classes as ClassRoom[],
     correctionRules: Array.isArray(candidate.correctionRules)
@@ -157,6 +163,8 @@ function normalizeImportedData(value: unknown): AppDataState | null {
     students: candidate.students as Student[],
     teacherProfile,
   };
+
+  return normalizeAppDataState(nextState);
 }
 
 function normalizeSession(value: unknown): AuthSessionUser | null {
@@ -202,20 +210,29 @@ function buildOperationalCsv(data: AppDataState) {
   return rows.map((row) => row.join(",")).join("\n");
 }
 
+function normalizeAppDataState(state: AppDataState): AppDataState {
+  const normalizedClasses = normalizeClasses(state.classes);
+  return {
+    ...state,
+    classes: normalizedClasses,
+    exams: normalizeExams(state.exams, normalizedClasses),
+  };
+}
+
 function applyRemoteSchoolData(
   previous: AppDataState,
   remote: RemoteSchoolData,
   session: AuthSessionUser | null,
 ): AppDataState {
-  const validClassIds = new Set(remote.classes.map((item) => item.id));
-  const nextExams = previous.exams.filter((item) => validClassIds.has(item.turma));
+  const normalizedClasses = normalizeClasses(remote.classes);
+  const nextExams = normalizeExams(previous.exams, normalizedClasses);
   const nextExamIds = new Set(nextExams.map((item) => item.id));
   const nextStudentIds = new Set(remote.students.map((item) => item.id));
 
-  return {
+  return normalizeAppDataState({
     ...previous,
     answerKeys: previous.answerKeys.filter((item) => nextExamIds.has(item.provaId)),
-    classes: remote.classes,
+    classes: normalizedClasses,
     correctionRules: previous.correctionRules.filter((item) => nextExamIds.has(item.provaId)),
     corrections: previous.corrections.filter(
       (item) => nextStudentIds.has(item.correction.alunoId) && nextExamIds.has(item.correction.provaId),
@@ -227,7 +244,7 @@ function applyRemoteSchoolData(
       email: session?.email ?? previous.teacherProfile.email,
       nome: session?.nome ?? previous.teacherProfile.nome,
     },
-  };
+  });
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
@@ -312,14 +329,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppDataContextValue>(() => {
     const createClassHandler = (input: CreateClassInput) => {
-      setData((previous) => ({
+      setData((previous) => normalizeAppDataState({
         ...previous,
         classes: [{ id: createId("T"), ...input }, ...previous.classes],
       }));
     };
 
     const updateClassHandler = (classId: string, input: CreateClassInput) => {
-      setData((previous) => ({
+      setData((previous) => normalizeAppDataState({
         ...previous,
         classes: previous.classes.map((item) => (item.id === classId ? { ...item, ...input } : item)),
       }));
@@ -329,22 +346,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const deleteClassHandler = (classId: string) => {
       setData((previous) => {
         const linkedStudents = previous.students.filter((item) => item.turma === classId).map((item) => item.id);
-        const linkedExams = previous.exams.filter((item) => item.turma === classId).map((item) => item.id);
 
-        return {
+        return normalizeAppDataState({
           ...previous,
           classes: previous.classes.filter((item) => item.id !== classId),
-          correctionRules: previous.correctionRules.filter((item) => !linkedExams.includes(item.provaId)),
           students: previous.students.filter((item) => item.turma !== classId),
-          exams: previous.exams.filter((item) => item.turma !== classId),
-          answerKeys: previous.answerKeys.filter((item) => !linkedExams.includes(item.provaId)),
           corrections: previous.corrections.filter(
-            (item) => !linkedStudents.includes(item.correction.alunoId) && !linkedExams.includes(item.correction.provaId),
+            (item) => !linkedStudents.includes(item.correction.alunoId),
           ),
-        };
+        });
       });
 
-      return { ok: true, message: "Turma e dados vinculados removidos do modo local." };
+      return { ok: true, message: "Turma removida. Provas compartilhadas foram preservadas." };
     };
 
     const createStudentHandler = (input: CreateStudentInput) => {
@@ -553,7 +566,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           return { ok: false, message: "Arquivo JSON inválido para importação." };
         }
 
-        setData(parsed);
+        setData(normalizeAppDataState(parsed));
         return { ok: true, message: "Dados importados com sucesso." };
       } catch {
         return { ok: false, message: "Não foi possível ler o JSON informado." };

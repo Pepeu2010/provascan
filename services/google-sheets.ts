@@ -1,5 +1,6 @@
 import { google, sheets_v4 } from "googleapis";
 import { z } from "zod";
+import { normalizeClasses } from "@/lib/exam-audience";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
 import type { ClassRoom, Student } from "@/types/domain";
 import type { SheetsUserRecord } from "@/types/auth";
@@ -441,7 +442,9 @@ export async function getSchoolRoster() {
     });
   });
 
-  const mappedClasses = [...classesByName.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const mappedClasses = normalizeClasses(
+    [...classesByName.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+  );
   const mappedStudents: Student[] = filteredRows.map((row) => ({
     id: row.id ? `ALUNO-${row.id}` : `ALUNO-${slugify(`${row.nome}-${row.ra || row.turma}`)}`,
     matricula: row.ra || row.id,

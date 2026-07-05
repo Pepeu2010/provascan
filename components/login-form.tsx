@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { ProvaScanLogo } from "@/components/provascan-logo";
@@ -10,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { getSafePostAuthRedirect, navigateAfterAuth } from "@/lib/client-auth-navigation";
 
 const highlights = [
   "Acesso seguro por perfil",
@@ -18,7 +18,6 @@ const highlights = [
 ];
 
 export function LoginForm() {
-  const router = useRouter();
   const { loginTeacher, session } = useAppData();
   const [email, setEmail] = useState(session?.email ?? "");
   const [password, setPassword] = useState("");
@@ -26,6 +25,19 @@ export function LoginForm() {
   const [showRecovery, setShowRecovery] = useState(false);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    const redirect =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("redirect") : null;
+    const target = session.forcePasswordChange
+      ? "/trocar-senha"
+      : getSafePostAuthRedirect(redirect, "/dashboard");
+    navigateAfterAuth(target);
+  }, [session]);
 
   const handleLogin = async () => {
     setIsSubmitting(true);
@@ -36,7 +48,8 @@ export function LoginForm() {
     if (result.ok) {
       const redirect =
         typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("redirect") : null;
-      router.push(redirect || result.redirectTo || "/dashboard");
+      const target = getSafePostAuthRedirect(redirect, result.redirectTo || "/dashboard");
+      navigateAfterAuth(target);
     }
   };
 

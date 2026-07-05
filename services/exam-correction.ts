@@ -83,10 +83,11 @@ export function buildAnswerSheetModel(params: {
   exam: Exam;
   teacherName: string;
   teacherSchool: string;
-  turma: ClassRoom;
+  turma?: ClassRoom | null;
+  turmaLabel: string;
   student?: Student | null;
 }) {
-  const { exam, student, teacherName, teacherSchool, turma } = params;
+  const { exam, student, teacherName, teacherSchool, turma, turmaLabel } = params;
   const uniqueCode = student ? buildIdentificationCode(exam, student) : `${exam.codigo}-EM-BRANCO`;
 
   return {
@@ -98,13 +99,13 @@ export function buildAnswerSheetModel(params: {
       "Não marque mais de uma alternativa por questão.",
       "Não dobre a área do código de identificação.",
     ],
-    qrPayload: student ? buildQrPayload(exam, student, turma) : "",
+    qrPayload: student && turma ? buildQrPayload(exam, student, turma) : "",
     questionNumbers: Array.from({ length: exam.quantidadeQuestoes }, (_, index) => index + 1),
     studentName: student?.nome ?? "____________________________",
     studentRegistration: student?.matricula ?? "________________",
     teacherName,
     teacherSchool,
-    turmaName: turma.nome,
+    turmaName: turma?.nome ?? turmaLabel,
     uniqueCode,
   };
 }

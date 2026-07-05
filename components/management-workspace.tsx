@@ -11,8 +11,13 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getClassLabel } from "@/lib/app-data";
 import { canManageUsers } from "@/lib/access-control";
+import {
+  buildExamAudienceOptions,
+  getRepresentativeClassForExam,
+  getStudentsForExam,
+  hasAmbiguousClasses,
+} from "@/lib/exam-audience";
 import { formatDate } from "@/lib/utils";
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
 import {
