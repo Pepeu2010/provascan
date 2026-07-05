@@ -46,7 +46,7 @@ export function DashboardShell({
   active: string;
 }) {
   const router = useRouter();
-  const { authResolved, data, isHydrated, logoutTeacher, session } = useAppData();
+  const { authResolved, data, isHydrated, logoutTeacher, session, syncError, syncStatus } = useAppData();
   const [menuOpen, setMenuOpen] = useState(false);
   const subjectLabel = getSubjectLabel(session?.subject);
 
@@ -213,6 +213,21 @@ export function DashboardShell({
             </div>
           </div>
         </header>
+
+        {syncStatus === "error" && syncError ? (
+          <Card className="mb-6 border-[color-mix(in_srgb,var(--error)_38%,var(--border))] bg-[color-mix(in_srgb,var(--error)_10%,var(--card-solid))] p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--error)]">
+              Falha na carga operacional
+            </p>
+            <p className="mt-3 text-base font-semibold text-[var(--foreground)]">
+              O painel nao conseguiu carregar os dados da planilha.
+            </p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">{syncError}</p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+              Se este login for de professor, confira a coluna `disciplina` na aba `usuarios`.
+            </p>
+          </Card>
+        ) : null}
 
         {children}
       </main>
