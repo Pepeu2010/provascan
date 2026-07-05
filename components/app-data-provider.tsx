@@ -212,10 +212,15 @@ function buildOperationalCsv(data: AppDataState) {
 
 function normalizeAppDataState(state: AppDataState): AppDataState {
   const normalizedClasses = normalizeClasses(state.classes);
+  const normalizedExams = normalizeExams(state.exams, normalizedClasses);
   return {
     ...state,
     classes: normalizedClasses,
-    exams: normalizeExams(state.exams, normalizedClasses),
+    corrections: state.corrections.map((item) => ({
+      ...item,
+      prova: normalizeExams([item.prova], normalizedClasses)[0],
+    })),
+    exams: normalizedExams,
   };
 }
 

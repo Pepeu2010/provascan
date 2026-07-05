@@ -29,6 +29,7 @@ import {
   detectIdentityWithOcr,
   resolveIdentityFromQr,
 } from "@/services/scan-pipeline";
+import { getStudentsForExam } from "@/lib/exam-audience";
 import { cn } from "@/lib/utils";
 
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
@@ -119,10 +120,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     if (!exam) {
       return data.students;
     }
-    const scoped = data.students.filter((item) => item.turma === exam.turma);
+    const scoped = getStudentsForExam(exam, data.students, data.classes);
     return scoped.length ? scoped : data.students;
-  }, [data.students, exam]);
-  const selectedClass = data.classes.find((item) => item.id === exam?.turma);
+  }, [data.classes, data.students, exam]);
 
   const activePreferredStudentId =
     studentsForExam.find((item) => item.id === preferredStudentId)?.id ?? studentsForExam[0]?.id ?? "";
@@ -465,7 +465,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   const nextExamId = event.target.value;
                   const nextExam = data.exams.find((item) => item.id === nextExamId);
                   const nextStudents = nextExam
-                    ? data.students.filter((item) => item.turma === nextExam.turma)
+                    ? getStudentsForExam(nextExam, data.students, data.classes)
                     : data.students;
                   setExamId(nextExamId);
                   setPreferredStudentId((nextStudents[0] ?? data.students[0])?.id ?? "");
@@ -548,7 +548,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <MetricCard label="Turma" value={selectedClass?.nome ?? "Sem turma"} helper="base atual da prova" />
+            <MetricCard label="Público" value={exam.audienceLabel} helper="base atual da prova" />
             <MetricCard
               label="Questões"
               value={String(answerKey.length)}

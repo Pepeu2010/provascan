@@ -330,21 +330,37 @@ export function ExamsManager() {
   const [selectedExamId, setSelectedExamId] = useState(data.exams[0]?.id ?? "");
   const [sheetMode, setSheetMode] = useState<"blank" | "class" | "student">("class");
   const [selectedStudentId, setSelectedStudentId] = useState("");
+  const audienceOptions = useMemo(() => buildExamAudienceOptions(data.classes), [data.classes]);
+  const fallbackAudience = audienceOptions[0];
   const [form, setForm] = useState({
     alternativas: "A,B,C,D,E",
+    audienceId: fallbackAudience?.id ?? "",
     data: new Date().toISOString().slice(0, 10),
     quantidadeQuestoes: "10",
     titulo: "",
-    turma: data.classes[0]?.id ?? "",
   });
 
   const activeExam = data.exams.find((item) => item.id === selectedExamId) ?? data.exams[0];
-  const activeClass = data.classes.find((item) => item.id === activeExam?.turma);
+  const activeClass = getRepresentativeClassForExam(activeExam, data.classes);
   const rule = activeExam ? getCorrectionRule(activeExam, data.correctionRules) : null;
   const studentsForExam = useMemo(
-    () => data.students.filter((item) => item.turma === activeExam?.turma),
-    [activeExam?.turma, data.students],
+    () => getStudentsForExam(activeExam, data.students, data.classes),
+    [activeExam, data.classes, data.students],
   );
+  const hasYearTwoAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "2"), [data.classes]);
+  const hasYearThreeAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "3"), [data.classes]);
+
+  useEffect(() => {
+    if (!audienceOptions.length) {
+      return;
+    }
+
+    setForm((previous) =>
+      audienceOptions.some((option) => option.id === previous.audienceId)
+        ? previous
+        : { ...previous, audienceId: audienceOptions[0].id },
+    );
+  }, [audienceOptions]);
 
   const [ruleForm, setRuleForm] = useState(() => {
     if (!activeExam || !rule) {
@@ -384,34 +400,47 @@ export function ExamsManager() {
   };
 
   const printSheets = async () => {
-    if (!activeExam || !activeClass) {
+    if (!activeExam) {
       return;
     }
 
     const items =
       sheetMode === "blank"
-        ? [buildAnswerSheetModel({ exam: activeExam, teacherName: data.teacherProfile.nome, teacherSchool: data.teacherProfile.escola, turma: activeClass, student: null })]
+        ? [
+            buildAnswerSheetModel({
+              exam: activeExam,
+              teacherName: data.teacherProfile.nome,
+              teacherSchool: data.teacherProfile.escola,
+              turma: activeClass,
+              turmaLabel: activeExam.audienceLabel,
+              student: null,
+            }),
+          ]
         : sheetMode === "student"
           ? studentsForExam
               .filter((item) => item.id === selectedStudentId)
-              .map((student) =>
-                buildAnswerSheetModel({
+              .map((student) => {
+                const studentClass = data.classes.find((item) => item.id === student.turma) ?? activeClass;
+                return buildAnswerSheetModel({
                   exam: activeExam,
                   teacherName: data.teacherProfile.nome,
                   teacherSchool: data.teacherProfile.escola,
-                  turma: activeClass,
+                  turma: studentClass,
+                  turmaLabel: studentClass?.nome ?? activeExam.audienceLabel,
                   student,
-                }),
-              )
-          : studentsForExam.map((student) =>
-              buildAnswerSheetModel({
+                });
+              })
+          : studentsForExam.map((student) => {
+              const studentClass = data.classes.find((item) => item.id === student.turma) ?? activeClass;
+              return buildAnswerSheetModel({
                 exam: activeExam,
                 teacherName: data.teacherProfile.nome,
                 teacherSchool: data.teacherProfile.escola,
-                turma: activeClass,
+                turma: studentClass,
+                turmaLabel: studentClass?.nome ?? activeExam.audienceLabel,
                 student,
-              }),
-            );
+              });
+            });
 
     const { toDataURL } = await import("qrcode");
 
@@ -494,10 +523,10 @@ export function ExamsManager() {
         </div>
         <div className="mt-6 grid gap-3 lg:grid-cols-5">
           <Input placeholder="Titulo da prova" value={form.titulo} onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))} />
-          <FieldSelect value={form.turma} onChange={(turma) => setForm((prev) => ({ ...prev, turma }))}>
-            {data.classes.map((item) => (
+          <FieldSelect value={form.audienceId} onChange={(audienceId) => setForm((prev) => ({ ...prev, audienceId }))}>
+            {audienceOptions.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.nome}
+                {item.label}
               </option>
             ))}
           </FieldSelect>
@@ -505,16 +534,26 @@ export function ExamsManager() {
           <Input type="number" min="1" value={form.quantidadeQuestoes} onChange={(event) => setForm((prev) => ({ ...prev, quantidadeQuestoes: event.target.value }))} />
           <Input placeholder="Alternativas: A,B,C,D,E" value={form.alternativas} onChange={(event) => setForm((prev) => ({ ...prev, alternativas: event.target.value }))} />
         </div>
+        {hasYearTwoAmbiguity || hasYearThreeAmbiguity ? (
+          <p className="mt-4 text-sm text-[var(--muted-foreground)]">
+            Existem turmas de 2º/3º ano sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
+          </p>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
           <Button
             onClick={() => {
-              if (!form.titulo.trim() || !form.turma) return;
+              if (!form.titulo.trim() || !form.audienceId) return;
+              const audience = audienceOptions.find((item) => item.id === form.audienceId);
+              if (!audience) return;
               const payload = {
                 alternativas: form.alternativas.split(",").map((item) => item.trim()).filter(Boolean),
+                audienceId: audience.id,
+                audienceLabel: audience.label,
                 data: form.data,
+                groupType: audience.groupType,
                 quantidadeQuestoes: Number(form.quantidadeQuestoes),
                 titulo: form.titulo,
-                turma: form.turma,
+                yearSegment: audience.yearSegment,
               };
 
               if (editingId) {
@@ -527,10 +566,10 @@ export function ExamsManager() {
 
               setForm({
                 alternativas: "A,B,C,D,E",
+                audienceId: audienceOptions[0]?.id ?? "",
                 data: new Date().toISOString().slice(0, 10),
                 quantidadeQuestoes: "10",
                 titulo: "",
-                turma: data.classes[0]?.id ?? "",
               });
             }}
           >
@@ -543,10 +582,10 @@ export function ExamsManager() {
                 setEditingId(null);
                 setForm({
                   alternativas: "A,B,C,D,E",
+                  audienceId: audienceOptions[0]?.id ?? "",
                   data: new Date().toISOString().slice(0, 10),
                   quantidadeQuestoes: "10",
                   titulo: "",
-                  turma: data.classes[0]?.id ?? "",
                 });
               }}
             >
@@ -562,7 +601,7 @@ export function ExamsManager() {
                 <div>
                   <p className="text-lg font-semibold text-[var(--foreground)]">{item.titulo}</p>
                   <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                    {formatDate(item.data)} • {getClassLabel(data.classes, item.turma)}
+                    {formatDate(item.data)} • {item.audienceLabel}
                   </p>
                 </div>
                 <Badge tone="neutral">{item.quantidadeQuestoes} questões</Badge>
@@ -585,10 +624,10 @@ export function ExamsManager() {
                     setEditingId(item.id);
                     setForm({
                       alternativas: item.alternativas.join(","),
+                      audienceId: item.audienceId,
                       data: item.data,
                       quantidadeQuestoes: String(item.quantidadeQuestoes),
                       titulo: item.titulo,
-                      turma: item.turma,
                     });
                     syncRuleForm(item.id);
                     setMessage(`Editando ${item.titulo}.`);
@@ -607,7 +646,7 @@ export function ExamsManager() {
         </div>
       </Card>
 
-      {activeExam && activeClass ? (
+      {activeExam ? (
         <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
           <Card className="p-6">
             <div className="flex items-center justify-between gap-4">
@@ -715,7 +754,7 @@ export function ExamsManager() {
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">{activeExam.titulo}</p>
                   <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                    {activeClass.nome} • {activeExam.codigo}
+                    {activeExam.audienceLabel} • {activeExam.codigo}
                   </p>
                 </div>
                 <QrCode className="size-6 text-[var(--accent)]" />
