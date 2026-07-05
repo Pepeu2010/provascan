@@ -132,7 +132,7 @@ function openPrintWindow(title: string, body: string) {
 }
 
 export function ClassesManager() {
-  const { createClass, data, deleteClass, updateClass } = useAppData();
+  const { createClass, data, deleteClass, syncError, syncStatus, updateClass } = useAppData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({
@@ -168,15 +168,14 @@ export function ClassesManager() {
         <Button
           onClick={() => {
             if (!form.nome.trim()) return;
-            if (editingId) {
-              const result = updateClass(editingId, form);
+            void (async () => {
+              const result = editingId ? await updateClass(editingId, form) : await createClass(form);
               setMessage(result.message);
-              setEditingId(null);
-            } else {
-              createClass(form);
-              setMessage("Turma criada com sucesso.");
-            }
-            setForm((prev) => ({ ...prev, nome: "" }));
+              if (result.ok) {
+                setEditingId(null);
+                setForm((prev) => ({ ...prev, nome: "" }));
+              }
+            })();
           }}
         >
           {editingId ? "Salvar turma" : "Nova turma"}
@@ -194,6 +193,7 @@ export function ClassesManager() {
         ) : null}
       </div>
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
+      {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {data.classes.map((item) => (
           <Card key={item.id} className="p-5">
@@ -220,7 +220,7 @@ export function ClassesManager() {
                 <Edit3 className="size-4" />
                 Editar
               </Button>
-              <Button variant="ghost" onClick={() => setMessage(deleteClass(item.id).message)}>
+              <Button variant="ghost" onClick={() => void (async () => setMessage((await deleteClass(item.id)).message))()}>
                 <Trash2 className="size-4" />
                 Excluir
               </Button>
@@ -233,7 +233,7 @@ export function ClassesManager() {
 }
 
 export function StudentsManager() {
-  const { createStudent, data, deleteStudent, updateStudent } = useAppData();
+  const { createStudent, data, deleteStudent, syncError, syncStatus, updateStudent } = useAppData();
   const [status, setStatus] = useState<StudentStatus>("Ativo");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -271,19 +271,21 @@ export function StudentsManager() {
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <Button
-            onClick={() => {
-              if (!student.nome.trim() || !student.matricula.trim() || !student.turma) return;
-              if (editingId) {
-                setMessage(updateStudent(editingId, { ...student, status }).message);
+          onClick={() => {
+            if (!student.nome.trim() || !student.matricula.trim() || !student.turma) return;
+            void (async () => {
+              const result = editingId
+                ? await updateStudent(editingId, { ...student, status })
+                : await createStudent({ ...student, status });
+              setMessage(result.message);
+              if (result.ok) {
                 setEditingId(null);
-              } else {
-                createStudent({ ...student, status });
-                setMessage("Aluno cadastrado com sucesso.");
+                setStudent({ matricula: "", nome: "", turma: data.classes[0]?.id ?? "" });
+                setStatus("Ativo");
               }
-              setStudent({ matricula: "", nome: "", turma: data.classes[0]?.id ?? "" });
-              setStatus("Ativo");
-            }}
-          >
+            })();
+          }}
+        >
             {editingId ? "Salvar aluno" : "Novo aluno"}
           </Button>
           {editingId ? (
@@ -300,12 +302,13 @@ export function StudentsManager() {
           ) : null}
         </div>
         {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
+        {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
       </Card>
       <div className="mt-5">
         <StudentTable
           classes={data.classes}
           students={data.students}
-          onDelete={(studentId) => setMessage(deleteStudent(studentId).message)}
+          onDelete={(studentId) => void (async () => setMessage((await deleteStudent(studentId)).message))()}
           onEdit={(studentId) => {
             const current = data.students.find((item) => item.id === studentId);
             if (!current) return;
@@ -321,7 +324,7 @@ export function StudentsManager() {
 }
 
 export function ExamsManager() {
-  const { createExam, data, deleteExam, saveCorrectionRule, updateExam } = useAppData();
+  const { createExam, data, deleteExam, saveCorrectionRule, syncError, syncStatus, updateExam } = useAppData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [selectedExamId, setSelectedExamId] = useState(data.exams[0]?.id ?? "");
@@ -547,21 +550,20 @@ export function ExamsManager() {
                 yearSegment: audience.yearSegment,
               };
 
-              if (editingId) {
-                setMessage(updateExam(editingId, payload).message);
-                setEditingId(null);
-              } else {
-                createExam(payload);
-                setMessage("Prova criada com sucesso.");
-              }
-
-              setForm({
-                alternativas: "A,B,C,D,E",
-                audienceId: audienceOptions[0]?.id ?? "",
-                data: new Date().toISOString().slice(0, 10),
-                quantidadeQuestoes: "10",
-                titulo: "",
-              });
+              void (async () => {
+                const result = editingId ? await updateExam(editingId, payload) : await createExam(payload);
+                setMessage(result.message);
+                if (result.ok) {
+                  setEditingId(null);
+                  setForm({
+                    alternativas: "A,B,C,D,E",
+                    audienceId: audienceOptions[0]?.id ?? "",
+                    data: new Date().toISOString().slice(0, 10),
+                    quantidadeQuestoes: "10",
+                    titulo: "",
+                  });
+                }
+              })();
             }}
           >
             {editingId ? "Salvar prova" : "Nova prova"}
@@ -585,6 +587,7 @@ export function ExamsManager() {
           ) : null}
         </div>
         {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
+        {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
         <div className="mt-6 grid gap-4 xl:grid-cols-3">
           {data.exams.map((item) => (
             <Card key={item.id} className="p-5">
@@ -627,7 +630,7 @@ export function ExamsManager() {
                   <Edit3 className="size-4" />
                   Editar
                 </Button>
-                <Button variant="ghost" onClick={() => setMessage(deleteExam(item.id).message)}>
+                <Button variant="ghost" onClick={() => void (async () => setMessage((await deleteExam(item.id)).message))()}>
                   <Trash2 className="size-4" />
                   Excluir
                 </Button>
@@ -679,8 +682,8 @@ export function ExamsManager() {
             <div className="mt-4 flex flex-wrap gap-3">
               <Button
                 onClick={() => {
-                  setMessage(
-                    saveCorrectionRule({
+                  void (async () => {
+                    const result = await saveCorrectionRule({
                       arredondamentoCasas: Number(ruleForm.arredondamentoCasas),
                       modoQuestaoAnulada: ruleForm.modoQuestaoAnulada as "full-credit" | "ignore",
                       notaMaxima: Number(ruleForm.notaMaxima),
@@ -689,8 +692,9 @@ export function ExamsManager() {
                       provaId: activeExam.id,
                       questoesAnuladasRaw: ruleForm.questoesAnuladasRaw,
                       totalQuestions: activeExam.quantidadeQuestoes,
-                    }).message,
-                  );
+                    });
+                    setMessage(result.message);
+                  })();
                 }}
               >
                 <Save className="size-4" />
@@ -791,7 +795,7 @@ export function ExamsManager() {
 }
 
 export function AnswerKeyEditor() {
-  const { data, saveAnswerKey } = useAppData();
+  const { data, saveAnswerKey, syncError, syncStatus } = useAppData();
   const activeExam = data.exams[0];
   const [examId, setExamId] = useState(activeExam?.id ?? "");
   const [message, setMessage] = useState("");
@@ -912,8 +916,10 @@ export function AnswerKeyEditor() {
       <div className="mt-6 flex flex-wrap gap-3">
         <Button
           onClick={() => {
-            saveAnswerKey(exam.id, answers);
-            setMessage("Gabarito salvo com sucesso.");
+            void (async () => {
+              const result = await saveAnswerKey(exam.id, answers);
+              setMessage(result.message);
+            })();
           }}
         >
           <Save className="size-4" />
@@ -922,6 +928,7 @@ export function AnswerKeyEditor() {
         <Badge tone="accent">{exam.quantidadeQuestoes} questões</Badge>
       </div>
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
+      {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
     </Card>
   );
 }
@@ -1034,7 +1041,7 @@ export function ReportsWorkspace() {
 
 export function SettingsWorkspace() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data, exportData, getOperationalCsv, importData, resetData, session } = useAppData();
+  const { data, exportData, getOperationalCsv, importData, resetData, session, syncError, syncStatus } = useAppData();
   const [payload, setPayload] = useState("");
   const [message, setMessage] = useState("");
   const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
@@ -1234,8 +1241,10 @@ export function SettingsWorkspace() {
           <Button
             variant="ghost"
             onClick={() => {
-              resetData();
-              setMessage("Base operacional restaurada para o conjunto inicial e pronta para sincronizar.");
+              void (async () => {
+                const result = await resetData();
+                setMessage(result.message);
+              })();
             }}
           >
             <RotateCcw className="size-4" />
@@ -1253,7 +1262,7 @@ export function SettingsWorkspace() {
           placeholder="Cole aqui o JSON de backup do ProvaScan."
         />
         <div className="mt-4 flex flex-wrap gap-3">
-          <Button onClick={() => setMessage(importData(payload).message)}>
+          <Button onClick={() => void (async () => setMessage((await importData(payload)).message))()}>
             <FileUp className="size-4" />
             Importar backup
           </Button>
@@ -1263,6 +1272,7 @@ export function SettingsWorkspace() {
           <Badge tone="accent">Pronto para Vercel</Badge>
         </div>
         {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
+        {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
         <input
           ref={fileInputRef}
           type="file"
@@ -1273,7 +1283,7 @@ export function SettingsWorkspace() {
             if (!file) return;
             const text = await file.text();
             setPayload(text);
-            setMessage(importData(text).message);
+            setMessage((await importData(text)).message);
             event.target.value = "";
           }}
         />

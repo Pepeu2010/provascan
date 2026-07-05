@@ -27,13 +27,13 @@ import {
 } from "@/services/exam-correction";
 import type {
   AnswerKey,
+  AudienceGroupType,
   ClassRoom,
   CorrectionSession,
   Exam,
   ExamCorrectionRule,
   Student,
   StudentStatus,
-  AudienceGroupType,
   YearSegment,
 } from "@/types/domain";
 
@@ -83,21 +83,30 @@ type SaveCorrectionRuleInput = {
   totalQuestions: number;
 };
 
+type MutationResult = {
+  ok: boolean;
+  message: string;
+};
+
+type SyncStatus = "idle" | "saving" | "error";
+
 type AppDataContextValue = {
   analytics: ReturnType<typeof calculateAnalytics>;
   authResolved: boolean;
   data: AppDataState;
   isHydrated: boolean;
   session: AuthSessionUser | null;
-  createClass: (input: CreateClassInput) => void;
-  createExam: (input: CreateExamInput) => void;
-  createStudent: (input: CreateStudentInput) => void;
-  deleteClass: (classId: string) => { ok: boolean; message: string };
-  deleteExam: (examId: string) => { ok: boolean; message: string };
-  deleteStudent: (studentId: string) => { ok: boolean; message: string };
+  syncError: string;
+  syncStatus: SyncStatus;
+  createClass: (input: CreateClassInput) => Promise<MutationResult>;
+  createExam: (input: CreateExamInput) => Promise<MutationResult>;
+  createStudent: (input: CreateStudentInput) => Promise<MutationResult>;
+  deleteClass: (classId: string) => Promise<MutationResult>;
+  deleteExam: (examId: string) => Promise<MutationResult>;
+  deleteStudent: (studentId: string) => Promise<MutationResult>;
   exportData: () => string;
   getOperationalCsv: () => string;
-  importData: (payload: string) => { ok: boolean; message: string };
+  importData: (payload: string) => Promise<MutationResult>;
   loginTeacher: (input: {
     email: string;
     password: string;
@@ -109,13 +118,13 @@ type AppDataContextValue = {
     newPassword: string;
     confirmPassword: string;
   }) => Promise<{ ok: boolean; message: string; redirectTo?: string }>;
-  resetData: () => void;
-  saveAnswerKey: (examId: string, answers: string[]) => void;
-  saveCorrection: (input: SaveCorrectionInput) => { ok: boolean; message: string };
-  saveCorrectionRule: (input: SaveCorrectionRuleInput) => { ok: boolean; message: string };
-  updateClass: (classId: string, input: CreateClassInput) => { ok: boolean; message: string };
-  updateExam: (examId: string, input: CreateExamInput) => { ok: boolean; message: string };
-  updateStudent: (studentId: string, input: CreateStudentInput) => { ok: boolean; message: string };
+  resetData: () => Promise<MutationResult>;
+  saveAnswerKey: (examId: string, answers: string[]) => Promise<MutationResult>;
+  saveCorrection: (input: SaveCorrectionInput) => Promise<MutationResult>;
+  saveCorrectionRule: (input: SaveCorrectionRuleInput) => Promise<MutationResult>;
+  updateClass: (classId: string, input: CreateClassInput) => Promise<MutationResult>;
+  updateExam: (examId: string, input: CreateExamInput) => Promise<MutationResult>;
+  updateStudent: (studentId: string, input: CreateStudentInput) => Promise<MutationResult>;
 };
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -237,9 +246,10 @@ function applyRemoteAppData(remote: AppDataState, session: AuthSessionUser | nul
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
   const [data, setData] = useState<AppDataState>(() => cloneDefaultAppData());
-
   const [authResolved, setAuthResolved] = useState(false);
   const [session, setSession] = useState<AuthSessionUser | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncError, setSyncError] = useState("");
   const hasLoadedRemoteDataRef = useRef(false);
   const lastSyncedPayloadRef = useRef("");
 
@@ -294,12 +304,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch("/api/app-data", { cache: "no-store" });
         if (!response.ok) {
-          return;
+          throw new Error("Falha na carga remota.");
         }
 
         const payload = normalizeImportedData(await response.json());
         if (!payload) {
-          return;
+          throw new Error("Payload remoto invalido.");
         }
 
         if (!cancelled) {
@@ -307,9 +317,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           setData(nextData);
           lastSyncedPayloadRef.current = JSON.stringify(nextData);
           hasLoadedRemoteDataRef.current = true;
+          setSyncStatus("idle");
+          setSyncError("");
         }
       } catch {
-        // Evita sobrescrever a planilha com estado vazio quando a carga remota falha.
+        if (!cancelled) {
+          hasLoadedRemoteDataRef.current = false;
+          setSyncStatus("error");
+          setSyncError("Nao foi possivel carregar os dados operacionais da planilha.");
+        }
       }
     };
 
@@ -320,113 +336,116 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !session || !hasLoadedRemoteDataRef.current) {
-      return;
-    }
-
-    const payload = JSON.stringify(data);
-    if (payload === lastSyncedPayloadRef.current) {
-      return;
-    }
-
-    let cancelled = false;
-    const timeout = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const response = await fetch("/api/app-data", {
-            body: JSON.stringify({ data }),
-            headers: {
-              "Content-Type": "application/json",
-            },
-            method: "PUT",
-          });
-
-          if (!response.ok || cancelled) {
-            return;
-          }
-
-          lastSyncedPayloadRef.current = payload;
-        } catch {
-          // Mantem o estado local; a proxima alteracao tenta persistir novamente.
-        }
-      })();
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeout);
-    };
-  }, [data, session]);
-
   const value = useMemo<AppDataContextValue>(() => {
-    const createClassHandler = (input: CreateClassInput) => {
-      setData((previous) => normalizeAppDataState({
-        ...previous,
-        classes: [{ id: createId("T"), ...input }, ...previous.classes],
-      }));
-    };
+    const persistAppData = async (nextData: AppDataState, successMessage: string): Promise<MutationResult> => {
+      if (!session || !hasLoadedRemoteDataRef.current) {
+        return { ok: false, message: "A sessao ainda nao terminou de carregar os dados remotos." };
+      }
 
-    const updateClassHandler = (classId: string, input: CreateClassInput) => {
-      setData((previous) => normalizeAppDataState({
-        ...previous,
-        classes: previous.classes.map((item) => (item.id === classId ? { ...item, ...input } : item)),
-      }));
-      return { ok: true, message: "Turma atualizada com sucesso." };
-    };
+      setSyncStatus("saving");
+      setSyncError("");
 
-    const deleteClassHandler = (classId: string) => {
-      setData((previous) => {
-        const linkedStudents = previous.students.filter((item) => item.turma === classId).map((item) => item.id);
-
-        return normalizeAppDataState({
-          ...previous,
-          classes: previous.classes.filter((item) => item.id !== classId),
-          students: previous.students.filter((item) => item.turma !== classId),
-          corrections: previous.corrections.filter(
-            (item) => !linkedStudents.includes(item.correction.alunoId),
-          ),
+      try {
+        const normalized = normalizeAppDataState(nextData);
+        const response = await fetch("/api/app-data", {
+          body: JSON.stringify({ data: normalized }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "PUT",
         });
-      });
 
-      return { ok: true, message: "Turma removida. Provas compartilhadas foram preservadas." };
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) {
+          const message = payload.error ?? "Nao foi possivel sincronizar a planilha.";
+          setSyncStatus("error");
+          setSyncError(message);
+          return { ok: false, message };
+        }
+
+        setData(normalized);
+        lastSyncedPayloadRef.current = JSON.stringify(normalized);
+        setSyncStatus("idle");
+        setSyncError("");
+        return { ok: true, message: successMessage };
+      } catch {
+        const message = "Falha de rede ao sincronizar a planilha.";
+        setSyncStatus("error");
+        setSyncError(message);
+        return { ok: false, message };
+      }
     };
 
-    const createStudentHandler = (input: CreateStudentInput) => {
-      setData((previous) => ({
-        ...previous,
-        students: [{ id: createId("A"), ...input }, ...previous.students],
-      }));
+    const createClassHandler = async (input: CreateClassInput) =>
+      persistAppData(
+        {
+          ...data,
+          classes: [{ id: createId("T"), ...input }, ...data.classes],
+        },
+        "Turma criada com sucesso.",
+      );
+
+    const updateClassHandler = async (classId: string, input: CreateClassInput) =>
+      persistAppData(
+        {
+          ...data,
+          classes: data.classes.map((item) => (item.id === classId ? { ...item, ...input } : item)),
+        },
+        "Turma atualizada com sucesso.",
+      );
+
+    const deleteClassHandler = async (classId: string) => {
+      const linkedStudents = data.students.filter((item) => item.turma === classId).map((item) => item.id);
+
+      return persistAppData(
+        {
+          ...data,
+          classes: data.classes.filter((item) => item.id !== classId),
+          students: data.students.filter((item) => item.turma !== classId),
+          corrections: data.corrections.filter((item) => !linkedStudents.includes(item.correction.alunoId)),
+        },
+        "Turma removida. Provas compartilhadas foram preservadas.",
+      );
     };
 
-    const updateStudentHandler = (studentId: string, input: CreateStudentInput) => {
-      setData((previous) => ({
-        ...previous,
-        corrections: previous.corrections.map((item) =>
-          item.correction.alunoId === studentId
-            ? {
-                ...item,
-                aluno: { ...item.aluno, ...input, id: studentId },
-                correction: { ...item.correction, nomeDetectado: input.nome },
-              }
-            : item,
-        ),
-        students: previous.students.map((item) => (item.id === studentId ? { ...item, ...input } : item)),
-      }));
-      return { ok: true, message: "Aluno atualizado com sucesso." };
-    };
+    const createStudentHandler = async (input: CreateStudentInput) =>
+      persistAppData(
+        {
+          ...data,
+          students: [{ id: createId("A"), ...input }, ...data.students],
+        },
+        "Aluno cadastrado com sucesso.",
+      );
 
-    const deleteStudentHandler = (studentId: string) => {
-      setData((previous) => ({
-        ...previous,
-        corrections: previous.corrections.filter((item) => item.correction.alunoId !== studentId),
-        students: previous.students.filter((item) => item.id !== studentId),
-      }));
+    const updateStudentHandler = async (studentId: string, input: CreateStudentInput) =>
+      persistAppData(
+        {
+          ...data,
+          corrections: data.corrections.map((item) =>
+            item.correction.alunoId === studentId
+              ? {
+                  ...item,
+                  aluno: { ...item.aluno, ...input, id: studentId },
+                  correction: { ...item.correction, nomeDetectado: input.nome },
+                }
+              : item,
+          ),
+          students: data.students.map((item) => (item.id === studentId ? { ...item, ...input } : item)),
+        },
+        "Aluno atualizado com sucesso.",
+      );
 
-      return { ok: true, message: "Aluno removido com sucesso." };
-    };
+    const deleteStudentHandler = async (studentId: string) =>
+      persistAppData(
+        {
+          ...data,
+          corrections: data.corrections.filter((item) => item.correction.alunoId !== studentId),
+          students: data.students.filter((item) => item.id !== studentId),
+        },
+        "Aluno removido com sucesso.",
+      );
 
-    const createExamHandler = (input: CreateExamInput) => {
+    const createExamHandler = async (input: CreateExamInput) => {
       const examId = createId("P");
       const codeBase = input.titulo
         .toUpperCase()
@@ -434,46 +453,48 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         .replace(/^-+|-+$/g, "")
         .slice(0, 12);
 
-      setData((previous) => {
-        const nextExam: Exam = {
-          id: examId,
-          ...input,
-          codigo: `${codeBase || "PROVA"}-${input.data.slice(0, 4)}`,
-          templateVersion: "PS-CARD-1",
-        };
+      const nextExam: Exam = {
+        id: examId,
+        ...input,
+        codigo: `${codeBase || "PROVA"}-${input.data.slice(0, 4)}`,
+        templateVersion: "PS-CARD-1",
+      };
 
-        return {
-          ...previous,
+      return persistAppData(
+        {
+          ...data,
           answerKeys: [
-            ...previous.answerKeys,
+            ...data.answerKeys,
             ...Array.from({ length: input.quantidadeQuestoes }, (_, index) => ({
               provaId: examId,
               questao: index + 1,
               respostaCorreta: input.alternativas[0] ?? "A",
             })),
           ],
-          correctionRules: [buildDefaultCorrectionRule(nextExam), ...previous.correctionRules],
-          exams: [nextExam, ...previous.exams],
-        };
-      });
+          correctionRules: [buildDefaultCorrectionRule(nextExam), ...data.correctionRules],
+          exams: [nextExam, ...data.exams],
+        },
+        "Prova criada com sucesso.",
+      );
     };
 
-    const updateExamHandler = (examId: string, input: CreateExamInput) => {
-      setData((previous) => {
-        const currentExam = previous.exams.find((item) => item.id === examId);
-        const previousAnswerKey = previous.answerKeys
-          .filter((item) => item.provaId === examId)
-          .sort((a, b) => a.questao - b.questao);
-        const nextAnswerKeys = Array.from({ length: input.quantidadeQuestoes }, (_, index) => ({
-          provaId: examId,
-          questao: index + 1,
-          respostaCorreta: previousAnswerKey[index]?.respostaCorreta ?? input.alternativas[0] ?? "A",
-        }));
+    const updateExamHandler = async (examId: string, input: CreateExamInput) => {
+      const currentExam = data.exams.find((item) => item.id === examId);
+      const previousAnswerKey = data.answerKeys
+        .filter((item) => item.provaId === examId)
+        .sort((a, b) => a.questao - b.questao);
 
-        return {
-          ...previous,
-          answerKeys: [...previous.answerKeys.filter((item) => item.provaId !== examId), ...nextAnswerKeys],
-          correctionRules: previous.correctionRules.map((item) =>
+      const nextAnswerKeys = Array.from({ length: input.quantidadeQuestoes }, (_, index) => ({
+        provaId: examId,
+        questao: index + 1,
+        respostaCorreta: previousAnswerKey[index]?.respostaCorreta ?? input.alternativas[0] ?? "A",
+      }));
+
+      return persistAppData(
+        {
+          ...data,
+          answerKeys: [...data.answerKeys.filter((item) => item.provaId !== examId), ...nextAnswerKeys],
+          correctionRules: data.correctionRules.map((item) =>
             item.provaId === examId
               ? {
                   ...item,
@@ -482,8 +503,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                 }
               : item,
           ),
-          corrections: previous.corrections.filter((item) => item.correction.provaId !== examId),
-          exams: previous.exams.map((item) =>
+          corrections: data.corrections.filter((item) => item.correction.provaId !== examId),
+          exams: data.exams.map((item) =>
             item.id === examId
               ? {
                   ...item,
@@ -493,45 +514,40 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                 }
               : item,
           ),
-        };
-      });
-
-      return {
-        ok: true,
-        message: "Prova atualizada. Correções antigas dessa prova foram removidas para manter consistência.",
-      };
+        },
+        "Prova atualizada. Correcoes antigas dessa prova foram removidas para manter consistencia.",
+      );
     };
 
-    const deleteExamHandler = (examId: string) => {
-      setData((previous) => ({
-        ...previous,
-        answerKeys: previous.answerKeys.filter((item) => item.provaId !== examId),
-        correctionRules: previous.correctionRules.filter((item) => item.provaId !== examId),
-        corrections: previous.corrections.filter((item) => item.correction.provaId !== examId),
-        exams: previous.exams.filter((item) => item.id !== examId),
-      }));
+    const deleteExamHandler = async (examId: string) =>
+      persistAppData(
+        {
+          ...data,
+          answerKeys: data.answerKeys.filter((item) => item.provaId !== examId),
+          correctionRules: data.correctionRules.filter((item) => item.provaId !== examId),
+          corrections: data.corrections.filter((item) => item.correction.provaId !== examId),
+          exams: data.exams.filter((item) => item.id !== examId),
+        },
+        "Prova, gabarito, regras e correcoes vinculadas foram removidos.",
+      );
 
-      return { ok: true, message: "Prova, gabarito, regras e correções vinculadas foram removidos." };
-    };
-
-    const saveAnswerKeyHandler = (examId: string, answers: string[]) => {
-      setData((previous) => {
-        const filtered = previous.answerKeys.filter((item) => item.provaId !== examId);
-        return {
-          ...previous,
+    const saveAnswerKeyHandler = async (examId: string, answers: string[]) =>
+      persistAppData(
+        {
+          ...data,
           answerKeys: [
-            ...filtered,
+            ...data.answerKeys.filter((item) => item.provaId !== examId),
             ...answers.map((respostaCorreta, index) => ({
               provaId: examId,
               questao: index + 1,
               respostaCorreta,
             })),
           ],
-        };
-      });
-    };
+        },
+        "Gabarito salvo com sucesso.",
+      );
 
-    const saveCorrectionRuleHandler = (input: SaveCorrectionRuleInput) => {
+    const saveCorrectionRuleHandler = async (input: SaveCorrectionRuleInput) => {
       const nextRule: ExamCorrectionRule = {
         arredondamentoCasas: input.arredondamentoCasas,
         modoQuestaoAnulada: input.modoQuestaoAnulada,
@@ -542,29 +558,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         questoesAnuladas: sanitizeQuestionList(input.questoesAnuladasRaw, input.totalQuestions),
       };
 
-      setData((previous) => ({
-        ...previous,
-        correctionRules: [
-          ...previous.correctionRules.filter((item) => item.provaId !== input.provaId),
-          nextRule,
-        ],
-      }));
-
-      return { ok: true, message: "Regras de correção salvas com sucesso." };
+      return persistAppData(
+        {
+          ...data,
+          correctionRules: [
+            ...data.correctionRules.filter((item) => item.provaId !== input.provaId),
+            nextRule,
+          ],
+        },
+        "Regras de correcao salvas com sucesso.",
+      );
     };
 
-    const saveCorrectionHandler = (input: SaveCorrectionInput) => {
+    const saveCorrectionHandler = async (input: SaveCorrectionInput) => {
       const student = data.students.find((item) => item.id === input.studentId);
       const answerKey = data.answerKeys
         .filter((item) => item.provaId === input.examId)
         .sort((a, b) => a.questao - b.questao);
 
       if (!student) {
-        return { ok: false, message: "Selecione um aluno válido." };
+        return { ok: false, message: "Selecione um aluno valido." };
       }
 
       if (!answerKey.length) {
-        return { ok: false, message: "Esta prova ainda não possui gabarito salvo." };
+        return { ok: false, message: "Esta prova ainda nao possui gabarito salvo." };
       }
 
       const sessionToSave = buildCorrectionSession({
@@ -580,34 +597,33 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         student,
       });
 
-      setData((previous) => ({
-        ...previous,
-        corrections: [sessionToSave, ...previous.corrections],
-      }));
-
-      return { ok: true, message: "Correção salva com sucesso na planilha operacional." };
+      return persistAppData(
+        {
+          ...data,
+          corrections: [sessionToSave, ...data.corrections],
+        },
+        "Correcao salva com sucesso na planilha operacional.",
+      );
     };
 
     const exportDataHandler = () => JSON.stringify(data, null, 2);
     const getOperationalCsvHandler = () => buildOperationalCsv(data);
 
-    const importDataHandler = (payload: string) => {
+    const importDataHandler = async (payload: string) => {
       try {
         const parsed = normalizeImportedData(JSON.parse(payload));
         if (!parsed) {
-          return { ok: false, message: "Arquivo JSON inválido para importação." };
+          return { ok: false, message: "Arquivo JSON invalido para importacao." };
         }
 
-        setData(normalizeAppDataState(parsed));
-        return { ok: true, message: "Dados importados com sucesso." };
+        return persistAppData(parsed, "Dados importados com sucesso.");
       } catch {
-        return { ok: false, message: "Não foi possível ler o JSON informado." };
+        return { ok: false, message: "Nao foi possivel ler o JSON informado." };
       }
     };
 
-    const resetDataHandler = () => {
-      setData(cloneDefaultAppData());
-    };
+    const resetDataHandler = async () =>
+      persistAppData(cloneDefaultAppData(), "Base operacional restaurada.");
 
     const loginTeacherHandler = async (input: { email: string; password: string; remember: boolean }) => {
       if (!input.email.trim()) {
@@ -639,7 +655,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
 
         if (!response.ok || !payload.user) {
-          return { ok: false, message: payload.error ?? "Não foi possível iniciar a sessão segura." };
+          return { ok: false, message: payload.error ?? "Nao foi possivel iniciar a sessao segura." };
         }
 
         setSession(normalizeSession(payload.user));
@@ -650,7 +666,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           redirectTo: payload.redirectTo,
         };
       } catch {
-        return { ok: false, message: "Falha ao iniciar a sessão segura." };
+        return { ok: false, message: "Falha ao iniciar a sessao segura." };
       }
     };
 
@@ -676,7 +692,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
 
         if (!response.ok || !payload.user) {
-          return { ok: false, message: payload.error ?? "Não foi possível alterar a senha." };
+          return { ok: false, message: payload.error ?? "Nao foi possivel alterar a senha." };
         }
 
         setSession(normalizeSession(payload.user));
@@ -703,8 +719,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return {
       analytics: calculateAnalytics(data),
       authResolved,
-      createClass: createClassHandler,
       changeTeacherPassword: changeTeacherPasswordHandler,
+      createClass: createClassHandler,
       createExam: createExamHandler,
       createStudent: createStudentHandler,
       data,
@@ -722,11 +738,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       saveCorrection: saveCorrectionHandler,
       saveCorrectionRule: saveCorrectionRuleHandler,
       session,
+      syncError,
+      syncStatus,
       updateClass: updateClassHandler,
       updateExam: updateExamHandler,
       updateStudent: updateStudentHandler,
     };
-  }, [authResolved, data, isHydrated, session]);
+  }, [authResolved, data, isHydrated, session, syncError, syncStatus]);
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }

@@ -405,7 +405,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setScreenMessage("Imagem pronta para pre-visualizacao e processamento.");
   };
 
-  const confirmCorrection = () => {
+  const confirmCorrection = async () => {
     if (!review) {
       setErrorMessage("Nenhuma leitura para salvar. Inicie um OCR ou abra o modo manual.");
       setPhase("error");
@@ -423,7 +423,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       return;
     }
 
-    const result = saveCorrection({
+    const result = await saveCorrection({
       answers: review.answers.map((item) => ({ marcacoes: item.markedAnswers, questao: item.question })),
       confidence: review.confidence,
       examId: exam.id,
@@ -439,8 +439,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       studentId: review.matchedStudentId,
     });
 
-    setScreenMessage(result.message);
-    setErrorMessage("");
+    if (result.ok) {
+      setScreenMessage(result.message);
+      setErrorMessage("");
+      return;
+    }
+
+    setErrorMessage(result.message);
   };
 
   return (
