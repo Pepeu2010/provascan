@@ -314,12 +314,12 @@ export function resolveIdentityFromQr(params: {
     };
   }
 
-  if (qrResult.payload.provaId !== dataExam.id || qrResult.payload.turma !== dataExam.turma) {
+  if (qrResult.payload.provaId !== dataExam.id || qrResult.payload.turma !== student.turma) {
     return {
       confidence: 0,
       detectedName: student.nome,
       detectedRegistration: student.matricula,
-      invalidMessage: "QR Code valido, mas aponta para outra prova ou turma.",
+      invalidMessage: "QR Code valido, mas aponta para outra prova ou aluno fora do publico atual.",
       method: "qr" as const,
       matchedStudentId: student.id,
     };
