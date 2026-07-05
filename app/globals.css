@@ -204,6 +204,26 @@ textarea {
   color: var(--input-foreground);
 }
 
+select {
+  background-color: transparent;
+}
+
+select option,
+select optgroup {
+  background: color-mix(in srgb, var(--surface-strong) 94%, black 6%);
+  color: var(--foreground);
+}
+
+select:invalid {
+  color: var(--muted-foreground);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.86;
+  cursor: pointer;
+  filter: saturate(0.4) brightness(1.2);
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--muted-foreground);

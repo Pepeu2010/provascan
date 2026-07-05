@@ -264,6 +264,12 @@ export function buildExamAudienceOptions(classes: ClassRoom[]) {
     classes.map((item) => deriveClassAudience(item).yearSegment).filter((item) => item === "1" || item === "2" || item === "3"),
   );
 
+  if (!yearsPresent.size) {
+    yearsPresent.add("1");
+    yearsPresent.add("2");
+    yearsPresent.add("3");
+  }
+
   const options: ExamAudienceOption[] = [];
   if (yearsPresent.has("1")) {
     options.push({

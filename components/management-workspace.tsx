@@ -515,6 +515,9 @@ export function ExamsManager() {
         <div className="mt-6 grid gap-3 lg:grid-cols-5">
           <Input placeholder="Titulo da prova" value={form.titulo} onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))} />
           <FieldSelect value={selectedAudienceId} onChange={(audienceId) => setForm((prev) => ({ ...prev, audienceId }))}>
+            {!audienceOptions.length ? (
+              <option value="">Nenhum público disponível</option>
+            ) : null}
             {audienceOptions.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -530,6 +533,23 @@ export function ExamsManager() {
             Existem turmas de 2º/3º ano sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
           </p>
         ) : null}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {audienceOptions.slice(0, 6).map((item) => (
+            <button
+              key={`quick-${item.id}`}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, audienceId: item.id }))}
+              className={[
+                "rounded-full border px-3 py-2 text-xs font-semibold tracking-[0.18em] uppercase transition-all duration-200",
+                selectedAudienceId === item.id
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)] shadow-[var(--shadow-soft)]"
+                  : "border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_84%,transparent)] text-[var(--muted-foreground)] hover:border-[var(--border-strong)] hover:text-[var(--foreground)]",
+              ].join(" ")}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
         <div className="mt-4 flex flex-wrap gap-3">
             <Button
               onClick={() => {
