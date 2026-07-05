@@ -16,6 +16,7 @@ import {
   isActiveUser,
   shouldForcePasswordChange,
 } from "@/services/google-sheets";
+import { normalizeSubject } from "@/lib/subject-scope";
 
 export const runtime = "nodejs";
 
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
       nome: user.nome,
       email: user.email,
       role: user.perfil,
+      subject: normalizeSubject(user.disciplina),
       forcePasswordChange: shouldForcePasswordChange(user.trocar_senha),
     };
 

@@ -12,6 +12,7 @@ const sessionPayloadSchema = z.object({
   nome: z.string().min(1),
   email: z.string().min(1),
   role: z.string().min(1),
+  subject: z.string().nullable(),
   forcePasswordChange: z.boolean(),
   remember: z.boolean(),
   loggedInAt: z.string().datetime(),
@@ -57,6 +58,7 @@ export async function createSessionToken(input: {
     passwordStamp: input.passwordStamp,
     remember: input.remember,
     role: input.user.role,
+    subject: input.user.subject,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(input.user.id)

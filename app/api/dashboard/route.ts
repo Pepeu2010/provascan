@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { calculateAnalytics } from "@/lib/app-data";
+import { canManageAllSubjects, filterAppDataForSubject, requireScopedSubject } from "@/lib/subject-scope";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import { getOperationalAppData, getSystemSnapshot } from "@/services/google-sheets";
 
@@ -22,11 +23,16 @@ export async function GET() {
 
   try {
     const [snapshot, data] = await Promise.all([getSystemSnapshot(), getOperationalAppData()]);
-    const analytics = calculateAnalytics(data);
+    const subject = requireScopedSubject(validation.session);
+    if (!canManageAllSubjects(validation.session.role) && !subject) {
+      return NextResponse.json({ error: "Usuario sem disciplina vinculada na aba usuarios." }, { status: 403 });
+    }
+    const scopedData = filterAppDataForSubject(data, subject);
+    const analytics = calculateAnalytics(scopedData);
     const response = NextResponse.json(
       {
         metrics: analytics.dashboardMetrics,
-        latestCorrection: data.corrections[0] ?? null,
+        latestCorrection: scopedData.corrections[0] ?? null,
         storage: snapshot,
       },
       {

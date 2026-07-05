@@ -13,10 +13,10 @@ import type {
 } from "@/types/domain";
 import type { SheetsUserRecord } from "@/types/auth";
 
-const USERS_RANGE_COLUMNS = "A:G";
+const USERS_RANGE_COLUMNS = "A:H";
 const STUDENTS_RANGE_COLUMNS = "A:E";
 const CLASSES_RANGE_COLUMNS = "A:I";
-const EXAMS_RANGE_COLUMNS = "A:K";
+const EXAMS_RANGE_COLUMNS = "A:L";
 const ANSWER_KEYS_RANGE_COLUMNS = "A:C";
 const CORRECTION_RULES_RANGE_COLUMNS = "A:G";
 const CORRECTIONS_RANGE_COLUMNS = "A:X";
@@ -38,6 +38,7 @@ const REQUIRED_CLASS_HEADERS = [
 const REQUIRED_EXAM_HEADERS = [
   "id",
   "titulo",
+  "disciplina",
   "audience_id",
   "audience_label",
   "group_type",
@@ -423,6 +424,22 @@ async function ensureSheetHeaders(
 
     const missingHeaders = definition.headers.filter((header) => !rawHeader.includes(String(header)));
     if (missingHeaders.length > 0) {
+      const canAppendMissingHeaders =
+        rawHeader.length <= definition.headers.length &&
+        rawHeader.every((header, index) => header === normalizeHeader(String(definition.headers[index])));
+
+      if (canAppendMissingHeaders) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${definition.tabName}!A1`,
+          valueInputOption: "RAW",
+          requestBody: {
+            values: [definition.headers.map((header) => String(header))],
+          },
+        });
+        return;
+      }
+
       throw new GoogleSheetsSchemaError(
         `A aba ${definition.tabName} esta sem as colunas obrigatorias: ${missingHeaders.join(", ")}.`,
       );
@@ -557,6 +574,7 @@ async function readUsersSheet() {
         email: (cells.get("email") ?? "").toLowerCase(),
         senha: cells.get("senha") ?? "",
         perfil: cells.get("perfil") ?? "",
+        disciplina: cells.get("disciplina") ?? cells.get("materia") ?? "",
         ativo: cells.get("ativo") ?? "",
         trocar_senha: cells.get("trocar_senha") ?? "",
       } satisfies SheetsUserRecord,
@@ -667,6 +685,7 @@ async function readExams(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
   return rows.map((cells) => ({
     id: cells.get("id") ?? "",
     titulo: cells.get("titulo") ?? "",
+    subject: cells.get("disciplina") ?? "",
     audienceId: cells.get("audience_id") ?? "",
     audienceLabel: cells.get("audience_label") ?? "",
     groupType: (cells.get("group_type") ?? "INDEFINIDO") as Exam["groupType"],
@@ -921,6 +940,7 @@ export async function listUsersForAdmin() {
       nome: item.record.nome,
       email: item.record.email,
       perfil: item.record.perfil,
+      disciplina: item.record.disciplina ?? "",
       ativo: item.record.ativo,
       trocar_senha: item.record.trocar_senha,
     }));
@@ -1012,6 +1032,7 @@ export async function saveOperationalAppData(data: AppDataState) {
     normalizedData.exams.map((item) => [
       item.id,
       item.titulo,
+      item.subject,
       item.audienceId,
       item.audienceLabel,
       item.groupType,

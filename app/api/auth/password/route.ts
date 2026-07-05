@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { applyAuthCookie, AUTH_COOKIE_NAME, buildSessionUser, createSessionToken } from "@/lib/auth";
+import { normalizeSubject } from "@/lib/subject-scope";
 import { createPasswordStamp, verifyPassword } from "@/lib/passwords";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
       nome: user.nome,
       email: user.email,
       role: user.perfil,
+      subject: normalizeSubject(user.disciplina),
       forcePasswordChange: false,
     };
 

@@ -37,6 +37,7 @@ export type ClassRoom = {
 export type Exam = {
   id: string;
   titulo: string;
+  subject: string;
   audienceId: string;
   audienceLabel: string;
   groupType: AudienceGroupType;

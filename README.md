@@ -78,7 +78,7 @@ Regras:
 O sistema depende exatamente destas colunas existentes:
 
 ```txt
-id | nome | email | senha | perfil | ativo | trocar_senha
+id | nome | email | senha | perfil | disciplina | ativo | trocar_senha
 ```
 
 Regras aplicadas:
@@ -87,8 +87,39 @@ Regras aplicadas:
 - comparacao da senha digitada com a coluna `senha`
 - acesso permitido apenas quando `ativo = SIM`
 - o campo `perfil` define a permissao do usuario
+- o campo `disciplina` define a materia operacional do usuario
 - o campo `trocar_senha` obriga o redirecionamento para `/trocar-senha`
 - toda leitura da planilha acontece apenas no backend
+
+Regra importante de escopo:
+
+- `admin` e `vice_diretor` podem ver todas as materias
+- `professor` precisa ter `disciplina` preenchida na aba `usuarios`
+- se a `disciplina` estiver vazia para um perfil comum, o painel bloqueia a carga com erro de configuracao
+
+Materias padronizadas hoje:
+
+- `Artes`
+- `Biologia`
+- `Ciencias`
+- `Educacao Fisica`
+- `Filosofia`
+- `Fisica`
+- `Geografia`
+- `Historia`
+- `Ingles`
+- `Lingua Portuguesa`
+- `Matematica`
+- `Quimica`
+- `Redacao`
+- `Sociologia`
+
+Aliases aceitos e normalizados automaticamente:
+
+- `Portugues` vira `Lingua Portuguesa`
+- `Lingua Inglesa` vira `Ingles`
+- `Ed Fisica` vira `Educacao Fisica`
+- `Mat` vira `Matematica`
 
 ## Compatibilidade atual e futura da senha
 

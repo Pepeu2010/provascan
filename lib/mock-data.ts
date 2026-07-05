@@ -33,6 +33,7 @@ export const exams: Exam[] = [
   {
     id: "P-301",
     titulo: "Simulado ENEM I",
+    subject: "Matemática",
     audienceId: "ANO-3-INDEFINIDO-t-101",
     audienceLabel: "3º ano - Revisar agrupamento",
     groupType: "INDEFINIDO",
@@ -46,6 +47,7 @@ export const exams: Exam[] = [
   {
     id: "P-302",
     titulo: "Revisão de Química",
+    subject: "Química",
     audienceId: "ANO-2-HUMANAS",
     audienceLabel: "2º ano - Humanas",
     groupType: "HUMANAS",
@@ -59,6 +61,7 @@ export const exams: Exam[] = [
   {
     id: "P-303",
     titulo: "Avaliação de Ciências",
+    subject: "Ciências",
     audienceId: "ANO-OUTROS-TURMA-t-103",
     audienceLabel: "9º Ano A",
     groupType: "TURMA",

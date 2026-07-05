@@ -18,6 +18,7 @@ import {
   getStudentsForExam,
   hasAmbiguousClasses,
 } from "@/lib/exam-audience";
+import { getSubjectLabel } from "@/lib/subject-scope";
 import { formatDate } from "@/lib/utils";
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
 import {
@@ -32,6 +33,7 @@ type AdminUserRow = {
   nome: string;
   email: string;
   perfil: string;
+  disciplina?: string;
   ativo: string;
   trocar_senha: string;
 };
@@ -324,7 +326,7 @@ export function StudentsManager() {
 }
 
 export function ExamsManager() {
-  const { createExam, data, deleteExam, saveCorrectionRule, syncError, syncStatus, updateExam } = useAppData();
+  const { createExam, data, deleteExam, saveCorrectionRule, session, syncError, syncStatus, updateExam } = useAppData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [selectedExamId, setSelectedExamId] = useState(data.exams[0]?.id ?? "");
@@ -352,6 +354,7 @@ export function ExamsManager() {
   );
   const hasYearTwoAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "2"), [data.classes]);
   const hasYearThreeAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "3"), [data.classes]);
+  const subjectLabel = getSubjectLabel(session?.subject);
 
   const [ruleForm, setRuleForm] = useState(() => {
     if (!activeExam || !rule) {
@@ -533,6 +536,11 @@ export function ExamsManager() {
             Existem turmas de 2º/3º ano sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
           </p>
         ) : null}
+        {subjectLabel ? (
+          <p className="mt-4 text-sm text-[var(--accent)]">
+            Materia ativa desta sessao: {subjectLabel}. Toda prova criada aqui sera vinculada automaticamente a essa materia.
+          </p>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
             <Button
               onClick={() => {
@@ -601,6 +609,7 @@ export function ExamsManager() {
                 <Badge tone="neutral">{item.quantidadeQuestoes} questões</Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
+                {item.subject ? <Badge tone="warning">Materia: {getSubjectLabel(item.subject)}</Badge> : null}
                 <Badge tone="accent">{item.codigo}</Badge>
                 <Badge tone="neutral">{item.templateVersion}</Badge>
               </div>
@@ -1183,6 +1192,7 @@ export function SettingsWorkspace() {
                   </div>
                   <p className="mt-2 text-sm text-[var(--muted-foreground)]">
                     {user.email || "Sem identificador de acesso"} • perfil {user.perfil || "sem perfil"}
+                    {user.disciplina ? ` • materia ${getSubjectLabel(user.disciplina)}` : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">

@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { canAccessSensitiveSettings } from "@/lib/access-control";
+import { getSubjectLabel } from "@/lib/subject-scope";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -47,6 +48,7 @@ export function DashboardShell({
   const router = useRouter();
   const { authResolved, data, isHydrated, logoutTeacher, session } = useAppData();
   const [menuOpen, setMenuOpen] = useState(false);
+  const subjectLabel = getSubjectLabel(session?.subject);
 
   const summary = useMemo(
     () =>
@@ -110,6 +112,9 @@ export function DashboardShell({
                 </p>
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
                 <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
+                {subjectLabel ? (
+                  <p className="mt-2 text-sm font-medium text-[var(--accent)]">Materia: {subjectLabel}</p>
+                ) : null}
               </div>
             </div>
 
@@ -157,11 +162,17 @@ export function DashboardShell({
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge tone="neutral">Workspace do professor</Badge>
                   <Badge tone="accent">Monitoramento ao vivo</Badge>
+                  {subjectLabel ? <Badge tone="warning">Materia: {subjectLabel}</Badge> : null}
                 </div>
                 <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-4xl">
                   {data.teacherProfile.escola}
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
+                {subjectLabel ? (
+                  <p className="mt-2 text-sm font-medium text-[var(--accent)]">
+                    As provas, gabaritos e correcoes desta sessao estao vinculados a {subjectLabel}.
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -239,6 +250,7 @@ export function DashboardShell({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Workspace ativo</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
                 <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
+                {subjectLabel ? <p className="mt-2 text-sm font-medium text-[var(--accent)]">Materia: {subjectLabel}</p> : null}
               </div>
               <div className="mt-6">
                 <ThemeSwitcher compact />

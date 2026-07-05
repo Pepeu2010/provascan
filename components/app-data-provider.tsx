@@ -184,6 +184,7 @@ function normalizeSession(value: unknown): AuthSessionUser | null {
     typeof candidate.nome !== "string" ||
     typeof candidate.email !== "string" ||
     typeof candidate.role !== "string" ||
+    !(typeof candidate.subject === "string" || candidate.subject === null || candidate.subject === undefined) ||
     typeof candidate.forcePasswordChange !== "boolean" ||
     typeof candidate.loggedInAt !== "string"
   ) {
@@ -198,6 +199,7 @@ function normalizeSession(value: unknown): AuthSessionUser | null {
     loggedInAt: candidate.loggedInAt,
     remember: Boolean(candidate.remember),
     role: candidate.role,
+    subject: candidate.subject ?? null,
   };
 }
 
@@ -304,7 +306,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch("/api/app-data", { cache: "no-store" });
         if (!response.ok) {
-          throw new Error("Falha na carga remota.");
+          const payload = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(payload.error ?? "Falha na carga remota.");
         }
 
         const payload = normalizeImportedData(await response.json());
@@ -320,11 +323,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           setSyncStatus("idle");
           setSyncError("");
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           hasLoadedRemoteDataRef.current = false;
           setSyncStatus("error");
-          setSyncError("Nao foi possivel carregar os dados operacionais da planilha.");
+          setSyncError(
+            error instanceof Error && error.message
+              ? error.message
+              : "Nao foi possivel carregar os dados operacionais da planilha.",
+          );
         }
       }
     };
@@ -457,6 +464,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         id: examId,
         ...input,
         codigo: `${codeBase || "PROVA"}-${input.data.slice(0, 4)}`,
+        subject: session?.subject ?? "",
         templateVersion: "PS-CARD-1",
       };
 
@@ -507,11 +515,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           exams: data.exams.map((item) =>
             item.id === examId
               ? {
-                  ...item,
-                  ...input,
-                  codigo: currentExam?.codigo ?? item.codigo,
-                  templateVersion: "PS-CARD-1",
-                }
+                ...item,
+                ...input,
+                codigo: currentExam?.codigo ?? item.codigo,
+                subject: currentExam?.subject ?? session?.subject ?? item.subject,
+                templateVersion: "PS-CARD-1",
+              }
               : item,
           ),
         },

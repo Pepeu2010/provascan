@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { canManageAllSubjects, filterAppDataForSubject, mergeScopedAppData, requireScopedSubject } from "@/lib/subject-scope";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
   getOperationalAppData,
@@ -53,12 +54,17 @@ export async function GET() {
 
   try {
     const data = await getOperationalAppData();
-    const response = NextResponse.json(data, {
+    const subject = requireScopedSubject(validation.session);
+    if (!canManageAllSubjects(validation.session.role) && !subject) {
+      return NextResponse.json({ error: "Usuario sem disciplina vinculada na aba usuarios." }, { status: 403 });
+    }
+    const filteredData = filterAppDataForSubject(data, subject);
+    const finalResponse = NextResponse.json(filteredData, {
       headers: { "Cache-Control": "no-store" },
     });
 
     if (validation.shouldRefreshCookie) {
-      await syncValidatedSessionCookie(response, {
+      await syncValidatedSessionCookie(finalResponse, {
         loggedInAt: validation.session.loggedInAt,
         passwordStamp: validation.passwordStamp,
         remember: validation.session.remember,
@@ -66,7 +72,7 @@ export async function GET() {
       });
     }
 
-    return response;
+    return finalResponse;
   } catch (error) {
     if (error instanceof GoogleSheetsConfigError) {
       return NextResponse.json({ error: "Planilha nao configurada." }, { status: 500 });
@@ -95,7 +101,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Payload invalido para persistencia." }, { status: 400 });
     }
 
-    await saveOperationalAppData(payload.data);
+    const subject = requireScopedSubject(validation.session);
+    if (!canManageAllSubjects(validation.session.role) && !subject) {
+      return NextResponse.json({ error: "Usuario sem disciplina vinculada na aba usuarios." }, { status: 403 });
+    }
+
+    const currentData = await getOperationalAppData();
+    const nextData = mergeScopedAppData(currentData, payload.data, subject);
+    await saveOperationalAppData(nextData);
 
     const response = NextResponse.json(
       { message: "Dados operacionais salvos com sucesso." },

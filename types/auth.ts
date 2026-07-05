@@ -6,6 +6,7 @@ export type SheetsUserRecord = {
   email: string;
   senha: string;
   perfil: UserRole;
+  disciplina?: string;
   ativo: string;
   trocar_senha: string;
 };
@@ -15,6 +16,7 @@ export type SafeAuthUser = {
   nome: string;
   email: string;
   role: UserRole;
+  subject: string | null;
   forcePasswordChange: boolean;
 };
 
