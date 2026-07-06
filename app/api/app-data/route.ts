@@ -38,7 +38,7 @@ async function validateRequestSession() {
 
 function buildAuthErrorResponse() {
   return NextResponse.json(
-    { error: "Autenticacao necessaria." },
+    { error: "Autenticação necessária." },
     { status: 401, headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -56,7 +56,7 @@ export async function GET() {
     const data = await getOperationalAppData();
     const subject = requireScopedSubject(validation.session);
     if (!canManageAllSubjects(validation.session.role) && !subject) {
-      return NextResponse.json({ error: "Usuario sem disciplina vinculada na aba usuarios." }, { status: 403 });
+      return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
     }
     const filteredData = filterAppDataForSubject(data, subject);
     const finalResponse = NextResponse.json(filteredData, {
@@ -75,7 +75,7 @@ export async function GET() {
     return finalResponse;
   } catch (error) {
     if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Planilha nao configurada." }, { status: 500 });
+      return NextResponse.json({ error: "Planilha não configurada." }, { status: 500 });
     }
 
     if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
@@ -98,12 +98,12 @@ export async function PUT(request: Request) {
   try {
     const payload = (await request.json()) as { data?: unknown };
     if (!isAppDataStatePayload(payload.data)) {
-      return NextResponse.json({ error: "Payload invalido para persistencia." }, { status: 400 });
+      return NextResponse.json({ error: "Payload inválido para persistência." }, { status: 400 });
     }
 
     const subject = requireScopedSubject(validation.session);
     if (!canManageAllSubjects(validation.session.role) && !subject) {
-      return NextResponse.json({ error: "Usuario sem disciplina vinculada na aba usuarios." }, { status: 403 });
+      return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
     }
 
     const currentData = await getOperationalAppData();
@@ -127,7 +127,7 @@ export async function PUT(request: Request) {
     return response;
   } catch (error) {
     if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Planilha nao configurada." }, { status: 500 });
+      return NextResponse.json({ error: "Planilha não configurada." }, { status: 500 });
     }
 
     if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {

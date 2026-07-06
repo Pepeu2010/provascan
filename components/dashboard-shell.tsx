@@ -76,7 +76,7 @@ export function DashboardShell({
             Redirecionando para o login do professor
           </h1>
           <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-            O painel exige uma sessão ativa neste navegador para reduzir exposição acidental do workspace.
+            O painel exige uma sessão ativa neste navegador para reduzir a exposição acidental do workspace.
           </p>
         </Card>
       </div>
@@ -87,12 +87,12 @@ export function DashboardShell({
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
         <Card className="w-full max-w-xl p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">Validando sessao</p>
+          <p className="text-sm text-[var(--muted-foreground)]">Validando sessão</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
             Confirmando acesso ao painel
           </h1>
           <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-            O painel aguarda a validacao da sessao antes de decidir qualquer redirecionamento.
+            O painel aguarda a validação da sessão antes de decidir qualquer redirecionamento.
           </p>
         </Card>
       </div>
@@ -113,7 +113,7 @@ export function DashboardShell({
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
                 <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
                 {subjectLabel ? (
-                  <p className="mt-2 text-sm font-medium text-[var(--accent)]">Materia: {subjectLabel}</p>
+                  <p className="mt-2 text-sm font-medium text-[var(--accent)]">Matéria: {subjectLabel}</p>
                 ) : null}
               </div>
             </div>
@@ -162,7 +162,7 @@ export function DashboardShell({
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge tone="neutral">Workspace do professor</Badge>
                   <Badge tone="accent">Monitoramento ao vivo</Badge>
-                  {subjectLabel ? <Badge tone="warning">Materia: {subjectLabel}</Badge> : null}
+                  {subjectLabel ? <Badge tone="warning">Matéria: {subjectLabel}</Badge> : null}
                 </div>
                 <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-4xl">
                   {data.teacherProfile.escola}
@@ -170,7 +170,7 @@ export function DashboardShell({
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
                 {subjectLabel ? (
                   <p className="mt-2 text-sm font-medium text-[var(--accent)]">
-                    As provas, gabaritos e correcoes desta sessao estao vinculados a {subjectLabel}.
+                    As provas, os gabaritos e as correções desta sessão estão vinculados a {subjectLabel}.
                   </p>
                 ) : null}
               </div>
@@ -178,7 +178,7 @@ export function DashboardShell({
 
             <div className="grid grid-cols-2 gap-3 sm:hidden">
               <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Sessao</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Sessão</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
               </div>
               <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
@@ -220,11 +220,11 @@ export function DashboardShell({
               Falha na carga operacional
             </p>
             <p className="mt-3 text-base font-semibold text-[var(--foreground)]">
-              O painel nao conseguiu carregar os dados da planilha.
+              O painel não conseguiu carregar os dados da planilha.
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">{syncError}</p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
-              Se este login for de professor, confira a coluna `disciplina` na aba `usuarios`.
+              Se este login for de professor, confira a coluna `disciplina` na aba `usuários`.
             </p>
           </Card>
         ) : null}
@@ -265,7 +265,7 @@ export function DashboardShell({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Workspace ativo</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
                 <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
-                {subjectLabel ? <p className="mt-2 text-sm font-medium text-[var(--accent)]">Materia: {subjectLabel}</p> : null}
+                {subjectLabel ? <p className="mt-2 text-sm font-medium text-[var(--accent)]">Matéria: {subjectLabel}</p> : null}
               </div>
               <div className="mt-6">
                 <ThemeSwitcher compact />

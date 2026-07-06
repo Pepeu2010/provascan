@@ -330,7 +330,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           setSyncError(
             error instanceof Error && error.message
               ? error.message
-              : "Nao foi possivel carregar os dados operacionais da planilha.",
+              : "Não foi possível carregar os dados operacionais da planilha.",
           );
         }
       }
@@ -346,7 +346,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppDataContextValue>(() => {
     const persistAppData = async (nextData: AppDataState, successMessage: string): Promise<MutationResult> => {
       if (!session || !hasLoadedRemoteDataRef.current) {
-        return { ok: false, message: "A sessao ainda nao terminou de carregar os dados remotos." };
+        return { ok: false, message: "A sessão ainda não terminou de carregar os dados remotos." };
       }
 
       setSyncStatus("saving");
@@ -364,7 +364,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         if (!response.ok) {
-          const message = payload.error ?? "Nao foi possivel sincronizar a planilha.";
+          const message = payload.error ?? "Não foi possível sincronizar a planilha.";
           setSyncStatus("error");
           setSyncError(message);
           return { ok: false, message };
@@ -537,7 +537,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           corrections: data.corrections.filter((item) => item.correction.provaId !== examId),
           exams: data.exams.filter((item) => item.id !== examId),
         },
-        "Prova, gabarito, regras e correcoes vinculadas foram removidos.",
+        "Prova, gabarito, regras e correções vinculadas foram removidos.",
       );
 
     const saveAnswerKeyHandler = async (examId: string, answers: string[]) =>
@@ -575,7 +575,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             nextRule,
           ],
         },
-        "Regras de correcao salvas com sucesso.",
+        "Regras de correção salvas com sucesso.",
       );
     };
 
@@ -590,7 +590,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
 
       if (!answerKey.length) {
-        return { ok: false, message: "Esta prova ainda nao possui gabarito salvo." };
+        return { ok: false, message: "Esta prova ainda não possui gabarito salvo." };
       }
 
       const sessionToSave = buildCorrectionSession({
@@ -611,7 +611,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ...data,
           corrections: [sessionToSave, ...data.corrections],
         },
-        "Correcao salva com sucesso na planilha operacional.",
+        "Correção salva com sucesso na planilha operacional.",
       );
     };
 
@@ -627,7 +627,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
         return persistAppData(parsed, "Dados importados com sucesso.");
       } catch {
-        return { ok: false, message: "Nao foi possivel ler o JSON informado." };
+        return { ok: false, message: "Não foi possível ler o JSON informado." };
       }
     };
 
@@ -664,7 +664,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
 
         if (!response.ok || !payload.user) {
-          return { ok: false, message: payload.error ?? "Nao foi possivel iniciar a sessao segura." };
+          return { ok: false, message: payload.error ?? "Não foi possível iniciar a sessão segura." };
         }
 
         setSession(normalizeSession(payload.user));
@@ -675,7 +675,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           redirectTo: payload.redirectTo,
         };
       } catch {
-        return { ok: false, message: "Falha ao iniciar a sessao segura." };
+        return { ok: false, message: "Falha ao iniciar a sessão segura." };
       }
     };
 
@@ -701,7 +701,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         };
 
         if (!response.ok || !payload.user) {
-          return { ok: false, message: payload.error ?? "Nao foi possivel alterar a senha." };
+          return { ok: false, message: payload.error ?? "Não foi possível alterar a senha." };
         }
 
         setSession(normalizeSession(payload.user));

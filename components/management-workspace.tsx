@@ -516,7 +516,7 @@ export function ExamsManager() {
           <Badge tone="accent">{data.exams.length} provas salvas</Badge>
         </div>
         <div className="mt-6 grid gap-3 lg:grid-cols-5">
-          <Input placeholder="Titulo da prova" value={form.titulo} onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))} />
+          <Input placeholder="Título da prova" value={form.titulo} onChange={(event) => setForm((prev) => ({ ...prev, titulo: event.target.value }))} />
           <FieldSelect value={selectedAudienceId} onChange={(audienceId) => setForm((prev) => ({ ...prev, audienceId }))}>
             {!audienceOptions.length ? (
               <option value="">Nenhum público disponível</option>
@@ -538,7 +538,7 @@ export function ExamsManager() {
         ) : null}
         {subjectLabel ? (
           <p className="mt-4 text-sm text-[var(--accent)]">
-            Materia ativa desta sessao: {subjectLabel}. Toda prova criada aqui sera vinculada automaticamente a essa materia.
+            Matéria ativa desta sessão: {subjectLabel}. Toda prova criada aqui será vinculada automaticamente a essa matéria.
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
@@ -609,7 +609,7 @@ export function ExamsManager() {
                 <Badge tone="neutral">{item.quantidadeQuestoes} questões</Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                {item.subject ? <Badge tone="warning">Materia: {getSubjectLabel(item.subject)}</Badge> : null}
+                {item.subject ? <Badge tone="warning">Matéria: {getSubjectLabel(item.subject)}</Badge> : null}
                 <Badge tone="accent">{item.codigo}</Badge>
                 <Badge tone="neutral">{item.templateVersion}</Badge>
               </div>
@@ -666,8 +666,8 @@ export function ExamsManager() {
               </FieldSelect>
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <Input value={ruleForm.notaMaxima} onChange={(event) => setRuleForm((prev) => ({ ...prev, notaMaxima: event.target.value }))} placeholder="Nota maxima" type="number" min="1" step="0.1" />
-              <Input value={ruleForm.pesoPadrao} onChange={(event) => setRuleForm((prev) => ({ ...prev, pesoPadrao: event.target.value }))} placeholder="Peso padrao" type="number" min="0.1" step="0.1" />
+              <Input value={ruleForm.notaMaxima} onChange={(event) => setRuleForm((prev) => ({ ...prev, notaMaxima: event.target.value }))} placeholder="Nota máxima" type="number" min="1" step="0.1" />
+              <Input value={ruleForm.pesoPadrao} onChange={(event) => setRuleForm((prev) => ({ ...prev, pesoPadrao: event.target.value }))} placeholder="Peso padrão" type="number" min="0.1" step="0.1" />
               <Input value={ruleForm.arredondamentoCasas} onChange={(event) => setRuleForm((prev) => ({ ...prev, arredondamentoCasas: event.target.value }))} placeholder="Casas decimais" type="number" min="0" max="3" />
               <FieldSelect value={ruleForm.modoQuestaoAnulada} onChange={(value) => setRuleForm((prev) => ({ ...prev, modoQuestaoAnulada: value as "full-credit" | "ignore" }))}>
                 <option value="full-credit">Questao anulada vale ponto</option>
@@ -685,7 +685,7 @@ export function ExamsManager() {
                 value={ruleForm.pesosPorQuestaoRaw}
                 onChange={(event) => setRuleForm((prev) => ({ ...prev, pesosPorQuestaoRaw: event.target.value }))}
                 className="min-h-28"
-                placeholder={"Pesos por questao\n5=1.5\n12=2"}
+                placeholder={"Pesos por questão\n5=1.5\n12=2"}
               />
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -854,8 +854,8 @@ export function AnswerKeyEditor() {
           <Card key={`mobile-${index + 1}`} className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-base font-semibold text-[var(--foreground)]">Questao {index + 1}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">Lancamento rapido para celular</p>
+                <p className="text-base font-semibold text-[var(--foreground)]">Questão {index + 1}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">Lançamento rápido para celular</p>
               </div>
               <Badge tone="neutral">{selected || "Sem resposta"}</Badge>
             </div>
@@ -1011,7 +1011,7 @@ export function ReportsWorkspace() {
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{filteredAverage}%</p>
           </Card>
           <Card className="p-4">
-            <p className="text-sm text-[var(--muted-foreground)]">Ranking disponivel</p>
+            <p className="text-sm text-[var(--muted-foreground)]">Ranking disponível</p>
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{analytics.studentRanking.length}</p>
           </Card>
         </div>
@@ -1192,7 +1192,7 @@ export function SettingsWorkspace() {
                   </div>
                   <p className="mt-2 text-sm text-[var(--muted-foreground)]">
                     {user.email || "Sem identificador de acesso"} • perfil {user.perfil || "sem perfil"}
-                    {user.disciplina ? ` • materia ${getSubjectLabel(user.disciplina)}` : ""}
+                    {user.disciplina ? ` • matéria ${getSubjectLabel(user.disciplina)}` : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">

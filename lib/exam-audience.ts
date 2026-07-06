@@ -15,10 +15,10 @@ const FIXED_EXAM_AUDIENCES: ExamAudienceOption[] = [
   { id: "ANO-1-GERAL", label: "1º ano", groupType: "GERAL", yearSegment: "1" },
   { id: "ANO-2-EXATAS", label: "2º ano - Exatas", groupType: "EXATAS", yearSegment: "2" },
   { id: "ANO-2-HUMANAS", label: "2º ano - Humanas", groupType: "HUMANAS", yearSegment: "2" },
-  { id: "ANO-2-TECNICO", label: "2º ano - Tecnico", groupType: "TECNICO", yearSegment: "2" },
+  { id: "ANO-2-TECNICO", label: "2º ano - Técnico", groupType: "TECNICO", yearSegment: "2" },
   { id: "ANO-3-EXATAS", label: "3º ano - Exatas", groupType: "EXATAS", yearSegment: "3" },
   { id: "ANO-3-HUMANAS", label: "3º ano - Humanas", groupType: "HUMANAS", yearSegment: "3" },
-  { id: "ANO-3-TECNICO", label: "3º ano - Tecnico", groupType: "TECNICO", yearSegment: "3" },
+  { id: "ANO-3-TECNICO", label: "3º ano - Técnico", groupType: "TECNICO", yearSegment: "3" },
 ] as const;
 
 function normalizeText(value: string) {
@@ -111,7 +111,7 @@ export function deriveExamAudienceFromLegacyClass(classroom?: Pick<ClassRoom, "i
   if (!classroom) {
     return {
       audienceId: createAudienceId("OUTROS", "TURMA", "sem-turma"),
-      audienceLabel: "Turma nao encontrada",
+      audienceLabel: "Turma não encontrada",
       groupType: "TURMA" as const,
       yearSegment: "OUTROS" as const,
     };

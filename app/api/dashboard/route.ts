@@ -25,7 +25,7 @@ export async function GET() {
     const [snapshot, data] = await Promise.all([getSystemSnapshot(), getOperationalAppData()]);
     const subject = requireScopedSubject(validation.session);
     if (!canManageAllSubjects(validation.session.role) && !subject) {
-      return NextResponse.json({ error: "Usuario sem disciplina vinculada na aba usuarios." }, { status: 403 });
+      return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
     }
     const scopedData = filterAppDataForSubject(data, subject);
     const analytics = calculateAnalytics(scopedData);

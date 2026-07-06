@@ -60,7 +60,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
           Questões com mais erro
         </h3>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-          Priorize revisão nas questões abaixo.
+          Priorize a revisão nas questões abaixo.
         </p>
 
         <div className="mt-6 space-y-4">

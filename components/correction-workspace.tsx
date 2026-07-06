@@ -275,12 +275,12 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         matchedStudentId: identity.matchedStudentId,
         notes: [
           `Template identificado: ${omrAnalysis.templateId} (${omrAnalysis.modelDisplayName}).`,
-          `Tipo da pagina: ${omrAnalysis.pageType}.`,
-          `Questoes detectadas no layout: ${omrAnalysis.totalQuestions}.`,
+          `Tipo da página: ${omrAnalysis.pageType}.`,
+          `Questões detectadas no layout: ${omrAnalysis.totalQuestions}.`,
           omrAnalysis.usedExpectedTemplate
-            ? "O scanner priorizou o template esperado da prova antes da leitura do cabecalho."
-            : `Classificacao do modelo pelo cabecalho com confianca ${omrAnalysis.modelConfidence}%.`,
-          omrAnalysis.headerText ? `Cabecalho OCR: ${omrAnalysis.headerText.slice(0, 140)}` : "Cabecalho OCR indisponivel nesta imagem.",
+            ? "O scanner priorizou o template esperado da prova antes da leitura do cabeçalho."
+            : `Classificação do modelo pelo cabeçalho com confiança ${omrAnalysis.modelConfidence}%.`,
+          omrAnalysis.headerText ? `Cabeçalho OCR: ${omrAnalysis.headerText.slice(0, 140)}` : "Cabeçalho OCR indisponível nesta imagem.",
           qrResult.status === "success"
             ? "QR Code lido com sucesso e validado contra a base local."
             : qrResult.status === "invalid"
@@ -296,16 +296,16 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           ocrIdentity?.rawText ? `OCR bruto: ${ocrIdentity.rawText.slice(0, 120)}` : "",
           needsManualReview ? "Fluxo marcado para revisão manual obrigatória." : "Leitura automática consistente, mas ainda exige conferência final.",
           omrAnalysis.totalQuestions !== answerKey.length
-            ? `Atencao: a prova atual tem ${answerKey.length} respostas cadastradas, mas o template identificado possui ${omrAnalysis.totalQuestions} questoes.`
+            ? `Atenção: a prova atual tem ${answerKey.length} respostas cadastradas, mas o template identificado possui ${omrAnalysis.totalQuestions} questões.`
             : "",
         ].filter(Boolean),
         pageType: omrAnalysis.pageType,
         processingLabel:
           identity.method === "qr"
-            ? "QR validado e leitura pronta para conferencia"
+            ? "QR validado e leitura pronta para conferência"
             : needsManualReview
               ? "Revisão manual obrigatória"
-              : "Leitura pronta para conferencia",
+              : "Leitura pronta para conferência",
         qrStatus: qrResult.status,
         qualitySummary: {
           brightness: preprocessing.lowLight ? "Baixa" : "Boa",
@@ -323,7 +323,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       setScreenMessage(
         identity.method === "qr"
           ? "QR Code confirmado. Revise os campos abaixo antes de salvar."
-          : "Leitura assistida concluida. Revise os campos abaixo antes de salvar.",
+          : "Leitura assistida concluída. Revise os campos abaixo antes de salvar.",
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao processar a imagem.";
@@ -354,7 +354,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       matchedStudentId: activePreferredStudentId,
       notes: [
         "Fluxo aberto em modo manual.",
-        "A imagem foi mantida para conferencia visual.",
+        "A imagem foi mantida para conferência visual.",
         "Preencha ou ajuste todas as respostas antes de confirmar.",
       ],
       pageType: "MANUAL",
@@ -372,7 +372,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     });
     setPhase("review");
     setPreviewZoom(1);
-    setScreenMessage("Modo manual habilitado. A imagem continua disponivel para consulta.");
+    setScreenMessage("Modo manual habilitado. A imagem continua disponível para consulta.");
   };
 
   const handleFileSelected = async (file: File | null) => {
@@ -402,7 +402,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
     setSelectedFile(file);
     setRawPreviewUrl(URL.createObjectURL(file));
-    setScreenMessage("Imagem pronta para pre-visualizacao e processamento.");
+    setScreenMessage("Imagem pronta para pré-visualização e processamento.");
   };
 
   const confirmCorrection = async () => {
@@ -458,7 +458,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               Scanner OMR responsivo
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              No celular, priorize a camera. No desktop, envie imagem ou PDF e revise a pagina processada antes de confirmar.
+              No celular, priorize a câmera. No desktop, envie imagem ou PDF e revise a página processada antes de confirmar.
             </p>
           </div>
 
@@ -517,7 +517,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Button>
             </div>
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
-              Aceita JPG, PNG, WebP e PDF ate 12 MB. Fotos horizontais, verticais e PDFs de uma pagina sao ajustados automaticamente.
+              Aceita JPG, PNG, WebP e PDF até 12 MB. Fotos horizontais, verticais e PDFs de uma página são ajustados automaticamente.
             </p>
           </div>
 
@@ -635,7 +635,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 <p className="text-sm text-[var(--muted-foreground)]">Revisão manual obrigatória</p>
                 <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Conferencia da leitura OCR</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-                  Ajuste nome, matricula, aluno encontrado na planilha Google e todas as respostas antes de confirmar.
+                  Ajuste nome, matrícula, aluno encontrado na planilha Google e todas as respostas antes de confirmar.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -662,7 +662,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="Acertos" value={String(summary.acertos)} helper="comparado com o gabarito" />
-              <MetricCard label="Erros" value={String(summary.erros)} helper="pedem conferencia" />
+              <MetricCard label="Erros" value={String(summary.erros)} helper="pedem conferência" />
               <MetricCard label="Percentual" value={`${summary.percentual}%`} helper="resultado atual" />
               <MetricCard label="Baixa confiança" value={String(summary.revisao)} helper="marcados para revisar" />
             </div>
@@ -932,7 +932,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 className="min-h-28"
-                placeholder="Anote ajustes manuais, observacoes de camera, sombra, baixa luz ou necessidade de nova captura."
+                placeholder="Anote ajustes manuais, observações de câmera, sombra, baixa luz ou necessidade de nova captura."
               />
             </FieldLabel>
 
@@ -973,7 +973,7 @@ function EmptyReviewState() {
       <h3 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">Tela específica de correção por foto</h3>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">
         Envie uma foto, visualize o pré-processamento, acompanhe o OCR por etapas e faça a revisão manual obrigatória
-        antes de salvar. O layout se adapta de 360px ate telas grandes sem estourar a imagem.
+        antes de salvar. O layout se adapta de 360px até telas grandes sem estourar a imagem.
       </p>
       <div className="mt-6 grid w-full max-w-3xl gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[

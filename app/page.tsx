@@ -137,7 +137,7 @@ export default function HomePage() {
               </Button>
             </Link>
             <Link href="/dashboard">
-              <Button className="min-w-[124px]">Criar conta</Button>
+              <Button className="min-w-[124px]">Abrir painel</Button>
             </Link>
           </div>
           <div className="mobile-nav-scroller -mx-1 flex gap-2 overflow-x-auto pb-1 md:hidden">
@@ -198,9 +198,11 @@ export default function HomePage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                  Entrada rapida
+                  Entrada rápida
                 </p>
-                <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">Tudo o que o professor precisa na primeira dobra.</p>
+                <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
+                  Tudo o que o professor precisa na primeira dobra.
+                </p>
               </div>
               <Badge tone="accent">{latest.confiancaOcr}% OCR</Badge>
             </div>
@@ -211,7 +213,7 @@ export default function HomePage() {
               </div>
               <div className="rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
                 <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted-foreground)]">Acerto</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{latest.correction.percentual}% na revisao</p>
+                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{latest.correction.percentual}% na revisão</p>
               </div>
             </div>
           </motion.div>

@@ -42,7 +42,7 @@ export async function GET() {
     return response;
   } catch (error) {
     if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Planilha nao configurada." }, { status: 500 });
+      return NextResponse.json({ error: "Planilha não configurada." }, { status: 500 });
     }
 
     if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {

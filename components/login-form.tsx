@@ -14,7 +14,7 @@ import { getSafePostAuthRedirect, navigateAfterAuth } from "@/lib/client-auth-na
 const highlights = [
   "Acesso seguro por perfil",
   "Planilha protegida no servidor",
-  "Fluxo rapido para primeiro acesso",
+  "Fluxo rápido para primeiro acesso",
 ];
 
 export function LoginForm() {
@@ -71,7 +71,7 @@ export function LoginForm() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <ProvaScanLogo size="md" />
-                  <p className="mt-5 text-sm text-[var(--muted-foreground)]">Professor, faca seu login</p>
+                  <p className="mt-5 text-sm text-[var(--muted-foreground)]">Professor, faça seu login</p>
                   <h1 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[var(--foreground)] sm:text-[2.3rem]">
                     Acesse o painel ProvaScan
                   </h1>
@@ -161,9 +161,9 @@ export function LoginForm() {
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 size-5 text-[var(--accent)]" />
                   <div>
-                    <p className="text-sm font-semibold text-[var(--foreground)]">Primeiro acesso e troca obrigatoria</p>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">Primeiro acesso e troca obrigatória</p>
                     <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                      O acesso depende da aba `usuarios` no Google Sheets. Se `trocar_senha = SIM`, o usuario sera
+                      O acesso depende da aba `usuarios` no Google Sheets. Se `trocar_senha = SIM`, o usuário será
                       redirecionado para definir uma nova senha antes de entrar no painel.
                     </p>
                   </div>

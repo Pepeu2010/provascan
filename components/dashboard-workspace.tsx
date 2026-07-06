@@ -38,7 +38,7 @@ export function DashboardWorkspace() {
               Um cockpit de revisão pensado para a rotina de correção
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--muted-foreground)]">
-              As métricas e gráficos abaixo respondem em tempo real aos cadastros, gabaritos e correções salvas.
+              As métricas e os gráficos abaixo respondem em tempo real aos cadastros, gabaritos e correções salvas.
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
