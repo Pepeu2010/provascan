@@ -545,30 +545,16 @@ async function ensureOperationalSheetSchemasCached(
   }
 }
 
-async function readTabRows(
-  sheets: sheets_v4.Sheets,
-  spreadsheetId: string,
-  definition: SheetDefinition,
-) {
-  try {
-    const result = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: normalizeRange(definition.tabName, definition.columns),
-    });
-
-    const rows = result.data.values ?? [];
-    if (rows.length <= 1) {
-      return [] as Map<string, string>[];
-    }
-
-    const headerRow = rows[0].map((cell) => normalizeHeader(String(cell)));
-    return rows
-      .slice(1)
-      .filter((row) => row.some((cell) => normalizeCell(String(cell ?? ""))))
-      .map((row) => mapCells(headerRow, row));
-  } catch {
-    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+function mapTabRowsFromValues(rows: unknown[][]) {
+  if (rows.length <= 1) {
+    return [] as Map<string, string>[];
   }
+
+  const headerRow = rows[0].map((cell) => normalizeHeader(String(cell)));
+  return rows
+    .slice(1)
+    .filter((row) => row.some((cell) => normalizeCell(String(cell ?? ""))))
+    .map((row) => mapCells(headerRow, row));
 }
 
 async function writeTabRows(
@@ -697,151 +683,6 @@ function mapStudentRowsToDomain(rows: StudentSheetRecord[], storedClasses: Class
       turma: turmaId,
     } satisfies Student;
   });
-}
-
-async function readStudentsRecords(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: STUDENTS_RANGE_COLUMNS,
-    headers: ["id", "nome", "turma", "ra", "status"],
-    tabName: env.GOOGLE_SHEETS_STUDENTS_TAB,
-  });
-
-  return rows.map((cells) => ({
-    id: cells.get("id") ?? "",
-    nome: cells.get("nome") ?? "",
-    turma: cells.get("turma") ?? "",
-    ra: cells.get("ra") ?? "",
-    status: cells.get("status") ?? cells.get("ativo") ?? "",
-  })) satisfies StudentSheetRecord[];
-}
-
-async function readClasses(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: CLASSES_RANGE_COLUMNS,
-    headers: REQUIRED_CLASS_HEADERS,
-    tabName: env.GOOGLE_SHEETS_CLASSES_TAB,
-  });
-
-  return rows.map((cells) => ({
-    id: cells.get("id") ?? "",
-    nome: cells.get("nome") ?? "",
-    professor: cells.get("professor") ?? "",
-    ano: cells.get("ano") ?? "",
-    periodo: cells.get("periodo") ?? "",
-    audienceId: cells.get("audience_id") || undefined,
-    audienceLabel: cells.get("audience_label") || undefined,
-    groupType: (cells.get("group_type") || undefined) as ClassRoom["groupType"],
-    requiresManualGrouping: parseBoolean(cells.get("requires_manual_grouping") ?? ""),
-    yearSegment: (cells.get("year_segment") || undefined) as ClassRoom["yearSegment"],
-  })) satisfies ClassRoom[];
-}
-
-async function readExams(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: EXAMS_RANGE_COLUMNS,
-    headers: REQUIRED_EXAM_HEADERS,
-    tabName: env.GOOGLE_SHEETS_EXAMS_TAB,
-  });
-
-  return rows.map((cells) => ({
-    id: cells.get("id") ?? "",
-    titulo: cells.get("titulo") ?? "",
-    subject: cells.get("disciplina") ?? "",
-    audienceId: cells.get("audience_id") ?? "",
-    audienceLabel: cells.get("audience_label") ?? "",
-    groupType: (cells.get("group_type") ?? "INDEFINIDO") as Exam["groupType"],
-    yearSegment: (cells.get("year_segment") ?? "OUTROS") as Exam["yearSegment"],
-    quantidadeQuestoes: parseInteger(cells.get("quantidade_questoes") ?? "", 0),
-    alternativas: splitAlternatives(cells.get("alternativas") ?? ""),
-    data: cells.get("data") ?? "",
-    codigo: cells.get("codigo") ?? "",
-    templateVersion: cells.get("template_version") ?? "PS-CARD-1",
-  })) satisfies Exam[];
-}
-
-async function readAnswerKeys(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: ANSWER_KEYS_RANGE_COLUMNS,
-    headers: REQUIRED_ANSWER_KEY_HEADERS,
-    tabName: env.GOOGLE_SHEETS_ANSWER_KEYS_TAB,
-  });
-
-  return rows.map((cells) => ({
-    provaId: cells.get("prova_id") ?? "",
-    questao: parseInteger(cells.get("questao") ?? "", 0),
-    respostaCorreta: cells.get("resposta_correta") ?? "",
-  }));
-}
-
-async function readCorrectionRules(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: CORRECTION_RULES_RANGE_COLUMNS,
-    headers: REQUIRED_CORRECTION_RULE_HEADERS,
-    tabName: env.GOOGLE_SHEETS_CORRECTION_RULES_TAB,
-  });
-
-  return rows.map((cells) => ({
-    provaId: cells.get("prova_id") ?? "",
-    notaMaxima: parseNumber(cells.get("nota_maxima") ?? "", 10),
-    arredondamentoCasas: parseInteger(cells.get("arredondamento_casas") ?? "", 1),
-    pesoPadrao: parseNumber(cells.get("peso_padrao") ?? "", 1),
-    pesosPorQuestao: safeJsonParse(cells.get("pesos_por_questao") ?? "", [] as ExamCorrectionRule["pesosPorQuestao"]),
-    questoesAnuladas: safeJsonParse(cells.get("questoes_anuladas") ?? "", [] as number[]),
-    modoQuestaoAnulada: (cells.get("modo_questao_anulada") ?? "full-credit") as ExamCorrectionRule["modoQuestaoAnulada"],
-  })) satisfies ExamCorrectionRule[];
-}
-
-async function readCorrections(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: CORRECTIONS_RANGE_COLUMNS,
-    headers: REQUIRED_CORRECTION_HEADERS,
-    tabName: env.GOOGLE_SHEETS_CORRECTIONS_TAB,
-  });
-
-  return rows.map((cells) => ({
-    correction: {
-      id: cells.get("id") ?? "",
-      provaId: cells.get("prova_id") ?? "",
-      alunoId: cells.get("aluno_id") ?? "",
-      nomeDetectado: cells.get("nome_detectado") ?? "",
-      nota: parseNumber(cells.get("nota") ?? "", 0),
-      acertos: parseInteger(cells.get("acertos") ?? "", 0),
-      erros: parseInteger(cells.get("erros") ?? "", 0),
-      emBranco: parseInteger(cells.get("em_branco") ?? "", 0),
-      multiplasMarcacoes: parseInteger(cells.get("multiplas_marcacoes") ?? "", 0),
-      anuladas: parseInteger(cells.get("anuladas") ?? "", 0),
-      percentual: parseNumber(cells.get("percentual") ?? "", 0),
-      data: cells.get("data") ?? "",
-      imagem: cells.get("imagem") ?? "",
-      tempoCorrecao: cells.get("tempo_correcao") ?? "",
-      metodoIdentificacao: (cells.get("metodo_identificacao") ?? "manual") as CorrectionSession["correction"]["metodoIdentificacao"],
-    },
-    aluno: safeJsonParse(cells.get("aluno_json") ?? "", cloneDefaultAppData().students[0] ?? ({} as Student)),
-    prova: safeJsonParse(cells.get("prova_json") ?? "", cloneDefaultAppData().exams[0] ?? ({} as Exam)),
-    turma: safeJsonParse(cells.get("turma_json") ?? "", cloneDefaultAppData().classes[0] ?? ({} as ClassRoom)),
-    respostas: safeJsonParse(cells.get("respostas_json") ?? "", [] as CorrectionSession["respostas"]),
-    confiancaOcr: parseNumber(cells.get("confianca_ocr") ?? "", 0),
-    imagemProcessada: cells.get("imagem_processada") ?? "",
-    observacoes: safeJsonParse(cells.get("observacoes_json") ?? "", [] as string[]),
-    identificacao: safeJsonParse(cells.get("identificacao_json") ?? "", {
-      method: "manual",
-      qrCode: "",
-      uniqueCode: "",
-    } as CorrectionSession["identificacao"]),
-  })) satisfies CorrectionSession[];
-}
-
-async function readConfigRows(env: GoogleSheetsEnv, sheets: sheets_v4.Sheets) {
-  const rows = await readTabRows(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID, {
-    columns: CONFIG_RANGE_COLUMNS,
-    headers: REQUIRED_CONFIG_HEADERS,
-    tabName: env.GOOGLE_SHEETS_CONFIG_TAB,
-  });
-
-  return rows.map((cells) => ({
-    key: cells.get("key") ?? "",
-    value: cells.get("value") ?? "",
-  })) satisfies ConfigRow[];
 }
 
 function buildConfigRows(profile: TeacherProfile) {
@@ -1017,18 +858,115 @@ export async function getUsersSheetHealth() {
 
 export async function getOperationalAppData() {
   const { env, sheets } = await createSheetsApiClient();
-  await ensureOperationalSheetSchemasCached(env, sheets);
+  const definitions = buildOperationalSheetDefinitions(env);
 
-  const [storedClasses, studentRows, examsRows, answerKeyRows, correctionRuleRows, correctionRows, configRows] =
-    await Promise.all([
-      readClasses(env, sheets),
-      readStudentsRecords(env, sheets),
-      readExams(env, sheets),
-      readAnswerKeys(env, sheets),
-      readCorrectionRules(env, sheets),
-      readCorrections(env, sheets),
-      readConfigRows(env, sheets),
-    ]);
+  let valueRanges: sheets_v4.Schema$ValueRange[];
+  try {
+    const result = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      ranges: definitions.map((definition) => normalizeRange(definition.tabName, definition.columns)),
+    });
+
+    valueRanges = result.data.valueRanges ?? [];
+  } catch {
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+
+  const rowsByTabName = new Map(
+    definitions.map((definition, index) => [
+      definition.tabName,
+      mapTabRowsFromValues((valueRanges[index]?.values ?? []) as unknown[][]),
+    ] as const),
+  );
+
+  const storedClasses = (rowsByTabName.get(env.GOOGLE_SHEETS_CLASSES_TAB) ?? []).map((cells) => ({
+    id: cells.get("id") ?? "",
+    nome: cells.get("nome") ?? "",
+    professor: cells.get("professor") ?? "",
+    ano: cells.get("ano") ?? "",
+    periodo: cells.get("periodo") ?? "",
+    audienceId: cells.get("audience_id") || undefined,
+    audienceLabel: cells.get("audience_label") || undefined,
+    groupType: (cells.get("group_type") || undefined) as ClassRoom["groupType"],
+    requiresManualGrouping: parseBoolean(cells.get("requires_manual_grouping") ?? ""),
+    yearSegment: (cells.get("year_segment") || undefined) as ClassRoom["yearSegment"],
+  })) satisfies ClassRoom[];
+
+  const studentRows = (rowsByTabName.get(env.GOOGLE_SHEETS_STUDENTS_TAB) ?? []).map((cells) => ({
+    id: cells.get("id") ?? "",
+    nome: cells.get("nome") ?? "",
+    turma: cells.get("turma") ?? "",
+    ra: cells.get("ra") ?? "",
+    status: cells.get("status") ?? cells.get("ativo") ?? "",
+  })) satisfies StudentSheetRecord[];
+
+  const examsRows = (rowsByTabName.get(env.GOOGLE_SHEETS_EXAMS_TAB) ?? []).map((cells) => ({
+    id: cells.get("id") ?? "",
+    titulo: cells.get("titulo") ?? "",
+    subject: cells.get("disciplina") ?? "",
+    audienceId: cells.get("audience_id") ?? "",
+    audienceLabel: cells.get("audience_label") ?? "",
+    groupType: (cells.get("group_type") ?? "INDEFINIDO") as Exam["groupType"],
+    yearSegment: (cells.get("year_segment") ?? "OUTROS") as Exam["yearSegment"],
+    quantidadeQuestoes: parseInteger(cells.get("quantidade_questoes") ?? "", 0),
+    alternativas: splitAlternatives(cells.get("alternativas") ?? ""),
+    data: cells.get("data") ?? "",
+    codigo: cells.get("codigo") ?? "",
+    templateVersion: cells.get("template_version") ?? "PS-CARD-1",
+  })) satisfies Exam[];
+
+  const answerKeyRows = (rowsByTabName.get(env.GOOGLE_SHEETS_ANSWER_KEYS_TAB) ?? []).map((cells) => ({
+    provaId: cells.get("prova_id") ?? "",
+    questao: parseInteger(cells.get("questao") ?? "", 0),
+    respostaCorreta: cells.get("resposta_correta") ?? "",
+  }));
+
+  const correctionRuleRows = (rowsByTabName.get(env.GOOGLE_SHEETS_CORRECTION_RULES_TAB) ?? []).map((cells) => ({
+    provaId: cells.get("prova_id") ?? "",
+    notaMaxima: parseNumber(cells.get("nota_maxima") ?? "", 10),
+    arredondamentoCasas: parseInteger(cells.get("arredondamento_casas") ?? "", 1),
+    pesoPadrao: parseNumber(cells.get("peso_padrao") ?? "", 1),
+    pesosPorQuestao: safeJsonParse(cells.get("pesos_por_questao") ?? "", [] as ExamCorrectionRule["pesosPorQuestao"]),
+    questoesAnuladas: safeJsonParse(cells.get("questoes_anuladas") ?? "", [] as number[]),
+    modoQuestaoAnulada: (cells.get("modo_questao_anulada") ?? "full-credit") as ExamCorrectionRule["modoQuestaoAnulada"],
+  })) satisfies ExamCorrectionRule[];
+
+  const correctionRows = (rowsByTabName.get(env.GOOGLE_SHEETS_CORRECTIONS_TAB) ?? []).map((cells) => ({
+    correction: {
+      id: cells.get("id") ?? "",
+      provaId: cells.get("prova_id") ?? "",
+      alunoId: cells.get("aluno_id") ?? "",
+      nomeDetectado: cells.get("nome_detectado") ?? "",
+      nota: parseNumber(cells.get("nota") ?? "", 0),
+      acertos: parseInteger(cells.get("acertos") ?? "", 0),
+      erros: parseInteger(cells.get("erros") ?? "", 0),
+      emBranco: parseInteger(cells.get("em_branco") ?? "", 0),
+      multiplasMarcacoes: parseInteger(cells.get("multiplas_marcacoes") ?? "", 0),
+      anuladas: parseInteger(cells.get("anuladas") ?? "", 0),
+      percentual: parseNumber(cells.get("percentual") ?? "", 0),
+      data: cells.get("data") ?? "",
+      imagem: cells.get("imagem") ?? "",
+      tempoCorrecao: cells.get("tempo_correcao") ?? "",
+      metodoIdentificacao: (cells.get("metodo_identificacao") ?? "manual") as CorrectionSession["correction"]["metodoIdentificacao"],
+    },
+    aluno: safeJsonParse(cells.get("aluno_json") ?? "", cloneDefaultAppData().students[0] ?? ({} as Student)),
+    prova: safeJsonParse(cells.get("prova_json") ?? "", cloneDefaultAppData().exams[0] ?? ({} as Exam)),
+    turma: safeJsonParse(cells.get("turma_json") ?? "", cloneDefaultAppData().classes[0] ?? ({} as ClassRoom)),
+    respostas: safeJsonParse(cells.get("respostas_json") ?? "", [] as CorrectionSession["respostas"]),
+    confiancaOcr: parseNumber(cells.get("confianca_ocr") ?? "", 0),
+    imagemProcessada: cells.get("imagem_processada") ?? "",
+    observacoes: safeJsonParse(cells.get("observacoes_json") ?? "", [] as string[]),
+    identificacao: safeJsonParse(cells.get("identificacao_json") ?? "", {
+      method: "manual",
+      qrCode: "",
+      uniqueCode: "",
+    } as CorrectionSession["identificacao"]),
+  })) satisfies CorrectionSession[];
+
+  const configRows = (rowsByTabName.get(env.GOOGLE_SHEETS_CONFIG_TAB) ?? []).map((cells) => ({
+    key: cells.get("key") ?? "",
+    value: cells.get("value") ?? "",
+  })) satisfies ConfigRow[];
 
   const nextTeacherProfile = normalizeTeacherProfile(configRows);
   const derivedClasses =
