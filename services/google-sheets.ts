@@ -134,6 +134,15 @@ type SheetDefinition = {
   tabName: string;
 };
 
+type OperationalSchemaCache = {
+  checkedAt: number;
+  key: string;
+  pending: Promise<void> | null;
+};
+
+const OPERATIONAL_SCHEMA_CACHE_TTL_MS = 5 * 60 * 1000;
+let operationalSchemaCache: OperationalSchemaCache | null = null;
+
 export class GoogleSheetsConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -481,6 +490,58 @@ async function ensureOperationalSheetSchemas(env: GoogleSheetsEnv, sheets: sheet
     await ensureSheetHeaders(sheets, spreadsheetId, definition, {
       allowLegacyStudentHeader: definition.tabName === env.GOOGLE_SHEETS_STUDENTS_TAB,
     });
+  }
+}
+
+async function ensureOperationalSheetSchemasCached(
+  env: GoogleSheetsEnv,
+  sheets: sheets_v4.Sheets,
+  options?: {
+    force?: boolean;
+  },
+) {
+  const cacheKey = [
+    env.GOOGLE_SHEETS_SPREADSHEET_ID,
+    env.GOOGLE_SHEETS_STUDENTS_TAB,
+    env.GOOGLE_SHEETS_CLASSES_TAB,
+    env.GOOGLE_SHEETS_EXAMS_TAB,
+    env.GOOGLE_SHEETS_ANSWER_KEYS_TAB,
+    env.GOOGLE_SHEETS_CORRECTION_RULES_TAB,
+    env.GOOGLE_SHEETS_CORRECTIONS_TAB,
+    env.GOOGLE_SHEETS_CONFIG_TAB,
+  ].join("|");
+  const now = Date.now();
+
+  if (!options?.force && operationalSchemaCache?.key === cacheKey) {
+    if (operationalSchemaCache.pending) {
+      await operationalSchemaCache.pending;
+      return;
+    }
+
+    if (now - operationalSchemaCache.checkedAt < OPERATIONAL_SCHEMA_CACHE_TTL_MS) {
+      return;
+    }
+  }
+
+  const pending = ensureOperationalSheetSchemas(env, sheets);
+  operationalSchemaCache = {
+    checkedAt: now,
+    key: cacheKey,
+    pending,
+  };
+
+  try {
+    await pending;
+    operationalSchemaCache = {
+      checkedAt: Date.now(),
+      key: cacheKey,
+      pending: null,
+    };
+  } catch (error) {
+    if (operationalSchemaCache?.key === cacheKey) {
+      operationalSchemaCache = null;
+    }
+    throw error;
   }
 }
 
@@ -956,7 +1017,7 @@ export async function getUsersSheetHealth() {
 
 export async function getOperationalAppData() {
   const { env, sheets } = await createSheetsApiClient();
-  await ensureOperationalSheetSchemas(env, sheets);
+  await ensureOperationalSheetSchemasCached(env, sheets);
 
   const [storedClasses, studentRows, examsRows, answerKeyRows, correctionRuleRows, correctionRows, configRows] =
     await Promise.all([
@@ -987,7 +1048,7 @@ export async function getOperationalAppData() {
 
 export async function saveOperationalAppData(data: AppDataState) {
   const { env, sheets } = await createSheetsApiClient();
-  await ensureOperationalSheetSchemas(env, sheets);
+  await ensureOperationalSheetSchemasCached(env, sheets, { force: true });
 
   const definitions = buildOperationalSheetDefinitions(env);
   const findDefinition = (tabName: string) => {

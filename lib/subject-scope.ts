@@ -1,4 +1,4 @@
-import { isAdminRole } from "@/lib/access-control";
+import { isPrivilegedRole } from "@/lib/access-control";
 import type { AppDataState } from "@/lib/app-data";
 import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
 import type { CorrectionSession, Exam } from "@/types/domain";
@@ -78,7 +78,7 @@ export function getSubjectLabel(subject: string | null | undefined) {
 }
 
 export function canManageAllSubjects(role: string) {
-  return isAdminRole(role);
+  return isPrivilegedRole(role);
 }
 
 export function requireScopedSubject(user: Pick<AuthSessionUser | SafeAuthUser, "role" | "subject">) {

@@ -93,9 +93,10 @@ Regras aplicadas:
 
 Regra importante de escopo:
 
-- `admin` e `vice_diretor` podem ver todas as materias
+- `admin` pode ver todas as materias e nao depende de `disciplina`
+- `vice_diretor` pode ver todas as materias e nao depende de `disciplina`
 - `professor` precisa ter `disciplina` preenchida na aba `usuarios`
-- se a `disciplina` estiver vazia para um perfil comum, o painel bloqueia a carga com erro de configuracao
+- se a `disciplina` estiver vazia para um `professor`, o painel bloqueia a carga com erro de configuracao
 
 Materias padronizadas hoje:
 
