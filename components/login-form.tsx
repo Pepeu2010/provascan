@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { KeyRound, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
+import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Badge } from "@/components/ui/badge";
@@ -170,6 +171,8 @@ export function LoginForm() {
                 </div>
               </div>
             ) : null}
+
+            <CreatorCredit variant="inline" className="mt-4" />
           </Card>
         </div>
       </div>

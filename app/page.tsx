@@ -11,6 +11,7 @@ import {
   Table2,
   Upload,
 } from "lucide-react";
+import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Badge } from "@/components/ui/badge";
@@ -424,6 +425,10 @@ export default function HomePage() {
             </Card>
           </RevealCard>
         </div>
+      </RevealSection>
+
+      <RevealSection className="mx-auto mt-10 max-w-[1280px] px-4 lg:px-6">
+        <CreatorCredit variant="footer" />
       </RevealSection>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { CREATOR_NAME } from "@/lib/creator-credit";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -16,6 +17,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "ProvaScan",
+  authors: [{ name: CREATOR_NAME }],
   description:
     "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Google Sheets.",
   icons: {

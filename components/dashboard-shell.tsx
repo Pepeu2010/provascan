@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
+import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Badge } from "@/components/ui/badge";
@@ -141,6 +142,7 @@ export function DashboardShell({
                 O painel está pronto para uso. Backup e restauração continuam disponíveis em Configurações.
               </p>
             </div>
+            <CreatorCredit className="mt-4" />
           </div>
         </Card>
       </aside>
@@ -270,6 +272,7 @@ export function DashboardShell({
               <div className="mt-6">
                 <ThemeSwitcher compact />
               </div>
+              <CreatorCredit className="mt-6" />
               <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-4">
                 <p className="text-sm font-semibold text-[var(--foreground)]">
                   {session?.nome ?? data.teacherProfile.nome}
