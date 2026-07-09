@@ -163,6 +163,7 @@ export default function HomePage() {
               <span className="rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_86%,transparent)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                 Mobile first
               </span>
+              <CreatorCredit variant="badge" />
             </div>
           </motion.div>
 

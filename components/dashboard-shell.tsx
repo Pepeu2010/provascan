@@ -164,6 +164,7 @@ export function DashboardShell({
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge tone="neutral">Workspace do professor</Badge>
                   <Badge tone="accent">Monitoramento ao vivo</Badge>
+                  <CreatorCredit variant="badge" />
                   {subjectLabel ? <Badge tone="warning">Matéria: {subjectLabel}</Badge> : null}
                 </div>
                 <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-4xl">

@@ -1,4 +1,4 @@
-export const CREATOR_NAME = "Pepeu2010";
+export const CREATOR_NAME = "Pedro Miguel do 1° ano B";
 
 export const CREATOR_CREDIT = {
   label: "Criação e interface",

@@ -4,10 +4,18 @@ import { cn } from "@/lib/utils";
 
 type CreatorCreditProps = {
   className?: string;
-  variant?: "panel" | "inline" | "footer";
+  variant?: "badge" | "panel" | "inline" | "footer";
 };
 
 const variantStyles = {
+  badge: {
+    container:
+      "inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] px-3 py-1.5 shadow-[var(--shadow-soft)]",
+    eyebrow: "hidden",
+    layout: "flex items-center gap-2",
+    name: "text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--foreground)]",
+    summary: "hidden",
+  },
   footer: {
     container:
       "rounded-[30px] border border-[var(--border)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),color-mix(in_srgb,var(--surface)_78%,transparent))] p-6 shadow-[var(--shadow-soft)]",
@@ -40,15 +48,29 @@ export function CreatorCredit({ className, variant = "panel" }: CreatorCreditPro
   return (
     <div className={cn(styles.container, className)}>
       <div className={styles.layout}>
-        <div className="grid size-10 shrink-0 place-items-center rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent-soft)_72%,transparent)] text-[var(--accent)]">
+        <div
+          className={cn(
+            "shrink-0 border border-[var(--border)] bg-[color-mix(in_srgb,var(--accent-soft)_72%,transparent)] text-[var(--accent)]",
+            variant === "badge"
+              ? "grid size-7 place-items-center rounded-full"
+              : "grid size-10 place-items-center rounded-2xl",
+          )}
+        >
           <Sparkles className="size-4" />
         </div>
         <div className="min-w-0">
-          <p className={styles.eyebrow}>{CREATOR_CREDIT.label}</p>
-          <p className={cn(variant === "footer" ? "mt-3" : "mt-1.5", styles.name)}>{CREATOR_CREDIT.name}</p>
-          <p className={cn(variant === "footer" ? "mt-3" : "", styles.summary)}>
-            {CREATOR_CREDIT.summary} <span className="font-semibold text-[var(--foreground)]">{CREATOR_CREDIT.name}</span>.
-          </p>
+          {variant === "badge" ? (
+            <p className={styles.name}>Por {CREATOR_CREDIT.name}</p>
+          ) : (
+            <>
+              <p className={styles.eyebrow}>{CREATOR_CREDIT.label}</p>
+              <p className={cn(variant === "footer" ? "mt-3" : "mt-1.5", styles.name)}>{CREATOR_CREDIT.name}</p>
+              <p className={cn(variant === "footer" ? "mt-3" : "", styles.summary)}>
+                {CREATOR_CREDIT.summary}{" "}
+                <span className="font-semibold text-[var(--foreground)]">{CREATOR_CREDIT.name}</span>.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
