@@ -76,7 +76,6 @@ export function LoginForm() {
                   <h1 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[var(--foreground)] sm:text-[2.3rem]">
                     Acesse o painel ProvaScan
                   </h1>
-                  <CreatorCredit variant="badge" className="mt-4" />
                 </div>
                 <Badge tone="neutral" className="hidden sm:inline-flex">Login seguro</Badge>
               </div>

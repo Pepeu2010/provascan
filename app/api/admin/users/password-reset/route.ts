@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { hasSameOriginRequest } from "@/lib/request-security";
 import { canManageUsers } from "@/lib/access-control";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
@@ -69,13 +70,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!(await hasSameOriginRequest())) {
+    return NextResponse.json({ error: "Origem da requisição não autorizada." }, { status: 403 });
+  }
   const auth = await requireManagementSession();
   if (!auth.ok) {
     return auth.response;
   }
 
   try {
-    const rateLimit = consumeRateLimit({
+    const rateLimit = await consumeRateLimit({
       bucket: "admin-password-reset",
       key: buildRateLimitKey(getClientIp(new Headers(request.headers)), auth.session.id, auth.session.email),
       limit: 20,

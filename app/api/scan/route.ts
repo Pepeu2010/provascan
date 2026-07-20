@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import { analyzeAnswerSheet } from "@/services/exam-correction";
@@ -8,6 +9,9 @@ import { analyzeAnswerSheet } from "@/services/exam-correction";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (!(await hasSameOriginRequest())) {
+    return NextResponse.json({ error: "Origem da requisição não autorizada." }, { status: 403 });
+  }
   const cookieStore = await cookies();
   const validation = await validateSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
@@ -26,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const rateLimit = consumeRateLimit({
+    const rateLimit = await consumeRateLimit({
       bucket: "scan-analysis",
       key: buildRateLimitKey(getClientIp(new Headers(request.headers)), validation.session.id, validation.session.email),
       limit: 20,

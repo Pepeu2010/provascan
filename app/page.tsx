@@ -132,14 +132,12 @@ export default function HomePage() {
           </nav>
           <div className="flex items-center justify-between gap-3 sm:justify-end">
             <ThemeSwitcher compact />
-            <Link href="/login">
-              <Button variant="ghost" className="min-w-[96px]">
+            <Button asChild variant="ghost" className="min-w-[96px]">
+              <Link href="/login">
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Button className="min-w-[124px]">Abrir painel</Button>
-            </Link>
+              </Link>
+            </Button>
+            <Button asChild className="min-w-[124px]"><Link href="/dashboard">Abrir painel</Link></Button>
           </div>
           <div className="mobile-nav-scroller -mx-1 flex gap-2 overflow-x-auto pb-1 md:hidden">
             {mobileEntryPoints.map((item) => (
@@ -163,7 +161,6 @@ export default function HomePage() {
               <span className="rounded-full border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_86%,transparent)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                 Mobile first
               </span>
-              <CreatorCredit variant="badge" />
             </div>
           </motion.div>
 
@@ -183,17 +180,17 @@ export default function HomePage() {
           </motion.p>
 
           <motion.div variants={fadeUp} className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <Link href="/dashboard">
-              <Button size="lg" className="w-full sm:w-auto">
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <Link href="/dashboard">
                 Abrir painel do professor
                 <ArrowRight className="size-4 transition-transform duration-300 group-hover/button:translate-x-1" />
-              </Button>
-            </Link>
-            <Link href="/dashboard/correcao">
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto">
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
+              <Link href="/dashboard/correcao">
                 Testar correção por foto
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </motion.div>
 
           <motion.div variants={fadeUp} className="mobile-signal-panel mt-6 rounded-[28px] border border-[var(--border)] p-4 sm:p-5 lg:hidden">

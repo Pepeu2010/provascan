@@ -16,7 +16,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
@@ -49,6 +49,7 @@ export function DashboardShell({
   const router = useRouter();
   const { authResolved, data, isHydrated, logoutTeacher, session, syncError, syncStatus } = useAppData();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const subjectLabel = getSubjectLabel(session?.subject);
 
   const summary = useMemo(
@@ -61,6 +62,16 @@ export function DashboardShell({
       ].join(" • "),
     [data.classes.length, data.corrections.length, data.exams.length, data.students.length],
   );
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    menuCloseButtonRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (isHydrated && authResolved && !session) {
@@ -164,7 +175,6 @@ export function DashboardShell({
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge tone="neutral">Workspace do professor</Badge>
                   <Badge tone="accent">Monitoramento ao vivo</Badge>
-                  <CreatorCredit variant="badge" />
                   {subjectLabel ? <Badge tone="warning">Matéria: {subjectLabel}</Badge> : null}
                 </div>
                 <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-4xl">
@@ -242,6 +252,9 @@ export function DashboardShell({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-[var(--overlay-scrim)] backdrop-blur-sm lg:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu de navegação"
           >
             <motion.div
               initial={{ x: -24, opacity: 0.9 }}
@@ -253,6 +266,7 @@ export function DashboardShell({
               <div className="flex items-center justify-between">
                 <ProvaScanLogo variant="sidebar" className="max-w-[220px]" />
                 <button
+                  ref={menuCloseButtonRef}
                   type="button"
                   onClick={() => setMenuOpen(false)}
                   className="inline-flex size-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]"

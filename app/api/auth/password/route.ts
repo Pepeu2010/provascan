@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = changePasswordSchema.parse(await request.json());
-    const rateLimit = consumeRateLimit({
+    const rateLimit = await consumeRateLimit({
       bucket: "auth-password-change",
       key: buildRateLimitKey(getClientIp(headersList), validation.session.id, validation.session.email),
       limit: 6,

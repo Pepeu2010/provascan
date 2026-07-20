@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = loginSchema.parse(await request.json());
-    const rateLimit = consumeRateLimit({
+    const rateLimit = await consumeRateLimit({
       bucket: "auth-login",
       key: buildRateLimitKey(getClientIp(headersList), payload.email),
       limit: 8,

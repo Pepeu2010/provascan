@@ -222,7 +222,11 @@ export function ClassesManager() {
                 <Edit3 className="size-4" />
                 Editar
               </Button>
-              <Button variant="ghost" onClick={() => void (async () => setMessage((await deleteClass(item.id)).message))()}>
+              <Button variant="ghost" onClick={() => {
+                if (window.confirm(`Excluir a turma ${item.nome}? Esta ação não pode ser desfeita.`)) {
+                  void (async () => setMessage((await deleteClass(item.id)).message))();
+                }
+              }}>
                 <Trash2 className="size-4" />
                 Excluir
               </Button>
@@ -310,7 +314,12 @@ export function StudentsManager() {
         <StudentTable
           classes={data.classes}
           students={data.students}
-          onDelete={(studentId) => void (async () => setMessage((await deleteStudent(studentId)).message))()}
+          onDelete={(studentId) => {
+            const student = data.students.find((item) => item.id === studentId);
+            if (student && window.confirm(`Excluir ${student.nome}? Esta ação não pode ser desfeita.`)) {
+              void (async () => setMessage((await deleteStudent(studentId)).message))();
+            }
+          }}
           onEdit={(studentId) => {
             const current = data.students.find((item) => item.id === studentId);
             if (!current) return;
@@ -639,7 +648,11 @@ export function ExamsManager() {
                   <Edit3 className="size-4" />
                   Editar
                 </Button>
-                <Button variant="ghost" onClick={() => void (async () => setMessage((await deleteExam(item.id)).message))()}>
+                <Button variant="ghost" onClick={() => {
+                  if (window.confirm(`Excluir a prova ${item.titulo}? Esta ação não pode ser desfeita.`)) {
+                    void (async () => setMessage((await deleteExam(item.id)).message))();
+                  }
+                }}>
                   <Trash2 className="size-4" />
                   Excluir
                 </Button>
@@ -849,7 +862,7 @@ export function AnswerKeyEditor() {
         </FieldSelect>
       </div>
 
-      <div className="mt-6 space-y-3 md:hidden">
+      <div className="mt-6 space-y-3 xl:hidden">
         {answers.map((selected, index) => (
           <Card key={`mobile-${index + 1}`} className="p-4">
             <div className="flex items-center justify-between gap-3">

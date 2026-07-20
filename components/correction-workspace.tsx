@@ -1464,7 +1464,13 @@ async function renderPdfPage(file: File) {
   const buffer = await file.arrayBuffer();
   const pdfDocument = await getDocument({ data: buffer }).promise;
   const page = await pdfDocument.getPage(1);
-  const viewport = page.getViewport({ scale: 2 });
+  const baseViewport = page.getViewport({ scale: 1 });
+  const maxPixels = 4_000_000;
+  const scale = Math.min(2, Math.sqrt(maxPixels / Math.max(1, baseViewport.width * baseViewport.height)));
+  if (scale < 0.2) {
+    throw new Error("O PDF possui dimensões incompatíveis com o processamento seguro no navegador.");
+  }
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement("canvas");
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);

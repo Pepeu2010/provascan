@@ -27,8 +27,10 @@ export function StudentTable({
         </div>
         <Badge tone="accent">Modo operacional</Badge>
       </div>
-      <div className="overflow-x-auto">
+      <p id="students-table-hint" className="px-6 pt-4 text-xs text-[var(--muted-foreground)] sm:hidden">Deslize horizontalmente para ver todas as colunas.</p>
+      <div className="overflow-x-auto" aria-describedby="students-table-hint">
         <table className="min-w-full text-left">
+          <caption className="sr-only">Lista de alunos, matrícula, turma, status e ações disponíveis.</caption>
           <thead className="bg-[var(--table-head)] text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
             <tr>
               <th className="px-6 py-4">Aluno</th>

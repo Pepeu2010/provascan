@@ -1,4 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
 import { classes, correctionSessions, exams, students, teacherProfile } from "@/lib/mock-data";
@@ -104,6 +105,7 @@ const envSchema = z.object({
   GOOGLE_SHEETS_CORRECTION_RULES_TAB: z.string().trim().min(1).default("regras_correcao"),
   GOOGLE_SHEETS_CORRECTIONS_TAB: z.string().trim().min(1).default("correcoes"),
   GOOGLE_SHEETS_CONFIG_TAB: z.string().trim().min(1).default("provascan_config"),
+  GOOGLE_SHEETS_META_TAB: z.string().trim().min(1).default("provascan_meta"),
 });
 
 type GoogleSheetsEnv = z.infer<typeof envSchema>;
@@ -177,6 +179,7 @@ function readEnv(): GoogleSheetsEnv | null {
     GOOGLE_SHEETS_CORRECTION_RULES_TAB: process.env.GOOGLE_SHEETS_CORRECTION_RULES_TAB,
     GOOGLE_SHEETS_CORRECTIONS_TAB: process.env.GOOGLE_SHEETS_CORRECTIONS_TAB,
     GOOGLE_SHEETS_CONFIG_TAB: process.env.GOOGLE_SHEETS_CONFIG_TAB,
+    GOOGLE_SHEETS_META_TAB: process.env.GOOGLE_SHEETS_META_TAB,
   });
 
   return parsed.success ? parsed.data : null;
@@ -207,6 +210,7 @@ function requireEnv() {
     GOOGLE_SHEETS_CLASSES_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_CLASSES_TAB),
     GOOGLE_SHEETS_CLIENT_EMAIL: unwrapEnvValue(env.GOOGLE_SHEETS_CLIENT_EMAIL),
     GOOGLE_SHEETS_CONFIG_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_CONFIG_TAB),
+    GOOGLE_SHEETS_META_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_META_TAB),
     GOOGLE_SHEETS_CORRECTIONS_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_CORRECTIONS_TAB),
     GOOGLE_SHEETS_CORRECTION_RULES_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_CORRECTION_RULES_TAB),
     GOOGLE_SHEETS_EXAMS_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_EXAMS_TAB),
@@ -337,6 +341,7 @@ function buildOperationalSheetDefinitions(env: GoogleSheetsEnv): SheetDefinition
       headers: REQUIRED_CONFIG_HEADERS,
       tabName: env.GOOGLE_SHEETS_CONFIG_TAB,
     },
+    { columns: "A:D", headers: ["revision", "updated_at", "updated_by", "state_hash"], tabName: env.GOOGLE_SHEETS_META_TAB },
   ];
 }
 
@@ -509,6 +514,7 @@ async function ensureOperationalSheetSchemasCached(
     env.GOOGLE_SHEETS_CORRECTION_RULES_TAB,
     env.GOOGLE_SHEETS_CORRECTIONS_TAB,
     env.GOOGLE_SHEETS_CONFIG_TAB,
+    env.GOOGLE_SHEETS_META_TAB,
   ].join("|");
   const now = Date.now();
 
@@ -984,7 +990,24 @@ export async function getOperationalAppData() {
   } satisfies AppDataState;
 }
 
-export async function saveOperationalAppData(data: AppDataState) {
+export async function getOperationalRevision() {
+  const { env, sheets } = await createSheetsApiClient();
+  await ensureOperationalSheetSchemasCached(env, sheets);
+  try {
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      range: `${env.GOOGLE_SHEETS_META_TAB}!A2:D2`,
+    });
+    return String(result.data.values?.[0]?.[0] ?? "0");
+  } catch { throw new GoogleSheetsConnectionError("Erro ao ler a revisão da planilha."); }
+}
+
+export async function getOperationalSnapshot() {
+  const [data, revision] = await Promise.all([getOperationalAppData(), getOperationalRevision()]);
+  return { data, revision };
+}
+
+export async function saveOperationalAppData(data: AppDataState, metadata?: { actorId: string; revision: string }) {
   const { env, sheets } = await createSheetsApiClient();
   await ensureOperationalSheetSchemasCached(env, sheets, { force: true });
 
@@ -1099,6 +1122,15 @@ export async function saveOperationalAppData(data: AppDataState) {
     findDefinition(env.GOOGLE_SHEETS_CONFIG_TAB),
     buildConfigRows(normalizedData.teacherProfile),
   );
+  const revision = String(Number(metadata?.revision ?? "0") + 1);
+  const stateHash = createHash("sha256").update(JSON.stringify(normalizedData)).digest("hex");
+  await writeTabRows(
+    sheets,
+    env.GOOGLE_SHEETS_SPREADSHEET_ID,
+    findDefinition(env.GOOGLE_SHEETS_META_TAB),
+    [[revision, new Date().toISOString(), metadata?.actorId ?? "system", stateHash]],
+  );
+  return revision;
 }
 
 export async function getSchoolRoster() {

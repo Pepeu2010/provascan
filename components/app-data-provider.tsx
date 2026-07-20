@@ -254,6 +254,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [syncError, setSyncError] = useState("");
   const hasLoadedRemoteDataRef = useRef(false);
   const lastSyncedPayloadRef = useRef("");
+  const revisionRef = useRef("0");
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -310,13 +311,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           throw new Error(payload.error ?? "Falha na carga remota.");
         }
 
-        const payload = normalizeImportedData(await response.json());
+        const responsePayload = (await response.json()) as { data?: unknown; revision?: string };
+        const payload = normalizeImportedData(responsePayload.data);
         if (!payload) {
           throw new Error("Payload remoto invalido.");
         }
 
         if (!cancelled) {
           const nextData = applyRemoteAppData(payload, session);
+          revisionRef.current = responsePayload.revision ?? "0";
           setData(nextData);
           lastSyncedPayloadRef.current = JSON.stringify(nextData);
           hasLoadedRemoteDataRef.current = true;
@@ -355,15 +358,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       try {
         const normalized = normalizeAppDataState(nextData);
         const response = await fetch("/api/app-data", {
-          body: JSON.stringify({ data: normalized }),
+          body: JSON.stringify({ data: normalized, revision: revisionRef.current }),
           headers: {
             "Content-Type": "application/json",
           },
           method: "PUT",
         });
 
-        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        const payload = (await response.json().catch(() => ({}))) as { error?: string; revision?: string; code?: string };
         if (!response.ok) {
+          if (response.status === 409) {
+            hasLoadedRemoteDataRef.current = false;
+            void fetch("/api/app-data", { cache: "no-store" }).then((reload) => reload.json()).then((remote: { data?: unknown; revision?: string }) => {
+              const refreshed = normalizeImportedData(remote.data);
+              if (refreshed) { revisionRef.current = remote.revision ?? "0"; setData(applyRemoteAppData(refreshed, session)); hasLoadedRemoteDataRef.current = true; }
+            });
+          }
           const message = payload.error ?? "Não foi possível sincronizar a planilha.";
           setSyncStatus("error");
           setSyncError(message);
@@ -371,6 +381,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }
 
         setData(normalized);
+        revisionRef.current = payload.revision ?? revisionRef.current;
         lastSyncedPayloadRef.current = JSON.stringify(normalized);
         setSyncStatus("idle");
         setSyncError("");

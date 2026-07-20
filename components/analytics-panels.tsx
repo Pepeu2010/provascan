@@ -3,9 +3,11 @@ import { Card } from "@/components/ui/card";
 
 export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot }) {
   const { classAverages, errorRanking, gradeEvolution } = analytics;
-  const barMax = Math.max(...classAverages.map((item) => item.media));
-  const lineMax = Math.max(...gradeEvolution.map((item) => item.media));
-  const lineMin = Math.min(...gradeEvolution.map((item) => item.media));
+  const hasClassAverages = classAverages.length > 0;
+  const hasEvolution = gradeEvolution.length > 0;
+  const barMax = hasClassAverages ? Math.max(...classAverages.map((item) => item.media), 1) : 1;
+  const lineMax = hasEvolution ? Math.max(...gradeEvolution.map((item) => item.media)) : 0;
+  const lineMin = hasEvolution ? Math.min(...gradeEvolution.map((item) => item.media)) : 0;
   const lineRange = Math.max(lineMax - lineMin, 1);
   const points = gradeEvolution
     .map((item, index) => {
@@ -33,7 +35,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
         </div>
 
         <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_94%,transparent),transparent)] p-6">
-          <div className="flex h-56 items-end gap-4 sm:gap-6">
+          {hasClassAverages ? <div className="flex h-56 items-end gap-4 sm:gap-6">
             {classAverages.map((item) => (
               <div key={item.turma} className="flex flex-1 flex-col items-center gap-4">
                 <div className="flex h-full w-full items-end justify-center rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface),transparent)] px-3 pb-3 sm:px-4 sm:pb-4">
@@ -48,7 +50,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
                 </div>
               </div>
             ))}
-          </div>
+          </div> : <EmptyState message="As médias por turma aparecerão após as primeiras correções." />}
         </div>
       </Card>
 
@@ -81,6 +83,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
               </div>
             </div>
           ))}
+          {!errorRanking.length ? <EmptyState message="Ainda não há erros suficientes para definir prioridades." /> : null}
         </div>
       </Card>
 
@@ -100,7 +103,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
         </div>
 
         <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_94%,transparent),transparent)] p-6">
-          <div className="grid gap-6 md:grid-cols-[1fr_auto]">
+          {hasEvolution ? <div className="grid gap-6 md:grid-cols-[1fr_auto]">
             <div>
               <svg viewBox="0 0 100 100" className="h-56 w-full overflow-visible">
                 {[20, 40, 60, 80].map((line) => (
@@ -150,9 +153,13 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
               <span>{Math.round((lineMax + lineMin) / 2)}%</span>
               <span>{lineMin}%</span>
             </div>
-          </div>
+          </div> : <EmptyState message="A evolução das notas será exibida depois da primeira aplicação corrigida." />}
         </div>
       </Card>
     </div>
   );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <div className="grid min-h-40 place-items-center rounded-[20px] border border-dashed border-[var(--border-strong)] px-6 text-center text-sm leading-6 text-[var(--muted-foreground)]">{message}</div>;
 }

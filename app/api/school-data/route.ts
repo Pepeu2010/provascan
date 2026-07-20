@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { canManageAllSubjects } from "@/lib/subject-scope";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
   GoogleSheetsConfigError,
@@ -22,6 +23,13 @@ export async function GET() {
     );
     clearInvalidSessionCookie(response);
     return response;
+  }
+
+  if (!canManageAllSubjects(validation.session.role)) {
+    return NextResponse.json(
+      { error: "A lista escolar completa é restrita a perfis de gestão." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   try {

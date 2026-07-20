@@ -10,6 +10,7 @@ import {
   type NormalizedRect,
 } from "@/services/answer-sheet-models";
 import { extractIdentityFromImage, extractTextFromImage } from "@/services/ocr";
+import { buildIdentificationCode } from "@/services/exam-correction";
 import type { Exam, Student } from "@/types/domain";
 
 export type QrPayload = {
@@ -176,7 +177,7 @@ export async function detectIdentityWithOcr(params: {
   preferredStudentId: string;
   students: Student[];
 }) {
-  const { canvas, preferredStudentId, students } = params;
+  const { canvas, students } = params;
   const headerCanvas = cropCanvas(canvas, {
     height: Math.round(canvas.height * 0.24),
     width: Math.round(canvas.width * 0.78),
@@ -190,19 +191,15 @@ export async function detectIdentityWithOcr(params: {
     const tokens = student.nome.split(" ").map((token) => normalizeText(token)).filter((token) => token.length >= 3);
     return tokens.some((token) => normalized.includes(token));
   });
-  const fallback =
-    byRegistration ??
-    byName ??
-    students.find((student) => student.id === preferredStudentId) ??
-    students[0];
+  const matchedStudent = byRegistration ?? byName;
 
   return {
     confidence: result.confianca,
-    detectedName: byName?.nome ?? fallback?.nome ?? "",
-    detectedRegistration: byRegistration?.matricula ?? fallback?.matricula ?? "",
+    detectedName: matchedStudent?.nome ?? "",
+    detectedRegistration: matchedStudent?.matricula ?? "",
     rawText: result.rawText,
-    status: fallback ? "matched" : "not-found",
-    studentId: fallback?.id ?? "",
+    status: matchedStudent ? "matched" : "not-found",
+    studentId: matchedStudent?.id ?? "",
   } satisfies OcrFallbackResult;
 }
 
@@ -314,12 +311,17 @@ export function resolveIdentityFromQr(params: {
     };
   }
 
-  if (qrResult.payload.provaId !== dataExam.id || qrResult.payload.turma !== student.turma) {
+  const expectedCorrectionCode = buildIdentificationCode(dataExam, student);
+  if (
+    qrResult.payload.provaId !== dataExam.id ||
+    qrResult.payload.turma !== student.turma ||
+    qrResult.payload.correctionCode !== expectedCorrectionCode
+  ) {
     return {
       confidence: 0,
       detectedName: student.nome,
       detectedRegistration: student.matricula,
-      invalidMessage: "QR Code valido, mas aponta para outra prova ou aluno fora do publico atual.",
+      invalidMessage: "QR Code invalido para esta prova, turma ou cartao-resposta.",
       method: "qr" as const,
       matchedStudentId: student.id,
     };
