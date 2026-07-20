@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
 
 export const AUTH_COOKIE_NAME = "provascan-auth";
+export const PRE_AUTH_COOKIE_NAME = "provascan-preauth";
 const AUTH_MAX_AGE = 60 * 60 * 12;
 const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30;
 
@@ -103,4 +104,12 @@ export function clearAuthCookie(response: NextResponse) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+}
+
+export function applyPreAuthCookie(response: NextResponse, token: string) {
+  response.cookies.set(PRE_AUTH_COOKIE_NAME, token, { httpOnly: true, maxAge: 15 * 60, path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+}
+
+export function clearPreAuthCookie(response: NextResponse) {
+  response.cookies.set(PRE_AUTH_COOKIE_NAME, "", { httpOnly: true, maxAge: 0, path: "/", sameSite: "lax", secure: process.env.NODE_ENV === "production" });
 }

@@ -111,7 +111,7 @@ type AppDataContextValue = {
     email: string;
     password: string;
     remember: boolean;
-  }) => Promise<{ ok: boolean; message: string; redirectTo?: string }>;
+  }) => Promise<{ ok: boolean; message: string; redirectTo?: string; step?: string }>;
   logoutTeacher: () => Promise<void>;
   changeTeacherPassword: (input: {
     currentPassword: string;
@@ -671,12 +671,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           error?: string;
           message?: string;
           redirectTo?: string;
+          step?: string;
           user?: AuthSessionUser | null;
         };
 
-        if (!response.ok || !payload.user) {
+        if (!response.ok) {
           return { ok: false, message: payload.error ?? "Não foi possível iniciar a sessão segura." };
         }
+
+        if (payload.step) return { ok: true, message: payload.message ?? "Credenciais confirmadas.", step: payload.step };
+        if (!payload.user) return { ok: false, message: "Não foi possível iniciar a sessão segura." };
 
         setSession(normalizeSession(payload.user));
         setAuthResolved(true);

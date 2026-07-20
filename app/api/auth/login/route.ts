@@ -2,11 +2,11 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  applyAuthCookie,
-  buildSessionUser,
-  createSessionToken,
+  applyPreAuthCookie,
 } from "@/lib/auth";
-import { createPasswordStamp, verifyPassword } from "@/lib/passwords";
+import { verifyPassword } from "@/lib/passwords";
+import { getMfaPolicy, getNextAuthStep } from "@/lib/auth-flow";
+import { createPreAuthToken } from "@/lib/pre-auth";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
   GoogleSheetsConfigError,
@@ -16,7 +16,6 @@ import {
   isActiveUser,
   shouldForcePasswordChange,
 } from "@/services/google-sheets";
-import { normalizeSubject } from "@/lib/subject-scope";
 
 export const runtime = "nodejs";
 
@@ -83,36 +82,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Usuário inativo." }, { status: 403 });
     }
 
-    const passwordMatches = await verifyPassword(payload.password, user.senha);
+    const passwordMatches = await verifyPassword(payload.password, user.senha, user.senha_formato);
     if (!passwordMatches) {
       return invalidCredentialsResponse();
     }
 
-    const storedPassword = user.senha;
-
-    const loggedInAt = new Date().toISOString();
-    const safeUser = {
-      id: user.id,
-      nome: user.nome,
-      email: user.email,
-      role: user.perfil,
-      subject: normalizeSubject(user.disciplina),
-      forcePasswordChange: shouldForcePasswordChange(user.trocar_senha),
-    };
-
-    const token = await createSessionToken({
-      user: safeUser,
-      remember: payload.remember,
-      loggedInAt,
-      passwordStamp: createPasswordStamp(storedPassword),
-    });
-
-    const response = NextResponse.json({
-      message: "Login realizado com sucesso.",
-      redirectTo: safeUser.forcePasswordChange ? "/trocar-senha" : "/dashboard",
-      user: buildSessionUser(safeUser, payload.remember, loggedInAt),
-    });
-    applyAuthCookie(response, token, payload.remember);
+    const policy = getMfaPolicy();
+    const step = policy.required ? getNextAuthStep(user) : (shouldForcePasswordChange(user.trocar_senha) ? "PASSWORD_CHANGE" : "MFA_METHOD");
+    const token = await createPreAuthToken({ userId: user.id, access: user.email, remember: payload.remember, step });
+    const response = NextResponse.json({ message: "Credenciais confirmadas.", redirectTo: "/login", step, user: { nome: user.nome, email: user.email } });
+    applyPreAuthCookie(response, token);
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -53,7 +53,7 @@ export async function validateSessionToken(token: string | undefined): Promise<V
     return { ok: false, reason: "invalid" };
   }
 
-  const passwordStamp = createPasswordStamp(user.senha);
+  const passwordStamp = createPasswordStamp(`${user.senha}|${user.sessao_revogada_em ?? ""}`);
   if (passwordStamp !== parsed.passwordStamp) {
     return { ok: false, reason: "invalid" };
   }

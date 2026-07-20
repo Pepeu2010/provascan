@@ -1,15 +1,14 @@
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { applyAuthCookie, AUTH_COOKIE_NAME, buildSessionUser, createSessionToken } from "@/lib/auth";
-import { normalizeSubject } from "@/lib/subject-scope";
-import { createPasswordStamp, verifyPassword } from "@/lib/passwords";
+import { applyPreAuthCookie } from "@/lib/auth";
+import { createPreAuthToken } from "@/lib/pre-auth";
+import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/passwords";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
-import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
+import { requirePreAuth } from "@/lib/auth-flow-server";
 import {
   GoogleSheetsConnectionError,
   GoogleSheetsSchemaError,
-  getUserByEmail,
   updateUserPassword,
 } from "@/services/google-sheets";
 
@@ -48,20 +47,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Origem da requisição não autorizada." }, { status: 403 });
   }
 
-  const cookieStore = await cookies();
-  const validation = await validateSessionToken(cookieStore.get(AUTH_COOKIE_NAME)?.value);
-
-  if (!validation.ok) {
-    const response = NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
-    clearInvalidSessionCookie(response);
-    return response;
-  }
+  const validation = await requirePreAuth();
+  if (!validation || validation.preAuth.step !== "PASSWORD_CHANGE") return NextResponse.json({ error: "Sua sessão de configuração expirou. Faça login novamente." }, { status: 401 });
 
   try {
     const payload = changePasswordSchema.parse(await request.json());
     const rateLimit = await consumeRateLimit({
       bucket: "auth-password-change",
-      key: buildRateLimitKey(getClientIp(headersList), validation.session.id, validation.session.email),
+      key: buildRateLimitKey(getClientIp(headersList), validation.user.id, validation.user.email),
       limit: 6,
       windowMs: 10 * 60 * 1000,
     });
@@ -78,43 +71,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await getUserByEmail(validation.session.email);
+    const user = validation.user;
 
-    if (!user) {
-      return NextResponse.json({ error: "Nome ou senha inválidos." }, { status: 401 });
-    }
-
-    const currentPasswordMatches = await verifyPassword(payload.currentPassword, user.senha);
+    const currentPasswordMatches = await verifyPassword(payload.currentPassword, user.senha, user.senha_formato);
     if (!currentPasswordMatches) {
       return NextResponse.json({ error: "Nome ou senha inválidos." }, { status: 401 });
     }
 
-    const nextStoredPassword = payload.newPassword;
+    const passwordError = validateNewPassword(payload.newPassword, user.email);
+    if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 });
+    const nextStoredPassword = await hashPassword(payload.newPassword);
     await updateUserPassword(user.id, nextStoredPassword, { clearPasswordChangeFlag: true });
-
-    const loggedInAt = new Date().toISOString();
-    const safeUser = {
-      id: user.id,
-      nome: user.nome,
-      email: user.email,
-      role: user.perfil,
-      subject: normalizeSubject(user.disciplina),
-      forcePasswordChange: false,
-    };
-
-    const token = await createSessionToken({
-      user: safeUser,
-      remember: validation.session.remember,
-      loggedInAt,
-      passwordStamp: createPasswordStamp(nextStoredPassword),
-    });
-
-    const response = NextResponse.json({
-      message: "Senha alterada com sucesso.",
-      redirectTo: "/dashboard",
-      user: buildSessionUser(safeUser, validation.session.remember, loggedInAt),
-    });
-    applyAuthCookie(response, token, validation.session.remember);
+    const step = "MFA_METHOD";
+    const token = await createPreAuthToken({ userId: user.id, access: user.email, remember: validation.preAuth.remember, step });
+    const response = NextResponse.json({ message: "Senha alterada com segurança.", step });
+    applyPreAuthCookie(response, token);
     return response;
   } catch (error) {
     if (error instanceof z.ZodError) {

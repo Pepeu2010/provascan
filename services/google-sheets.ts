@@ -1,5 +1,6 @@
 import { google, sheets_v4 } from "googleapis";
 import { createHash } from "node:crypto";
+import { compare } from "bcryptjs";
 import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
 import { classes, correctionSessions, exams, students, teacherProfile } from "@/lib/mock-data";
@@ -14,7 +15,7 @@ import type {
 } from "@/types/domain";
 import type { SheetsUserRecord } from "@/types/auth";
 
-const USERS_RANGE_COLUMNS = "A:H";
+const USERS_RANGE_COLUMNS = "A:AZ";
 const STUDENTS_RANGE_COLUMNS = "A:E";
 const CLASSES_RANGE_COLUMNS = "A:I";
 const EXAMS_RANGE_COLUMNS = "A:L";
@@ -24,6 +25,12 @@ const CORRECTIONS_RANGE_COLUMNS = "A:X";
 const CONFIG_RANGE_COLUMNS = "A:B";
 
 const REQUIRED_USER_HEADERS = ["id", "nome", "email", "senha", "perfil", "ativo", "trocar_senha"] as const;
+export const SECURITY_USER_HEADERS = [
+  "acesso", "senha_formato", "mfa_ativo", "mfa_metodo",
+  "mfa_secret_encrypted", "mfa_configurado_em", "recovery_codes_configurados", "recovery_codes_hashes",
+  "senha_alterada_em", "ultimo_mfa_em", "ultimo_login", "falhas_mfa", "sessao_revogada_em", "atualizado_em",
+] as const;
+const AUDIT_HEADERS = ["id", "ocorreu_em", "ator_id", "evento", "alvo_id", "ip_hash", "metadata"] as const;
 const REQUIRED_STUDENT_BASE_HEADERS = ["id", "nome", "turma", "ra"] as const;
 const REQUIRED_CLASS_HEADERS = [
   "id",
@@ -106,6 +113,7 @@ const envSchema = z.object({
   GOOGLE_SHEETS_CORRECTIONS_TAB: z.string().trim().min(1).default("correcoes"),
   GOOGLE_SHEETS_CONFIG_TAB: z.string().trim().min(1).default("provascan_config"),
   GOOGLE_SHEETS_META_TAB: z.string().trim().min(1).default("provascan_meta"),
+  GOOGLE_SHEETS_AUDIT_TAB: z.string().trim().min(1).default("provascan_auditoria"),
 });
 
 type GoogleSheetsEnv = z.infer<typeof envSchema>;
@@ -180,6 +188,7 @@ function readEnv(): GoogleSheetsEnv | null {
     GOOGLE_SHEETS_CORRECTIONS_TAB: process.env.GOOGLE_SHEETS_CORRECTIONS_TAB,
     GOOGLE_SHEETS_CONFIG_TAB: process.env.GOOGLE_SHEETS_CONFIG_TAB,
     GOOGLE_SHEETS_META_TAB: process.env.GOOGLE_SHEETS_META_TAB,
+    GOOGLE_SHEETS_AUDIT_TAB: process.env.GOOGLE_SHEETS_AUDIT_TAB,
   });
 
   return parsed.success ? parsed.data : null;
@@ -207,6 +216,7 @@ function requireEnv() {
   return {
     ...env,
     GOOGLE_SHEETS_ANSWER_KEYS_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_ANSWER_KEYS_TAB),
+    GOOGLE_SHEETS_AUDIT_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_AUDIT_TAB),
     GOOGLE_SHEETS_CLASSES_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_CLASSES_TAB),
     GOOGLE_SHEETS_CLIENT_EMAIL: unwrapEnvValue(env.GOOGLE_SHEETS_CLIENT_EMAIL),
     GOOGLE_SHEETS_CONFIG_TAB: unwrapEnvValue(env.GOOGLE_SHEETS_CONFIG_TAB),
@@ -351,6 +361,17 @@ function mapCells(headers: string[], row: unknown[]) {
     cells.set(header, normalizeCell(String(row[index] ?? "")));
   });
   return cells;
+}
+
+function columnName(index: number) {
+  let value = index + 1;
+  let result = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    value = Math.floor((value - 1) / 26);
+  }
+  return result;
 }
 
 function isUsableUserRecord(user: SheetsUserRecord) {
@@ -624,17 +645,25 @@ async function readUsersSheet() {
       record: {
         id: cells.get("id") ?? "",
         nome: cells.get("nome") ?? "",
-        email: (cells.get("email") ?? "").toLowerCase(),
+        // Durante a migração, `email` histórico permanece como nome de acesso.
+        email: (cells.get("acesso") ?? cells.get("email") ?? "").toLowerCase(),
         senha: cells.get("senha") ?? "",
+        senha_formato: (cells.get("senha_formato") ?? "PLAIN").toUpperCase() === "BCRYPT" ? "BCRYPT" : "PLAIN",
         perfil: cells.get("perfil") ?? "",
         disciplina: cells.get("disciplina") ?? cells.get("materia") ?? "",
         ativo: cells.get("ativo") ?? "",
         trocar_senha: cells.get("trocar_senha") ?? "",
+        mfa_ativo: cells.get("mfa_ativo") ?? "NAO",
+        mfa_metodo: (cells.get("mfa_metodo") ?? "").toUpperCase() as SheetsUserRecord["mfa_metodo"],
+        mfa_secret_encrypted: cells.get("mfa_secret_encrypted") ?? "",
+        recovery_codes_configurados: cells.get("recovery_codes_configurados") ?? "NAO",
+        recovery_codes_hashes: cells.get("recovery_codes_hashes") ?? "",
+        sessao_revogada_em: cells.get("sessao_revogada_em") ?? "",
       } satisfies SheetsUserRecord,
     };
   });
 
-  return { env, sheets, users };
+  return { env, sheets, users, headerRow };
 }
 
 function mapStoredStudentStatus(value: string) {
@@ -742,15 +771,22 @@ export async function getUserByEmail(email: string) {
   return match.record;
 }
 
+/** Nome mais preciso para o novo domínio; mantém o alias histórico acima. */
+export const getUserByAccess = getUserByEmail;
+
+export async function getUserAuthState(access: string) {
+  return getUserByAccess(access);
+}
+
 async function findUserRowById(userId: string) {
-  const { env, sheets, users } = await readUsersSheet();
+  const { env, sheets, users, headerRow } = await readUsersSheet();
   const match = users.find((item) => item.record.id === userId);
 
   if (!match) {
     return null;
   }
 
-  return { env, sheets, match };
+  return { env, sheets, match, headerRow };
 }
 
 export async function updateUserPassword(
@@ -766,19 +802,26 @@ export async function updateUserPassword(
   }
 
   try {
+    const passwordColumn = found.headerRow.indexOf("senha");
+    const forceColumn = found.headerRow.indexOf("trocar_senha");
+    const formatColumn = found.headerRow.indexOf("senha_formato");
+    const changedAtColumn = found.headerRow.indexOf("senha_alterada_em");
+    if (passwordColumn < 0 || forceColumn < 0) throw new GoogleSheetsSchemaError("Colunas de senha ausentes na aba usuarios.");
     const data: sheets_v4.Schema$ValueRange[] = [
       {
-        range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!D${found.match.rowNumber}`,
+        range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!${columnName(passwordColumn)}${found.match.rowNumber}`,
         values: [[nextStoredPassword]],
       },
     ];
 
     if (options?.clearPasswordChangeFlag) {
       data.push({
-        range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!G${found.match.rowNumber}`,
+        range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!${columnName(forceColumn)}${found.match.rowNumber}`,
         values: [["NAO"]],
       });
     }
+    if (formatColumn >= 0) data.push({ range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!${columnName(formatColumn)}${found.match.rowNumber}`, values: [["BCRYPT"]] });
+    if (changedAtColumn >= 0) data.push({ range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!${columnName(changedAtColumn)}${found.match.rowNumber}`, values: [[new Date().toISOString()]] });
 
     await found.sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: found.env.GOOGLE_SHEETS_SPREADSHEET_ID,
@@ -792,6 +835,56 @@ export async function updateUserPassword(
   }
 }
 
+async function updateUserColumns(userId: string, values: Record<string, string>) {
+  const found = await findUserRowById(userId);
+  if (!found) throw new GoogleSheetsSchemaError("Usuario nao encontrado.");
+  const data = Object.entries(values).flatMap(([header, value]) => {
+    const index = found.headerRow.indexOf(header);
+    return index < 0 ? [] : [{ range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!${columnName(index)}${found.match.rowNumber}`, values: [[value]] }];
+  });
+  if (Object.keys(values).some((header) => !found.headerRow.includes(header))) throw new GoogleSheetsSchemaError("A aba usuarios não possui as colunas de segurança. Execute a migração administrativa.");
+  try {
+    await found.sheets.spreadsheets.values.batchUpdate({ spreadsheetId: found.env.GOOGLE_SHEETS_SPREADSHEET_ID, requestBody: { data, valueInputOption: "USER_ENTERED" } });
+  } catch (error) {
+    if (error instanceof GoogleSheetsSchemaError) throw error;
+    throw new GoogleSheetsConnectionError("Erro ao conectar com a planilha.");
+  }
+}
+
+export async function updateMfaMethod(userId: string, method: "TOTP") { await updateUserColumns(userId, { mfa_metodo: method, atualizado_em: new Date().toISOString() }); }
+export async function markMfaEnabled(userId: string) { await updateUserColumns(userId, { mfa_ativo: "SIM", mfa_configurado_em: new Date().toISOString(), ultimo_mfa_em: new Date().toISOString(), sessao_revogada_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }); }
+export async function updateLastMfa(userId: string) { await updateUserColumns(userId, { ultimo_mfa_em: new Date().toISOString(), falhas_mfa: "0", atualizado_em: new Date().toISOString() }); }
+export async function updateLastLogin(userId: string) { await updateUserColumns(userId, { ultimo_login: new Date().toISOString(), atualizado_em: new Date().toISOString() }); }
+export async function storeEncryptedTotpSecret(userId: string, secret: string) { await updateUserColumns(userId, { mfa_secret_encrypted: secret, atualizado_em: new Date().toISOString() }); }
+export async function storeRecoveryCodeHashes(userId: string, hashes: string) { await updateUserColumns(userId, { recovery_codes_hashes: hashes, recovery_codes_configurados: "SIM", atualizado_em: new Date().toISOString() }); }
+export async function revokeUserSessions(userId: string) { await updateUserColumns(userId, { sessao_revogada_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }); }
+export async function disableUserMfa(userId: string) { await updateUserColumns(userId, { mfa_ativo: "NAO", mfa_metodo: "", mfa_secret_encrypted: "", recovery_codes_configurados: "NAO", recovery_codes_hashes: "", sessao_revogada_em: new Date().toISOString(), atualizado_em: new Date().toISOString() }); }
+export const resetUserMfaByAdministration = disableUserMfa;
+export async function completeTotpSetup(userId: string, input: { encryptedSecret: string; recoveryCodeHashes: string }) {
+  await updateUserColumns(userId, {
+    mfa_secret_encrypted: input.encryptedSecret,
+    recovery_codes_hashes: input.recoveryCodeHashes,
+    recovery_codes_configurados: "SIM",
+    mfa_metodo: "TOTP",
+    mfa_ativo: "SIM",
+    mfa_configurado_em: new Date().toISOString(),
+    ultimo_mfa_em: new Date().toISOString(),
+    falhas_mfa: "0",
+    sessao_revogada_em: new Date().toISOString(),
+    atualizado_em: new Date().toISOString(),
+  });
+}
+export async function consumeRecoveryCode(userId: string, code: string) {
+  const user = await findUserRowById(userId);
+  if (!user) return false;
+  let hashes: string[];
+  try { hashes = JSON.parse(user.match.record.recovery_codes_hashes ?? "[]") as string[]; } catch { return false; }
+  const index = await (async () => { for (let current = 0; current < hashes.length; current += 1) if (await compare(code, hashes[current])) return current; return -1; })();
+  if (index < 0) return false;
+  await updateUserColumns(userId, { recovery_codes_hashes: JSON.stringify(hashes.filter((_, current) => current !== index)), atualizado_em: new Date().toISOString() });
+  return true;
+}
+
 export async function updateUserPasswordChangeFlag(userId: string, shouldForce: boolean) {
   const found = await findUserRowById(userId);
   if (!found) {
@@ -799,9 +892,11 @@ export async function updateUserPasswordChangeFlag(userId: string, shouldForce: 
   }
 
   try {
+    const forceColumn = found.headerRow.indexOf("trocar_senha");
+    if (forceColumn < 0) throw new GoogleSheetsSchemaError("Coluna trocar_senha ausente.");
     await found.sheets.spreadsheets.values.update({
       spreadsheetId: found.env.GOOGLE_SHEETS_SPREADSHEET_ID,
-      range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!G${found.match.rowNumber}`,
+      range: `${found.env.GOOGLE_SHEETS_USERS_TAB}!${columnName(forceColumn)}${found.match.rowNumber}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[shouldForce ? "SIM" : "NAO"]],
@@ -813,7 +908,7 @@ export async function updateUserPasswordChangeFlag(userId: string, shouldForce: 
 }
 
 export async function updateAllUsersPasswordChangeFlag(shouldForce: boolean) {
-  const { env, sheets, users } = await readUsersSheet();
+  const { env, sheets, users, headerRow } = await readUsersSheet();
   const rows = users.filter((item) => item.record.id && item.record.nome);
 
   if (!rows.length) {
@@ -821,11 +916,13 @@ export async function updateAllUsersPasswordChangeFlag(shouldForce: boolean) {
   }
 
   try {
+    const forceColumn = headerRow.indexOf("trocar_senha");
+    if (forceColumn < 0) throw new GoogleSheetsSchemaError("Coluna trocar_senha ausente.");
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
       requestBody: {
         data: rows.map((item) => ({
-          range: `${env.GOOGLE_SHEETS_USERS_TAB}!G${item.rowNumber}`,
+          range: `${env.GOOGLE_SHEETS_USERS_TAB}!${columnName(forceColumn)}${item.rowNumber}`,
           values: [[shouldForce ? "SIM" : "NAO"]],
         })),
         valueInputOption: "USER_ENTERED",
@@ -836,6 +933,50 @@ export async function updateAllUsersPasswordChangeFlag(shouldForce: boolean) {
   }
 
   return { updated: rows.length };
+}
+
+export async function migrateUsersSecuritySchema() {
+  const { env, sheets, headerRow } = await readUsersSheet();
+  const missing = SECURITY_USER_HEADERS.filter((header) => !headerRow.includes(header));
+  if (missing.length) {
+    try {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+        range: `${env.GOOGLE_SHEETS_USERS_TAB}!${columnName(headerRow.length)}1:${columnName(headerRow.length + missing.length - 1)}1`,
+        valueInputOption: "RAW",
+        requestBody: { values: [missing] },
+      });
+    } catch {
+      throw new GoogleSheetsConnectionError("Erro ao adicionar colunas de segurança na planilha.");
+    }
+  }
+
+  const titles = await listSheetTitles(sheets, env.GOOGLE_SHEETS_SPREADSHEET_ID);
+  let auditCreated = false;
+  if (!titles.has(env.GOOGLE_SHEETS_AUDIT_TAB)) {
+    try {
+      await sheets.spreadsheets.batchUpdate({ spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID, requestBody: { requests: [{ addSheet: { properties: { title: env.GOOGLE_SHEETS_AUDIT_TAB } } }] } });
+      await sheets.spreadsheets.values.update({ spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID, range: `${env.GOOGLE_SHEETS_AUDIT_TAB}!A1:G1`, valueInputOption: "RAW", requestBody: { values: [Array.from(AUDIT_HEADERS)] } });
+      auditCreated = true;
+    } catch {
+      throw new GoogleSheetsConnectionError("Erro ao criar a aba de auditoria.");
+    }
+  }
+  return { addedHeaders: missing, auditCreated, usersTab: env.GOOGLE_SHEETS_USERS_TAB };
+}
+
+export async function appendAuditEvent(input: { actorId: string; event: string; targetId?: string; ipHash?: string; metadata?: Record<string, string | number | boolean> }) {
+  const { env, sheets } = await createSheetsApiClient();
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      range: `${env.GOOGLE_SHEETS_AUDIT_TAB}!A:G`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[createHash("sha256").update(`${Date.now()}-${input.actorId}-${input.event}`).digest("hex").slice(0, 20), new Date().toISOString(), input.actorId, input.event, input.targetId ?? "", input.ipHash ?? "", JSON.stringify(input.metadata ?? {})]] },
+    });
+  } catch {
+    throw new GoogleSheetsConnectionError("Não foi possível registrar a auditoria. Execute a migração de segurança.");
+  }
 }
 
 export async function listUsersForAdmin() {

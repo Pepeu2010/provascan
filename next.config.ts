@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               `script-src ${scriptSrc.join(" ")}`,
               "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://sheets.googleapis.com",
+              "connect-src 'self'",
               "object-src 'none'",
               "frame-src 'none'",
               "frame-ancestors 'none'",

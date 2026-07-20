@@ -68,29 +68,47 @@ ENABLE_TESSERACT_OCR=
 AUTH_SECRET=
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
+MFA_REQUIRED=true
+MFA_ENCRYPTION_KEY=
+GOOGLE_SHEETS_AUDIT_TAB=provascan_auditoria
 ```
 
 Regras:
 
 - `GOOGLE_SHEETS_PRIVATE_KEY` deve manter `\n` escapado no `.env`
 - `AUTH_SECRET` deve ter pelo menos 32 caracteres
+- `MFA_ENCRYPTION_KEY` deve ser uma chave aleatória de 32 bytes em Base64 (por exemplo, gerada com `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
 - nunca versionar `.env` nem expor email de servico, chave privada ou credenciais no frontend
 
 ## Estrutura da aba `usuarios`
 
-O sistema depende exatamente destas colunas existentes:
+O sistema preserva as colunas existentes e localiza todas pelo cabeçalho:
 
 ```txt
-id | nome | email | senha | perfil | disciplina | ativo | trocar_senha
+id | nome | email (acesso legado) | senha | perfil | disciplina | ativo | trocar_senha
 ```
 
 Regras aplicadas:
 
-- login pelo campo `email`
-- comparacao da senha digitada com a coluna `senha`
+- login por `acesso` quando a coluna existir, ou pelo `email` legado
+- senhas legadas são `PLAIN`; toda senha nova é salva como `BCRYPT`
 - acesso permitido apenas quando `ativo = SIM`
 - o campo `perfil` define a permissao do usuario
 - o campo `disciplina` define a materia operacional do usuario
+
+## Migração de segurança e MFA
+
+Antes de ativar MFA na produção, um perfil de gestão deve executar manualmente `POST /api/admin/security/migration` no painel autenticado. A operação é idempotente: acrescenta somente os cabeçalhos de segurança ausentes na aba `usuarios`, não altera dados existentes nem reordena colunas, e cria a aba de auditoria `provascan_auditoria` se ela não existir.
+
+Os estados adicionais incluem `senha_formato`, `mfa_ativo`, `mfa_metodo`, segredo TOTP criptografado AES-256-GCM, hashes bcrypt de códigos de recuperação e marcas de revogação/auditoria. Nunca grave segredo TOTP em texto puro ou chaves de ambiente na planilha.
+
+## Produção no Vercel
+
+No Vercel, configure as variáveis secretas no nível do projeto e marque como **Sensitive**: `AUTH_SECRET`, `MFA_ENCRYPTION_KEY`, credenciais do Google Sheets, `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`. Produção e Preview devem ter valores próprios; Preview não deve reutilizar a planilha de produção.
+
+Para produção, use `MFA_REQUIRED=true` e Upstash Redis configurado. O armazenamento de desafios MFA usa Redis em produção porque funções do Vercel não compartilham memória entre execuções. Sem Redis, o login MFA falha fechado.
+
+Depois de alterar variáveis no Vercel, faça um novo deployment: mudanças de ambiente não se aplicam retroativamente a deployments já existentes. Proteja os deployments Preview e nunca exponha variáveis com prefixo `NEXT_PUBLIC_`.
 - o campo `trocar_senha` obriga o redirecionamento para `/trocar-senha`
 - toda leitura da planilha acontece apenas no backend
 

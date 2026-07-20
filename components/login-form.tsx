@@ -6,6 +6,7 @@ import { useAppData } from "@/components/app-data-provider";
 import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AuthSecurityFlow } from "@/components/auth-security-flow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +27,7 @@ export function LoginForm() {
   const [showRecovery, setShowRecovery] = useState(false);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [securityFlow, setSecurityFlow] = useState(false);
 
   useEffect(() => {
     if (!authResolved || !session) {
@@ -47,6 +49,11 @@ export function LoginForm() {
     setMessage(result.message);
 
     if (result.ok) {
+      if (result.step) {
+        setSecurityFlow(true);
+        setMessage("");
+        return;
+      }
       const redirect =
         typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("redirect") : null;
       const target = getSafePostAuthRedirect(redirect, result.redirectTo || "/dashboard");
@@ -104,7 +111,9 @@ export function LoginForm() {
               ))}
             </div>
 
-            <form
+            {securityFlow ? (
+              <AuthSecurityFlow onComplete={() => navigateAfterAuth("/dashboard")} />
+            ) : <form
               className="login-form-panel mt-4 grid gap-4 rounded-[28px] border border-[var(--border)] p-5 sm:p-6"
               onSubmit={(event) => {
                 event.preventDefault();
@@ -149,7 +158,7 @@ export function LoginForm() {
               <Button size="lg" className="mt-2 h-[54px] w-full rounded-[20px]" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Entrando..." : "Entrar"}
               </Button>
-            </form>
+            </form>}
 
             {message ? (
               <div className="mt-4 rounded-[20px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_64%,transparent)] px-4 py-3 text-sm text-[var(--muted-foreground)]">
@@ -157,7 +166,7 @@ export function LoginForm() {
               </div>
             ) : null}
 
-            {showRecovery ? (
+            {showRecovery && !securityFlow ? (
               <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] p-5">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 size-5 text-[var(--accent)]" />
