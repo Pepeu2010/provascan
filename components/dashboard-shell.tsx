@@ -1,43 +1,17 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  BarChart3,
-  BookCheck,
-  ClipboardCheck,
-  GraduationCap,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  ScanLine,
-  Settings,
-  Users,
-  X,
-} from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { LogOut, Menu } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
-import { CreatorCredit } from "@/components/creator-credit";
-import { ProvaScanLogo } from "@/components/provascan-logo";
+import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { canAccessSensitiveSettings } from "@/lib/access-control";
 import { getSubjectLabel } from "@/lib/subject-scope";
-import { cn } from "@/lib/utils";
 
-const items = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/turmas", label: "Turmas", icon: GraduationCap },
-  { href: "/dashboard/alunos", label: "Alunos", icon: Users },
-  { href: "/dashboard/provas", label: "Provas", icon: BookCheck },
-  { href: "/dashboard/gabaritos", label: "Gabaritos", icon: ClipboardCheck },
-  { href: "/dashboard/correcao", label: "Correção por foto", icon: ScanLine },
-  { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
-  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings, privileged: true },
-];
+const DIALOG_TRANSITION_MS = 200;
 
 export function DashboardShell({
   children,
@@ -48,10 +22,15 @@ export function DashboardShell({
 }) {
   const router = useRouter();
   const { authResolved, data, isHydrated, logoutTeacher, session, syncError, syncStatus } = useAppData();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dialogReady, setDialogReady] = useState(false);
+  const [tabletExpanded, setTabletExpanded] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
   const subjectLabel = getSubjectLabel(session?.subject);
-  const activeLabel = items.find((item) => item.href === active)?.label ?? "Painel";
+  const activeLabel = dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
 
   const summary = useMemo(
     () =>
@@ -64,113 +43,127 @@ export function DashboardShell({
     [data.classes.length, data.corrections.length, data.exams.length, data.students.length],
   );
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    menuCloseButtonRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
+  const clearDialogCloseTransition = useCallback(() => {
+    const dialog = dialogRef.current;
+    if (dialogTransitionHandlerRef.current && dialog) {
+      dialog.removeEventListener("transitionend", dialogTransitionHandlerRef.current);
+    }
+    if (dialogCloseTimerRef.current) {
+      clearTimeout(dialogCloseTimerRef.current);
+    }
+    dialogTransitionHandlerRef.current = null;
+    dialogCloseTimerRef.current = null;
+  }, []);
+
+  const finishMobileClose = useCallback(() => {
+    clearDialogCloseTransition();
+    const dialog = dialogRef.current;
+    setDialogReady(false);
+    if (dialog?.open) {
+      dialog.close();
+      return;
+    }
+    setMobileMenuOpen(false);
+  }, [clearDialogCloseTransition]);
+
+  const requestMobileClose = useCallback(() => {
+    const dialog = dialogRef.current;
+    if (!dialog?.open) {
+      setMobileMenuOpen(false);
+      setDialogReady(false);
+      return;
+    }
+
+    clearDialogCloseTransition();
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      finishMobileClose();
+      return;
+    }
+
+    setDialogReady(false);
+    const onTransitionEnd = (event: TransitionEvent) => {
+      if (event.target !== dialog || event.propertyName !== "opacity") return;
+      finishMobileClose();
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [menuOpen]);
+    dialogTransitionHandlerRef.current = onTransitionEnd;
+    dialog.addEventListener("transitionend", onTransitionEnd);
+    dialogCloseTimerRef.current = setTimeout(finishMobileClose, DIALOG_TRANSITION_MS + 80);
+  }, [clearDialogCloseTransition, finishMobileClose]);
 
   useEffect(() => {
-    if (isHydrated && authResolved && !session) {
-      router.replace("/login");
-    }
+    if (!mobileMenuOpen) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    const frame = requestAnimationFrame(() => setDialogReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen && !tabletExpanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileMenuOpen, tabletExpanded]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    return () => {
+      clearDialogCloseTransition();
+      if (dialog?.open) dialog.close();
+    };
+  }, [clearDialogCloseTransition, mobileMenuOpen]);
+
+  useEffect(() => {
+    if (isHydrated && authResolved && !session) router.replace("/login");
   }, [authResolved, isHydrated, router, session]);
 
   if (isHydrated && authResolved && !session) {
-    return (
-      <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
-        <Card className="w-full max-w-xl p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">Sessão necessária</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-            Redirecionando para o login do professor
-          </h1>
-          <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-            O painel exige uma sessão ativa neste navegador para reduzir a exposição acidental do workspace.
-          </p>
-        </Card>
-      </div>
-    );
+    return <SessionNotice label="Sessão necessária" title="Redirecionando para o login do professor" detail="O painel exige uma sessão ativa neste navegador para reduzir a exposição acidental do workspace." />;
   }
 
   if (isHydrated && !authResolved) {
-    return (
-      <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
-        <Card className="w-full max-w-xl p-6">
-          <p className="text-sm text-[var(--muted-foreground)]">Validando sessão</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">
-            Confirmando acesso ao painel
-          </h1>
-          <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
-            O painel aguarda a validação da sessão antes de decidir qualquer redirecionamento.
-          </p>
-        </Card>
-      </div>
-    );
+    return <SessionNotice label="Validando sessão" title="Confirmando acesso ao painel" detail="O painel aguarda a validação da sessão antes de decidir qualquer redirecionamento." />;
   }
 
   return (
-    <div className="mx-auto grid min-h-[100dvh] w-full max-w-[1680px] gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4 xl:grid-cols-[14.5rem_minmax(0,1fr)] xl:px-5 xl:py-5">
-      <aside className="hidden min-h-0 xl:flex xl:flex-col">
-        <Card className="dashboard-shell-panel sticky top-5 flex max-h-[calc(100dvh-40px)] min-h-0 flex-col overflow-hidden p-3">
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b border-[var(--border)] px-2 pb-4 pt-2">
-              <ProvaScanLogo variant="sidebar" />
-            </div>
-            <section className="mt-4 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_92%,transparent),transparent)] p-3.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  Workspace ativo
-                </p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
-                <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
-                {subjectLabel ? (
-                  <p className="mt-2 text-sm font-medium text-[var(--accent)]">Matéria: {subjectLabel}</p>
-                ) : null}
-            </section>
+    <div className="dashboard-shell">
+      {tabletExpanded ? (
+        <button
+          type="button"
+          className="dashboard-tablet-scrim"
+          aria-label="Fechar navegação expandida"
+          onClick={() => setTabletExpanded(false)}
+        />
+      ) : null}
 
-            <nav className="mt-4 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1" aria-label="NavegaÃ§Ã£o principal">
-              {renderNavItems(active, session?.role ?? "professor", () => setMenuOpen(false))}
-            </nav>
+      <div className="dashboard-shell__sidebar-slot">
+        <DashboardSidebar
+          active={active}
+          compact={!tabletExpanded}
+          expanded={tabletExpanded}
+          onNavigate={() => setTabletExpanded(false)}
+          onToggleCompact={() => setTabletExpanded((value) => !value)}
+        />
+      </div>
 
-            <div className="mt-4 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-3.5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">Acesso atual</p>
-                  <p className="mt-1 text-sm text-[var(--muted-foreground)]">{session?.role ?? "professor"}</p>
-                </div>
-                <Badge tone="accent">Online</Badge>
-              </div>
-            </div>
-
-            <div className="hidden">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                Ambiente ativo
-              </p>
-              <p className="mt-2 text-base font-semibold text-[var(--foreground)]">Painel operacional pronto</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                O painel está pronto para uso. Backup e restauração continuam disponíveis em Configurações.
-              </p>
-            </div>
-            <CreatorCredit className="mt-4" />
-          </div>
-        </Card>
-      </aside>
-
-      <main className="min-w-0 flex-1">
-        <header className="dashboard-shell-panel relative z-40 mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
+      <main className="dashboard-shell__main">
+        <header className="dashboard-shell-panel relative z-20 mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
           <div className="relative flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div className="flex items-start justify-between gap-3 2xl:block">
               <button
+                ref={menuTriggerRef}
                 type="button"
-                onClick={() => setMenuOpen(true)}
-                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] xl:hidden"
+                onClick={() => setMobileMenuOpen(true)}
+                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] md:hidden"
                 aria-label="Abrir menu"
+                aria-expanded={mobileMenuOpen}
               >
-                <Menu className="size-5" />
+                <Menu className="size-5" aria-hidden="true" />
               </button>
               <div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -178,15 +171,9 @@ export function DashboardShell({
                   <Badge tone="accent">Monitoramento ao vivo</Badge>
                   {subjectLabel ? <Badge tone="warning">Matéria: {subjectLabel}</Badge> : null}
                 </div>
-                <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-3xl">
-                  {activeLabel}
-                </h1>
+                <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-3xl">{activeLabel}</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
-                {subjectLabel ? (
-                  <p className="mt-2 text-sm font-medium text-[var(--accent)]">
-                    As provas, os gabaritos e as correções desta sessão estão vinculados a {subjectLabel}.
-                  </p>
-                ) : null}
+                {subjectLabel ? <p className="mt-2 text-sm font-medium text-[var(--accent)]">As provas, os gabaritos e as correções desta sessão estão vinculados a {subjectLabel}.</p> : null}
               </div>
             </div>
 
@@ -207,20 +194,10 @@ export function DashboardShell({
             <div className="flex flex-wrap items-center justify-end gap-3 2xl:max-w-[360px]">
               <ThemeSwitcher />
               <div className="hidden min-w-[150px] rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),transparent)] px-4 py-3 text-right sm:block">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  Sessão atual
-                </p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">
-                  {session?.nome ?? data.teacherProfile.nome}
-                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Sessão atual</p>
+                <p className="text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
               </div>
-              <Button
-                variant="ghost"
-                onClick={async () => {
-                  await logoutTeacher();
-                  router.push("/login");
-                }}
-              >
+              <Button variant="ghost" onClick={async () => { await logoutTeacher(); router.push("/login"); }}>
                 <LogOut className="size-4" />
                 Sair
               </Button>
@@ -230,110 +207,54 @@ export function DashboardShell({
 
         {syncStatus === "error" && syncError ? (
           <Card className="mb-6 border-[color-mix(in_srgb,var(--error)_38%,var(--border))] bg-[color-mix(in_srgb,var(--error)_10%,var(--card-solid))] p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--error)]">
-              Falha na carga operacional
-            </p>
-            <p className="mt-3 text-base font-semibold text-[var(--foreground)]">
-              O painel não conseguiu carregar os dados.
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--error)]">Falha na carga operacional</p>
+            <p className="mt-3 text-base font-semibold text-[var(--foreground)]">O painel não conseguiu carregar os dados.</p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">{syncError}</p>
-            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
-              Se este login for de professor, confira a coluna `disciplina` na aba `usuários`.
-            </p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">Se este login for de professor, confira a coluna `disciplina` na aba `usuários`.</p>
           </Card>
         ) : null}
 
         {children}
       </main>
 
-      <AnimatePresence>
-        {menuOpen ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[var(--overlay-scrim)] backdrop-blur-sm xl:hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu de navegação"
-          >
-            <motion.div
-              initial={{ x: -24, opacity: 0.9 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -24, opacity: 0.9 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="absolute inset-y-0 left-0 flex w-[84vw] max-w-sm flex-col border-r border-[var(--border)] bg-[var(--card-solid)] p-5 shadow-[var(--shadow-floating)]"
-            >
-              <div className="flex items-center justify-between">
-                <ProvaScanLogo variant="sidebar" className="max-w-[220px]" />
-                <button
-                  ref={menuCloseButtonRef}
-                  type="button"
-                  onClick={() => setMenuOpen(false)}
-                  className="inline-flex size-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)]"
-                  aria-label="Fechar menu"
-                >
-                  <X className="size-5" />
-                </button>
-              </div>
-              <div className="mt-6 space-y-1.5">
-                {renderNavItems(active, session?.role ?? "professor", () => setMenuOpen(false))}
-              </div>
-              <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface)_88%,transparent),transparent)] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Workspace ativo</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{data.teacherProfile.escola}</p>
-                <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{summary}</p>
-                {subjectLabel ? <p className="mt-2 text-sm font-medium text-[var(--accent)]">Matéria: {subjectLabel}</p> : null}
-              </div>
-              <div className="mt-6">
-                <ThemeSwitcher compact />
-              </div>
-              <CreatorCredit className="mt-6" />
-              <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-4">
-                <p className="text-sm font-semibold text-[var(--foreground)]">
-                  {session?.nome ?? data.teacherProfile.nome}
-                </p>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {mobileMenuOpen ? (
+        <dialog
+          ref={dialogRef}
+          className="dashboard-mobile-dialog"
+          data-ready={dialogReady ? "true" : "false"}
+          aria-label="Menu de navegação"
+          onCancel={(event) => {
+            event.preventDefault();
+            requestMobileClose();
+          }}
+          onClick={(event) => {
+            const dialog = event.currentTarget;
+            const bounds = dialog.getBoundingClientRect();
+            const clickedOutsidePanel = event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom;
+            if (clickedOutsidePanel) requestMobileClose();
+          }}
+          onClose={() => {
+            clearDialogCloseTransition();
+            setDialogReady(false);
+            setMobileMenuOpen(false);
+            requestAnimationFrame(() => menuTriggerRef.current?.focus());
+          }}
+        >
+          <DashboardSidebar active={active} modal onNavigate={requestMobileClose} onRequestClose={requestMobileClose} />
+        </dialog>
+      ) : null}
     </div>
   );
 }
 
-function renderNavItems(active: string, role: string, onNavigate: () => void) {
-  return items
-    .filter((item) => !item.privileged || canAccessSensitiveSettings(role))
-    .map((item) => {
-      const Icon = item.icon;
-      const isActive = active === item.href;
-
-      return (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={onNavigate}
-          className={cn(
-            "group flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition-all duration-200",
-            isActive
-              ? "border-[var(--border-strong)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-contrast)_62%,transparent),transparent)] text-[var(--foreground)] shadow-[var(--shadow-soft)]"
-              : "border-transparent text-[var(--muted-foreground)] hover:border-[var(--border)] hover:bg-[color-mix(in_srgb,var(--surface)_86%,transparent)] hover:text-[var(--foreground)]",
-          )}
-        >
-          <span
-            className={cn(
-              "grid size-9 place-items-center rounded-xl border transition-colors",
-              isActive
-                ? "border-[var(--border-strong)] bg-[color-mix(in_srgb,var(--accent-soft)_76%,transparent)] text-[var(--accent)]"
-                : "border-transparent bg-transparent text-[var(--muted-foreground)] group-hover:bg-[var(--card-solid)]",
-            )}
-          >
-            <Icon className="size-4" />
-          </span>
-          <span className="flex-1">{item.label}</span>
-          {isActive ? <span className="size-2 rounded-full bg-[var(--accent)]" aria-hidden="true" /> : null}
-        </Link>
-      );
-    });
+function SessionNotice({ label, title, detail }: { label: string; title: string; detail: string }) {
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-[960px] items-center justify-center px-4 py-10">
+      <Card className="w-full max-w-xl p-6">
+        <p className="text-sm text-[var(--muted-foreground)]">{label}</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">{title}</h1>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">{detail}</p>
+      </Card>
+    </div>
+  );
 }
