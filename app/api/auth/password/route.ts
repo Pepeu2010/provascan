@@ -7,10 +7,10 @@ import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/passwor
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { requirePreAuth } from "@/lib/auth-flow-server";
 import {
-  GoogleSheetsConnectionError,
-  GoogleSheetsSchemaError,
+  SupabaseConnectionError,
+  SupabaseSchemaError,
   updateUserPassword,
-} from "@/services/google-sheets";
+} from "@/services/supabase-data";
 
 export const runtime = "nodejs";
 
@@ -92,8 +92,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });
     }
 
-    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
-      return NextResponse.json({ error: "Erro ao conectar com a planilha." }, { status: 503 });
+    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+      return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 
     return NextResponse.json({ error: "Erro interno ao alterar senha." }, { status: 500 });

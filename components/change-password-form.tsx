@@ -126,7 +126,7 @@ export function ChangePasswordForm() {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-1 size-5 text-[var(--accent)]" />
               <p className="text-sm leading-6 text-[var(--muted-foreground)]">
-                A atualização continua usando a mesma coluna `senha`. Quando possível, o sistema grava o novo valor de forma compatível com hash sem exigir mudança no schema da planilha.
+                A nova senha é protegida por hash seguro no banco de dados.
               </p>
             </div>
           </div>

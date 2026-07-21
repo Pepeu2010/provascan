@@ -18,7 +18,7 @@ export function Select({ children, className, ...props }: SelectProps) {
     <div className={cn("relative", className)}>
       <select
         {...props}
-        className="h-12 w-full appearance-none rounded-2xl border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--input-bg)_98%,transparent),color-mix(in_srgb,var(--surface)_88%,transparent))] px-4 pr-11 text-sm font-medium text-[var(--foreground)] shadow-[var(--shadow-soft)] transition-[border-color,box-shadow,transform,background-color] duration-200 hover:-translate-y-[1px] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-floating)] focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_14%,transparent),var(--shadow-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-11 w-full appearance-none rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--input-bg)] px-3.5 pr-11 text-sm font-medium text-[var(--foreground)] transition-[border-color,box-shadow,background-color] duration-200 hover:border-[var(--border-strong)] focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {children}
       </select>

@@ -9,13 +9,13 @@ import { getMfaPolicy, getNextAuthStep } from "@/lib/auth-flow";
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
-  GoogleSheetsConfigError,
-  GoogleSheetsConnectionError,
-  GoogleSheetsSchemaError,
+  SupabaseConfigError,
+  SupabaseConnectionError,
+  SupabaseSchemaError,
   getUserByEmail,
   isActiveUser,
   shouldForcePasswordChange,
-} from "@/services/google-sheets";
+} from "@/services/supabase-data";
 
 export const runtime = "nodejs";
 
@@ -98,12 +98,12 @@ export async function POST(request: Request) {
       return invalidCredentialsResponse(400);
     }
 
-    if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Erro ao conectar com a planilha." }, { status: 500 });
+    if (error instanceof SupabaseConfigError) {
+      return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
-      return NextResponse.json({ error: "Erro ao conectar com a planilha." }, { status: 503 });
+    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+      return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 
     return NextResponse.json({ error: "Erro interno ao autenticar." }, { status: 500 });

@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "professor" | "vice_diretor" | string;
 
-export type SheetsUserRecord = {
+export type UserRecord = {
   id: string;
   nome: string;
   email: string;

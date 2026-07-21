@@ -4,7 +4,7 @@ import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { calculateAnalytics } from "@/lib/app-data";
 import { canManageAllSubjects, filterAppDataForSubject, requireScopedSubject } from "@/lib/subject-scope";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
-import { getOperationalAppData, getSystemSnapshot } from "@/services/google-sheets";
+import { getOperationalAppData, getSystemSnapshot } from "@/services/supabase-data";
 
 export const runtime = "nodejs";
 

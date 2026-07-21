@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createFinalSession, requirePreAuth } from "@/lib/auth-flow-server";
-import { consumeRecoveryCode, appendAuditEvent, updateLastMfa } from "@/services/google-sheets";
+import { consumeRecoveryCode, appendAuditEvent, updateLastMfa } from "@/services/supabase-data";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 

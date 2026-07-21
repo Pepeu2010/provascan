@@ -635,7 +635,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 <p className="text-sm text-[var(--muted-foreground)]">Revisão manual obrigatória</p>
                 <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Conferencia da leitura OCR</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-                  Ajuste nome, matrícula, aluno encontrado na planilha Google e todas as respostas antes de confirmar.
+                  Ajuste nome, matrícula, aluno encontrado no sistema e todas as respostas antes de confirmar.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -691,7 +691,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                       }
                     />
                   </FieldLabel>
-                  <FieldLabel label="Aluno encontrado na planilha Google">
+                  <FieldLabel label="Aluno encontrado no sistema">
                     <Select
                       value={review.matchedStudentId}
                       onChange={(event) =>

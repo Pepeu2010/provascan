@@ -7,12 +7,12 @@ import { canManageUsers } from "@/lib/access-control";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
-  GoogleSheetsConnectionError,
-  GoogleSheetsSchemaError,
+  SupabaseConnectionError,
+  SupabaseSchemaError,
   listUsersForAdmin,
   updateAllUsersPasswordChangeFlag,
   updateUserPasswordChangeFlag,
-} from "@/services/google-sheets";
+} from "@/services/supabase-data";
 
 export const runtime = "nodejs";
 
@@ -61,8 +61,8 @@ export async function GET() {
     const users = await listUsersForAdmin();
     return NextResponse.json({ users }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
-      return NextResponse.json({ error: "Erro ao conectar com a planilha." }, { status: 503 });
+    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+      return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 
     return NextResponse.json({ error: "Erro interno ao carregar usuários." }, { status: 500 });
@@ -121,8 +121,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });
     }
 
-    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
-      return NextResponse.json({ error: "Erro ao conectar com a planilha." }, { status: 503 });
+    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+      return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 
     return NextResponse.json({ error: "Erro interno ao atualizar usuários." }, { status: 500 });

@@ -10,11 +10,11 @@ import {
   getOperationalAppData,
   getOperationalSnapshot,
   getOperationalRevision,
-  GoogleSheetsConfigError,
-  GoogleSheetsConnectionError,
-  GoogleSheetsSchemaError,
+  SupabaseConfigError,
+  SupabaseConnectionError,
+  SupabaseSchemaError,
   saveOperationalAppData,
-} from "@/services/google-sheets";
+} from "@/services/supabase-data";
 import type { AppDataState } from "@/lib/app-data";
 
 export const runtime = "nodejs";
@@ -78,12 +78,12 @@ export async function GET() {
 
     return finalResponse;
   } catch (error) {
-    if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Planilha não configurada." }, { status: 500 });
+    if (error instanceof SupabaseConfigError) {
+      return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
-      return NextResponse.json({ error: "Erro ao carregar dados operacionais da planilha." }, { status: 503 });
+    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+      return NextResponse.json({ error: "Erro ao carregar dados operacionais." }, { status: 503 });
     }
 
     return NextResponse.json({ error: "Erro interno ao carregar os dados operacionais." }, { status: 500 });
@@ -117,10 +117,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
     }
 
-    const revision = await withOperationalWriteLock(process.env.GOOGLE_SHEETS_SPREADSHEET_ID ?? "unconfigured", async () => {
+    const revision = await withOperationalWriteLock(process.env.SUPABASE_URL ?? "unconfigured", async () => {
       const currentRevision = await getOperationalRevision();
       if (currentRevision !== payload.revision) {
-        throw new GoogleSheetsSchemaError("CONFLICT");
+        throw new SupabaseSchemaError("CONFLICT");
       }
       const currentData = await getOperationalAppData();
       const nextData = mergeScopedAppData(currentData, parsedData.data as AppDataState, subject);
@@ -143,18 +143,18 @@ export async function PUT(request: Request) {
 
     return response;
   } catch (error) {
-    if (error instanceof GoogleSheetsSchemaError && error.message === "CONFLICT") {
+    if (error instanceof SupabaseSchemaError && error.message === "CONFLICT") {
       return NextResponse.json({ error: "Os dados foram alterados em outra sessão. Recarregue antes de salvar.", code: "REVISION_CONFLICT" }, { status: 409 });
     }
     if (error instanceof OperationalLockBusyError || error instanceof OperationalLockUnavailableError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    if (error instanceof GoogleSheetsConfigError) {
-      return NextResponse.json({ error: "Planilha não configurada." }, { status: 500 });
+    if (error instanceof SupabaseConfigError) {
+      return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
-      return NextResponse.json({ error: "Erro ao salvar dados operacionais na planilha." }, { status: 503 });
+    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+      return NextResponse.json({ error: "Erro ao salvar dados operacionais." }, { status: 503 });
     }
 
     return NextResponse.json({ error: "Erro interno ao salvar os dados operacionais." }, { status: 500 });

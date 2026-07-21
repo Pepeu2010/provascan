@@ -4,7 +4,7 @@ import { AUTH_COOKIE_NAME, PRE_AUTH_COOKIE_NAME, applyAuthCookie, clearPreAuthCo
 import { createPasswordStamp } from "@/lib/passwords";
 import { parsePreAuthToken } from "@/lib/pre-auth";
 import { normalizeSubject } from "@/lib/subject-scope";
-import { getUserByAccess, isActiveUser, updateLastLogin } from "@/services/google-sheets";
+import { getUserByAccess, isActiveUser, updateLastLogin } from "@/services/supabase-data";
 
 export async function requirePreAuth() {
   const store = await cookies();

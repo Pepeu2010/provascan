@@ -36,15 +36,13 @@ export function Checkbox({
       <motion.span
         initial={false}
         animate={{
-          backgroundColor: checked ? "rgba(96, 165, 250, 0.18)" : "rgba(255, 255, 255, 0.02)",
-          borderColor: checked ? "rgba(96, 165, 250, 0.72)" : "rgba(148, 163, 184, 0.18)",
-          boxShadow: checked
-            ? "0 0 0 4px rgba(59, 130, 246, 0.14), 0 10px 24px rgba(37, 99, 235, 0.18)"
-            : "0 8px 18px rgba(15, 23, 42, 0.18)",
+          backgroundColor: checked ? "var(--accent)" : "var(--input-bg)",
+          borderColor: checked ? "var(--accent)" : "var(--border-strong)",
+          boxShadow: checked ? "0 0 0 3px var(--focus-ring)" : "none",
         }}
         transition={{ duration: 0.22, ease: "easeOut" }}
         className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-[9px] border backdrop-blur-sm transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent)]/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-transparent group-hover:border-[var(--border-strong)]",
+          "flex size-5 shrink-0 items-center justify-center rounded-[6px] border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent)]/50 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-transparent group-hover:border-[var(--border-strong)]",
           className,
         )}
       >
@@ -58,7 +56,7 @@ export function Checkbox({
           transition={{ duration: 0.18, ease: "easeOut" }}
           className="flex items-center justify-center"
         >
-          <Check className="size-3.5 text-[var(--accent)]" strokeWidth={3} />
+          <Check className="size-3.5 text-[var(--accent-contrast)]" strokeWidth={3} />
         </motion.span>
       </motion.span>
       {label ? <span>{label}</span> : null}

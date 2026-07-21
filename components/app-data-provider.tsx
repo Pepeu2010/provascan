@@ -333,7 +333,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           setSyncError(
             error instanceof Error && error.message
               ? error.message
-              : "Não foi possível carregar os dados operacionais da planilha.",
+              : "Não foi possível carregar os dados operacionais.",
           );
         }
       }
@@ -374,7 +374,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               if (refreshed) { revisionRef.current = remote.revision ?? "0"; setData(applyRemoteAppData(refreshed, session)); hasLoadedRemoteDataRef.current = true; }
             });
           }
-          const message = payload.error ?? "Não foi possível sincronizar a planilha.";
+          const message = payload.error ?? "Não foi possível sincronizar os dados.";
           setSyncStatus("error");
           setSyncError(message);
           return { ok: false, message };
@@ -387,7 +387,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         setSyncError("");
         return { ok: true, message: successMessage };
       } catch {
-        const message = "Falha de rede ao sincronizar a planilha.";
+        const message = "Falha de rede ao sincronizar os dados.";
         setSyncStatus("error");
         setSyncError(message);
         return { ok: false, message };
@@ -622,7 +622,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ...data,
           corrections: [sessionToSave, ...data.corrections],
         },
-        "Correção salva com sucesso na planilha operacional.",
+        "Correção salva com sucesso.",
       );
     };
 

@@ -1089,7 +1089,7 @@ export function SettingsWorkspace() {
         }
       } catch {
         if (!cancelled) {
-          setAdminMessage("Não foi possível carregar os usuários da planilha.");
+          setAdminMessage("Não foi possível carregar os usuários.");
         }
       } finally {
         if (!cancelled) {
@@ -1117,7 +1117,7 @@ export function SettingsWorkspace() {
       setAdminUsers(Array.isArray(payload.users) ? payload.users : []);
       setAdminMessage(payload.error ?? "");
     } catch {
-      setAdminMessage("Não foi possível carregar os usuários da planilha.");
+      setAdminMessage("Não foi possível carregar os usuários.");
     } finally {
       setAdminLoading(false);
     }
@@ -1161,7 +1161,7 @@ export function SettingsWorkspace() {
               </div>
               <h2 className="mt-4 text-2xl font-semibold text-[var(--foreground)]">Reset de primeiro acesso</h2>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted-foreground)]">
-                Aqui você controla a coluna `trocar_senha` da planilha. Marcar `SIM` obriga cada usuário a entrar com a senha atual e definir uma nova senha pessoal antes de acessar o painel.
+                Aqui você controla a obrigatoriedade de troca de senha. Ao marcar, cada usuário deverá definir uma nova senha pessoal antes de acessar o painel.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -1181,7 +1181,7 @@ export function SettingsWorkspace() {
           <div className="mt-6 grid gap-3">
             {adminLoading && !adminUsers.length ? (
               <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 text-sm text-[var(--muted-foreground)]">
-                Carregando usuários da planilha...
+                Carregando usuários...
               </div>
             ) : null}
             {!adminLoading && !adminUsers.length ? (
@@ -1234,7 +1234,7 @@ export function SettingsWorkspace() {
       <div className="grid gap-5 xl:grid-cols-2">
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Persistência operacional</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Os dados do painel agora são lidos e gravados nas abas operacionais do Google Planilhas. O backup JSON continua disponível como contingência manual.</p>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Os dados do painel são lidos e gravados com segurança no Supabase. O backup JSON continua disponível como contingência manual.</p>
         <div className="mt-6 rounded-[24px] bg-[var(--surface)] p-5">
           <p className="text-sm text-[var(--muted-foreground)]">Resumo atual</p>
           <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">

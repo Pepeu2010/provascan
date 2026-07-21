@@ -51,6 +51,7 @@ export function DashboardShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const subjectLabel = getSubjectLabel(session?.subject);
+  const activeLabel = items.find((item) => item.href === active)?.label ?? "Painel";
 
   const summary = useMemo(
     () =>
@@ -112,9 +113,9 @@ export function DashboardShell({
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1680px] gap-6 px-4 py-4 lg:px-6">
-      <aside className="hidden w-[296px] shrink-0 lg:flex lg:flex-col">
-        <Card className="dashboard-shell-panel sticky top-4 p-5">
+    <div className="mx-auto flex min-h-[100dvh] w-full max-w-[1680px] gap-4 px-3 py-3 lg:px-5 lg:py-5">
+      <aside className="hidden w-[252px] shrink-0 lg:flex lg:flex-col">
+        <Card className="dashboard-shell-panel sticky top-5 flex min-h-[calc(100dvh-40px)] flex-col p-3">
           <div className="flex h-full flex-col">
             <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_98%,transparent),transparent)] p-4">
               <ProvaScanLogo variant="sidebar" />
@@ -159,14 +160,14 @@ export function DashboardShell({
       </aside>
 
       <main className="min-w-0 flex-1">
-        <header className="dashboard-shell-panel relative z-40 mb-6 overflow-hidden rounded-[32px] border border-[var(--border)] p-4 sm:p-5">
+        <header className="dashboard-shell-panel relative z-40 mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
-          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-start justify-between gap-3 xl:block">
               <button
                 type="button"
                 onClick={() => setMenuOpen(true)}
-                className="inline-flex size-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_94%,transparent)] text-[var(--foreground)] lg:hidden"
+                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] lg:hidden"
                 aria-label="Abrir menu"
               >
                 <Menu className="size-5" />
@@ -177,8 +178,8 @@ export function DashboardShell({
                   <Badge tone="accent">Monitoramento ao vivo</Badge>
                   {subjectLabel ? <Badge tone="warning">Matéria: {subjectLabel}</Badge> : null}
                 </div>
-                <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-4xl">
-                  {data.teacherProfile.escola}
+                <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-3xl">
+                  {activeLabel}
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
                 {subjectLabel ? (
@@ -233,7 +234,7 @@ export function DashboardShell({
               Falha na carga operacional
             </p>
             <p className="mt-3 text-base font-semibold text-[var(--foreground)]">
-              O painel não conseguiu carregar os dados da planilha.
+              O painel não conseguiu carregar os dados.
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">{syncError}</p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">

@@ -4,7 +4,7 @@ import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { canManageUsers } from "@/lib/access-control";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent, migrateUsersSecuritySchema } from "@/services/google-sheets";
+import { appendAuditEvent, migrateUsersSecuritySchema } from "@/services/supabase-data";
 
 export const runtime = "nodejs";
 

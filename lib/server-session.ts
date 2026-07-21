@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth";
 import { normalizeSubject } from "@/lib/subject-scope";
 import { createPasswordStamp } from "@/lib/passwords";
-import { getUserByEmail, isActiveUser, shouldForcePasswordChange } from "@/services/google-sheets";
+import { getUserByEmail, isActiveUser, shouldForcePasswordChange } from "@/services/supabase-data";
 import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
 
 type ValidSessionResult =

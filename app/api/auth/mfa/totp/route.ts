@@ -8,7 +8,7 @@ import { encryptTotpSecret } from "@/lib/mfa-crypto";
 import { decryptTotpSecret } from "@/lib/mfa-crypto";
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { createRecoveryCodes, createTotpSetup, verifyTotp } from "@/lib/totp";
-import { appendAuditEvent, completeTotpSetup, updateLastMfa } from "@/services/google-sheets";
+import { appendAuditEvent, completeTotpSetup, updateLastMfa } from "@/services/supabase-data";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 
