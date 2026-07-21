@@ -113,13 +113,14 @@ export function DashboardShell({
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] w-full max-w-[1680px] gap-4 px-3 py-3 lg:px-5 lg:py-5">
-      <aside className="hidden w-[252px] shrink-0 lg:flex lg:flex-col">
-        <Card className="dashboard-shell-panel sticky top-5 flex min-h-[calc(100dvh-40px)] flex-col p-3">
-          <div className="flex h-full flex-col">
-            <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_98%,transparent),transparent)] p-4">
+    <div className="mx-auto grid min-h-[100dvh] w-full max-w-[1680px] gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4 xl:grid-cols-[14.5rem_minmax(0,1fr)] xl:px-5 xl:py-5">
+      <aside className="hidden min-h-0 xl:flex xl:flex-col">
+        <Card className="dashboard-shell-panel sticky top-5 flex max-h-[calc(100dvh-40px)] min-h-0 flex-col overflow-hidden p-3">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="border-b border-[var(--border)] px-2 pb-4 pt-2">
               <ProvaScanLogo variant="sidebar" />
-              <div className="mt-5">
+            </div>
+            <section className="mt-4 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_92%,transparent),transparent)] p-3.5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                   Workspace ativo
                 </p>
@@ -128,14 +129,13 @@ export function DashboardShell({
                 {subjectLabel ? (
                   <p className="mt-2 text-sm font-medium text-[var(--accent)]">Matéria: {subjectLabel}</p>
                 ) : null}
-              </div>
-            </div>
+            </section>
 
-            <div className="mt-6 space-y-2">
+            <nav className="mt-4 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1" aria-label="NavegaÃ§Ã£o principal">
               {renderNavItems(active, session?.role ?? "professor", () => setMenuOpen(false))}
-            </div>
+            </nav>
 
-            <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-4">
+            <div className="mt-4 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_92%,transparent),transparent)] p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">Acesso atual</p>
@@ -145,7 +145,7 @@ export function DashboardShell({
               </div>
             </div>
 
-            <div className="mt-auto rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_98%,transparent),color-mix(in_srgb,var(--surface)_86%,transparent))] p-5">
+            <div className="hidden">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                 Ambiente ativo
               </p>
@@ -162,12 +162,12 @@ export function DashboardShell({
       <main className="min-w-0 flex-1">
         <header className="dashboard-shell-panel relative z-40 mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
           <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
-          <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-start justify-between gap-3 xl:block">
+          <div className="relative flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
+            <div className="flex items-start justify-between gap-3 2xl:block">
               <button
                 type="button"
                 onClick={() => setMenuOpen(true)}
-                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] lg:hidden"
+                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] xl:hidden"
                 aria-label="Abrir menu"
               >
                 <Menu className="size-5" />
@@ -204,7 +204,7 @@ export function DashboardShell({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-3 xl:max-w-[360px]">
+            <div className="flex flex-wrap items-center justify-end gap-3 2xl:max-w-[360px]">
               <ThemeSwitcher />
               <div className="hidden min-w-[150px] rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),transparent)] px-4 py-3 text-right sm:block">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
@@ -252,7 +252,7 @@ export function DashboardShell({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[var(--overlay-scrim)] backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-50 bg-[var(--overlay-scrim)] backdrop-blur-sm xl:hidden"
             role="dialog"
             aria-modal="true"
             aria-label="Menu de navegação"

@@ -94,21 +94,19 @@ export function ProvaScanLogo({
     return (
       <div
         className={cn(
-          "flex items-center rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(15,26,49,0.98),rgba(12,22,42,0.94))] p-3.5 shadow-[var(--shadow-floating)]",
-          styles.shell,
+          "flex min-w-0 items-center gap-3",
           className,
         )}
       >
-        <LogoMark className={cn("shrink-0", styles.mark)} />
+        <LogoMark className="size-12 shrink-0 rounded-2xl" />
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.36em] text-[#8fa6d8]">
             ProvaScan
           </p>
-          <p className="mt-1 text-xl font-semibold leading-5 text-[var(--foreground)]">
-            Corretor
+          <p className="mt-1 whitespace-nowrap text-base font-semibold leading-none tracking-[-0.03em] text-[var(--foreground)]">
+            Corretor <span className="text-[#39c6ff]">de Provas</span>
           </p>
-          <p className="text-xl font-semibold leading-5 text-[#39c6ff]">de Provas</p>
-          <p className="mt-1.5 text-xs leading-5 text-[var(--muted-foreground)]">
+          <p className="mt-1.5 truncate text-xs leading-5 text-[var(--muted-foreground)]">
             Correção inteligente
           </p>
         </div>

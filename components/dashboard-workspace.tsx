@@ -20,7 +20,7 @@ export function DashboardWorkspace() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
-        className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]"
+        className="grid gap-5 2xl:grid-cols-[1.15fr_0.85fr]"
       >
         <div className="grid gap-5 sm:grid-cols-2">
           {analytics.dashboardMetrics.map((metric) => (
