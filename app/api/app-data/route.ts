@@ -108,9 +108,6 @@ export async function PUT(request: Request) {
     const payload = (await request.json()) as { data?: unknown; revision?: unknown };
     const parsedData = appDataSchema.safeParse(payload.data);
     if (!parsedData.success) {
-      console.warn("Invalid operational persistence payload", {
-        issues: parsedData.error.issues.map((issue) => ({ code: issue.code, path: issue.path.join(".") })),
-      });
       return NextResponse.json({ error: "Payload inválido para persistência." }, { status: 400 });
     }
     if (typeof payload.revision !== "string" || !/^\d+$/.test(payload.revision)) {
