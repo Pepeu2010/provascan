@@ -39,6 +39,18 @@ function flag(value: string | boolean | null | undefined) {
 
 function toDate(value: string | null) { return value || ""; }
 
+/**
+ * The former Sheets adapter accepted a few legacy spellings for the student
+ * status. The operational API deliberately accepts only the domain values
+ * below, so normalize migrated rows before they are sent back to the client.
+ */
+function mapStudentStatus(value: unknown): Student["status"] {
+  const normalized = String(value ?? "").trim().toLocaleUpperCase("pt-BR");
+  if (normalized === "ATIVO" || normalized === "SIM") return "Ativo";
+  if (normalized === "TRANSFERIDO") return "Transferido";
+  return "Inativo";
+}
+
 type DbUser = {
   legacy_id: string; access_key: string; full_name: string; role: string; subject: string; password_hash: string;
   active: boolean; force_password_change: boolean; mfa_active: boolean; mfa_method: string; mfa_secret_encrypted: string;
@@ -125,7 +137,7 @@ export async function getOperationalAppData(): Promise<AppDataState> {
   const normalizedClasses = normalizeClasses(storedClasses);
   return {
     classes: normalizedClasses,
-    students: ((studentResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), turma: String(row.class_id ?? ""), matricula: String(row.registration ?? ""), status: String(row.status ?? "Ativo") })) as Student[],
+    students: ((studentResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), turma: String(row.class_id ?? ""), matricula: String(row.registration ?? ""), status: mapStudentStatus(row.status) })) as Student[],
     exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), subject: String(row.subject), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version) })) as Exam[],
     answerKeys: ((keyResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), questao: Number(row.question_number), respostaCorreta: String(row.correct_answer) })),
     correctionRules: ((ruleResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), notaMaxima: Number(row.max_score), arredondamentoCasas: Number(row.rounding_places), pesoPadrao: Number(row.default_weight), pesosPorQuestao: Array.isArray(row.weights_by_question) ? row.weights_by_question : [], questoesAnuladas: Array.isArray(row.voided_questions) ? row.voided_questions.map(Number) : [], modoQuestaoAnulada: String(row.voided_question_mode) as ExamCorrectionRule["modoQuestaoAnulada"] })),

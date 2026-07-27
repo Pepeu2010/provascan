@@ -1,41 +1,13 @@
 # ProvaScan
 
-Sistema web para professores corrigirem provas objetivas, organizarem turmas e alunos, salvarem gabaritos e registrarem correcoes com persistencia operacional em Google Planilhas. A autenticacao usa Google Sheets como base inicial de usuarios.
-
-## Estado atual
-
-Funciona hoje:
-
-- Landing page, tela de login e sessao segura por cookie httpOnly
-- Autenticacao manual baseada na aba `usuarios` do Google Sheets
-- Forca troca de senha quando `trocar_senha = SIM`
-- Tema claro, escuro e sistema
-- Dashboard com metricas derivadas do estado salvo
-- Cadastro, edicao e exclusao de turmas
-- Cadastro, edicao e exclusao de alunos
-- Cadastro, edicao e exclusao de provas
-- Editor de gabarito com salvamento real
-- Fluxo de correcao com revisao manual e historico persistido em planilha
-- UX mobile especifica para gabarito e correcao
-- Exportacao operacional em JSON e CSV
-- Importacao e restauracao por JSON
-
-Limitacoes atuais:
-
-- Google Planilhas continua sendo a camada de persistencia, entao concorrencia pesada nao e o foco
-- O painel administrativo de usuarios ainda nao foi implementado por completo
-- OCR continua opcional
+Sistema web para professores corrigirem provas objetivas, organizarem turmas e alunos, salvarem gabaritos e registrarem correções. O Supabase é a fonte de verdade operacional e de autenticação; Google Sheets não faz parte do runtime atual.
 
 ## Stack
 
-- Next.js 16
-- TypeScript
+- Next.js 16 e TypeScript
 - Tailwind CSS 4
-- Lucide React
-- Zod
-- Google Sheets API
-- bcryptjs
-- jose
+- Supabase (Postgres e RPC server-side)
+- Zod, bcryptjs, jose e TOTP
 - Tesseract.js opcional
 
 ## Como rodar
@@ -47,109 +19,38 @@ npm run dev
 
 Abra [http://localhost:3000](http://localhost:3000).
 
-## Variaveis de ambiente
-
-Para o login funcionar de verdade, estas variaveis precisam existir.
+## Variáveis de ambiente
 
 ```bash
-GOOGLE_SHEETS_CLIENT_EMAIL=
-GOOGLE_SHEETS_PRIVATE_KEY=
-GOOGLE_SHEETS_SPREADSHEET_ID=
-GOOGLE_SHEETS_USERS_TAB=usuarios
-GOOGLE_SHEETS_STUDENTS_TAB=alunos
-GOOGLE_SHEETS_CLASSES_TAB=turmas
-GOOGLE_SHEETS_EXAMS_TAB=provas
-GOOGLE_SHEETS_ANSWER_KEYS_TAB=gabaritos
-GOOGLE_SHEETS_CORRECTION_RULES_TAB=regras_correcao
-GOOGLE_SHEETS_CORRECTIONS_TAB=correcoes
-GOOGLE_SHEETS_CONFIG_TAB=provascan_config
-GOOGLE_SHEETS_META_TAB=provascan_meta
-ENABLE_TESSERACT_OCR=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 AUTH_SECRET=
+MFA_ENCRYPTION_KEY=
+MFA_REQUIRED=true
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
-MFA_REQUIRED=true
-MFA_ENCRYPTION_KEY=
-GOOGLE_SHEETS_AUDIT_TAB=provascan_auditoria
+ENABLE_TESSERACT_OCR=
 ```
 
-Regras:
+- `SUPABASE_SERVICE_ROLE_KEY` e `AUTH_SECRET` são segredos de servidor: nunca use `NEXT_PUBLIC_`.
+- `AUTH_SECRET` deve ter pelo menos 32 caracteres.
+- `MFA_ENCRYPTION_KEY` deve ser uma chave aleatória de 32 bytes em Base64.
+- Em produção, configure as variáveis no Vercel como **Sensitive** e faça um novo deploy após alterá-las.
 
-- `GOOGLE_SHEETS_PRIVATE_KEY` deve manter `\n` escapado no `.env`
-- `AUTH_SECRET` deve ter pelo menos 32 caracteres
-- `MFA_ENCRYPTION_KEY` deve ser uma chave aleatória de 32 bytes em Base64 (por exemplo, gerada com `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
-- nunca versionar `.env` nem expor email de servico, chave privada ou credenciais no frontend
+## Banco de dados
 
-## Estrutura da aba `usuarios`
+Antes de rodar ou publicar, aplique as migrations em `supabase/migrations/` no projeto Supabase. Elas criam as tabelas operacionais (`classes`, `students`, `exams`, `answer_keys`, `correction_rules`, `corrections`), os perfis em `app_users`, tabelas internas de segurança e a RPC atômica `replace_operational_state`.
 
-O sistema preserva as colunas existentes e localiza todas pelo cabeçalho:
+O backend acessa o Supabase exclusivamente pelo servidor. A chave de serviço não é enviada ao navegador.
 
-```txt
-id | nome | email (acesso legado) | senha | perfil | disciplina | ativo | trocar_senha
-```
+## Acesso e escopo
 
-Regras aplicadas:
+- `admin` e `vice_diretor` acessam todas as disciplinas.
+- `professor` precisa ter `subject` preenchido em `app_users`.
+- Usuários legados com senha em texto simples são convertidos para bcrypt no primeiro login válido ou na troca obrigatória de senha.
+- O MFA usa TOTP e desafios persistidos; em produção, Redis é necessário para que o fluxo funcione entre execuções serverless.
 
-- login por `acesso` quando a coluna existir, ou pelo `email` legado
-- senhas legadas são `PLAIN`; toda senha nova é salva como `BCRYPT`
-- acesso permitido apenas quando `ativo = SIM`
-- o campo `perfil` define a permissao do usuario
-- o campo `disciplina` define a materia operacional do usuario
-
-## Migração de segurança e MFA
-
-Antes de ativar MFA na produção, um perfil de gestão deve executar manualmente `POST /api/admin/security/migration` no painel autenticado. A operação é idempotente: acrescenta somente os cabeçalhos de segurança ausentes na aba `usuarios`, não altera dados existentes nem reordena colunas, e cria a aba de auditoria `provascan_auditoria` se ela não existir.
-
-Os estados adicionais incluem `senha_formato`, `mfa_ativo`, `mfa_metodo`, segredo TOTP criptografado AES-256-GCM, hashes bcrypt de códigos de recuperação e marcas de revogação/auditoria. Nunca grave segredo TOTP em texto puro ou chaves de ambiente na planilha.
-
-## Produção no Vercel
-
-No Vercel, configure as variáveis secretas no nível do projeto e marque como **Sensitive**: `AUTH_SECRET`, `MFA_ENCRYPTION_KEY`, credenciais do Google Sheets, `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN`. Produção e Preview devem ter valores próprios; Preview não deve reutilizar a planilha de produção.
-
-Para produção, use `MFA_REQUIRED=true` e Upstash Redis configurado. O armazenamento de desafios MFA usa Redis em produção porque funções do Vercel não compartilham memória entre execuções. Sem Redis, o login MFA falha fechado.
-
-Depois de alterar variáveis no Vercel, faça um novo deployment: mudanças de ambiente não se aplicam retroativamente a deployments já existentes. Proteja os deployments Preview e nunca exponha variáveis com prefixo `NEXT_PUBLIC_`.
-- o campo `trocar_senha` obriga o redirecionamento para `/trocar-senha`
-- toda leitura da planilha acontece apenas no backend
-
-Regra importante de escopo:
-
-- `admin` pode ver todas as materias e nao depende de `disciplina`
-- `vice_diretor` pode ver todas as materias e nao depende de `disciplina`
-- `professor` precisa ter `disciplina` preenchida na aba `usuarios`
-- se a `disciplina` estiver vazia para um `professor`, o painel bloqueia a carga com erro de configuracao
-
-Materias padronizadas hoje:
-
-- `Artes`
-- `Biologia`
-- `Ciencias`
-- `Educacao Fisica`
-- `Filosofia`
-- `Fisica`
-- `Geografia`
-- `Historia`
-- `Ingles`
-- `Lingua Portuguesa`
-- `Matematica`
-- `Quimica`
-- `Redacao`
-- `Sociologia`
-
-Aliases aceitos e normalizados automaticamente:
-
-- `Portugues` vira `Lingua Portuguesa`
-- `Lingua Inglesa` vira `Ingles`
-- `Ed Fisica` vira `Educacao Fisica`
-- `Mat` vira `Matematica`
-
-## Compatibilidade atual e futura da senha
-
-Hoje o sistema endurece a coluna `senha` sem alterar o schema da planilha. Se um usuario ainda estiver com senha em texto simples, o sistema converte esse valor para bcrypt no primeiro login valido ou na troca obrigatoria de senha.
-
-Isso preserva a estrutura atual sem manter o fallback inseguro em operacao normal.
-
-## Rotas de autenticacao
+## Rotas principais
 
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
@@ -158,31 +59,10 @@ Isso preserva a estrutura atual sem manter o fallback inseguro em operacao norma
 - `GET /api/app-data`
 - `PUT /api/app-data`
 
-As areas `/dashboard`, `/admin` e `/painel` exigem autenticacao. Quando `trocar_senha = SIM`, o usuario so pode seguir para `/trocar-senha` ate concluir a atualizacao. Rotas privilegiadas tambem respeitam o `perfil` da planilha.
+## Checklist de deploy
 
-## Deploy no Vercel
-
-1. Suba este repositorio para o GitHub.
-2. Importe o projeto no Vercel.
-3. Configure as variaveis de ambiente do login antes do deploy.
-4. Compartilhe a planilha com o email da service account como editor.
-5. Se quiser OCR depois, adicione a variavel correspondente e faca novo deploy.
-
-## Estrutura
-
-- `app/`: rotas e paginas
-- `components/`: shell, UI e areas operacionais
-- `lib/`: estado base, utilitarios e autenticacao
-- `services/`: integracoes opcionais e acesso ao Google Sheets
-- `types/`: contratos de dominio
-
-## Checklist antes de subir
-
-- Verifique se `.env*` continua fora do commit
-- Rode `npm run lint`
-- Rode `npm run build`
-- Teste `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout` e `POST /api/auth/password`
-- Teste `GET /api/app-data` e `PUT /api/app-data`
-- Confirme que a aba `usuarios` tem exatamente as colunas esperadas
-- Confirme que as abas operacionais (`turmas`, `alunos`, `provas`, `gabaritos`, `regras_correcao`, `correcoes`, `provascan_config`) foram criadas ou inicializadas
-- Abra o app e teste login normal, login inativo e fluxo de troca obrigatoria
+1. Aplique todas as migrations no Supabase.
+2. Configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_SECRET` e `MFA_ENCRYPTION_KEY` no Vercel.
+3. Configure Redis e `MFA_REQUIRED=true` para produção.
+4. Execute `npm run lint` e `npm run build`.
+5. Teste login, carga de `/api/app-data` e a criação de uma prova.
