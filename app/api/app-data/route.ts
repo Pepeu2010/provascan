@@ -31,7 +31,9 @@ const appDataSchema = z.object({
   corrections: z.array(z.unknown()).max(20000),
   exams: z.array(examSchema).max(1000),
   students: z.array(studentSchema).max(10000),
-  teacherProfile: z.object({ nome: text, email: z.string().email().max(256), escola: text }).strict(),
+  // O campo é usado como identificador de acesso do responsável. A base
+  // legada permite logins como "admin" e "guilherme", que não são e-mails.
+  teacherProfile: z.object({ nome: text, email: text.max(256), escola: text }).strict(),
 }).strict();
 
 async function validateRequestSession() {
