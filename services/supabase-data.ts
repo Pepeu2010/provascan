@@ -18,6 +18,12 @@ export class SupabaseConfigError extends Error {}
 export class SupabaseConnectionError extends Error {}
 export class SupabaseSchemaError extends Error {}
 
+export type PersistentRateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  resetAt: number;
+};
+
 function client() {
   const parsed = envSchema.safeParse({ SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY });
   if (!parsed.success) throw new SupabaseConfigError("Supabase não configurado.");
@@ -74,6 +80,36 @@ export async function getUserByEmail(access: string) {
   const { data, error } = await client().from("app_users").select("*").eq("access_key", access.trim().toLowerCase()).maybeSingle();
   dbError(error);
   return data ? mapUser(data as DbUser) : null;
+}
+
+/**
+ * Uses Postgres for rate limiting when an external Redis service is not
+ * configured. The RPC increments atomically, so concurrent serverless
+ * requests cannot bypass the configured window.
+ */
+export async function consumePersistentRateLimit(input: {
+  bucket: string;
+  key: string;
+  limit: number;
+  windowMs: number;
+}): Promise<PersistentRateLimitResult> {
+  const { data, error } = await client()
+    .rpc("consume_request_rate_limit", {
+      p_bucket: input.bucket,
+      p_key: input.key,
+      p_limit: input.limit,
+      p_window_seconds: Math.max(1, Math.ceil(input.windowMs / 1000)),
+    })
+    .single();
+  dbError(error);
+
+  const row = data as { allowed?: unknown; remaining?: unknown; reset_at?: unknown } | null;
+  const resetAt = Date.parse(String(row?.reset_at ?? ""));
+  if (!row || typeof row.allowed !== "boolean" || !Number.isFinite(Number(row.remaining)) || !Number.isFinite(resetAt)) {
+    throw new SupabaseSchemaError("Resposta invÃ¡lida do limitador persistente.");
+  }
+
+  return { allowed: row.allowed, remaining: Number(row.remaining), resetAt };
 }
 export const getUserByAccess = getUserByEmail;
 export const getUserAuthState = getUserByEmail;
