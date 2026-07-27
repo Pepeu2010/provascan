@@ -91,7 +91,7 @@ type PreprocessResult = {
 };
 
 export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) {
-  const { data, saveCorrection } = useAppData();
+  const { data, saveCorrection, syncStatus } = useAppData();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const cancelProcessingRef = useRef(false);
@@ -937,7 +937,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             </FieldLabel>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" onClick={confirmCorrection}>
+              <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
                 Confirmar correção
               </Button>

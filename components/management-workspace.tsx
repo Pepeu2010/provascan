@@ -168,6 +168,7 @@ export function ClassesManager() {
       </div>
       <div className="mt-4 flex flex-wrap gap-3">
         <Button
+          loading={syncStatus === "saving"}
           onClick={() => {
             if (!form.nome.trim()) return;
             void (async () => {
@@ -277,6 +278,7 @@ export function StudentsManager() {
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <Button
+          loading={syncStatus === "saving"}
           onClick={() => {
             if (!student.nome.trim() || !student.matricula.trim() || !student.turma) return;
             void (async () => {
@@ -552,6 +554,7 @@ export function ExamsManager() {
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
             <Button
+              loading={syncStatus === "saving"}
               onClick={() => {
               if (!form.titulo.trim() || !selectedAudienceId) return;
               const audience = audienceOptions.find((item) => item.id === selectedAudienceId);
@@ -703,6 +706,7 @@ export function ExamsManager() {
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
               <Button
+                loading={syncStatus === "saving"}
                 onClick={() => {
                   void (async () => {
                     const result = await saveCorrectionRule({
@@ -937,6 +941,7 @@ export function AnswerKeyEditor() {
 
       <div className="mt-6 flex flex-wrap gap-3">
         <Button
+          loading={syncStatus === "saving"}
           onClick={() => {
             void (async () => {
               const result = await saveAnswerKey(exam.id, answers);
@@ -1263,6 +1268,7 @@ export function SettingsWorkspace() {
           </Button>
           <Button
             variant="ghost"
+            loading={syncStatus === "saving"}
             onClick={() => {
               void (async () => {
                 const result = await resetData();
@@ -1285,7 +1291,7 @@ export function SettingsWorkspace() {
           placeholder="Cole aqui o JSON de backup do ProvaScan."
         />
         <div className="mt-4 flex flex-wrap gap-3">
-          <Button onClick={() => void (async () => setMessage((await importData(payload)).message))()}>
+          <Button loading={syncStatus === "saving"} onClick={() => void (async () => setMessage((await importData(payload)).message))()}>
             <FileUp className="size-4" />
             Importar backup
           </Button>

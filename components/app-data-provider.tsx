@@ -253,6 +253,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncError, setSyncError] = useState("");
   const hasLoadedRemoteDataRef = useRef(false);
+  const isPersistingRef = useRef(false);
   const lastSyncedPayloadRef = useRef("");
   const revisionRef = useRef("0");
 
@@ -348,10 +349,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppDataContextValue>(() => {
     const persistAppData = async (nextData: AppDataState, successMessage: string): Promise<MutationResult> => {
+      if (isPersistingRef.current) {
+        return { ok: false, message: "Um salvamento já está em andamento. Aguarde a conclusão." };
+      }
       if (!session || !hasLoadedRemoteDataRef.current) {
         return { ok: false, message: "A sessão ainda não terminou de carregar os dados remotos." };
       }
 
+      isPersistingRef.current = true;
       setSyncStatus("saving");
       setSyncError("");
 
@@ -391,6 +396,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         setSyncStatus("error");
         setSyncError(message);
         return { ok: false, message };
+      } finally {
+        isPersistingRef.current = false;
       }
     };
 

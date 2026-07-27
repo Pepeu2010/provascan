@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { LoaderCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -35,10 +36,11 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ asChild = false, className, variant, size, children, ...props }, ref) => {
+  ({ asChild = false, className, variant, size, children, loading = false, disabled, ...props }, ref) => {
     const classes = cn(buttonVariants({ variant, size }), className);
     if (asChild && React.isValidElement<{ className?: string }>(children)) {
       return React.cloneElement(children, {
@@ -46,7 +48,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       });
     }
 
-    return <button className={classes} ref={ref} {...props}>{children}</button>;
+    return (
+      <button aria-busy={loading || undefined} className={classes} disabled={disabled || loading} ref={ref} {...props}>
+        {loading ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}
+        {children}
+      </button>
+    );
   },
 );
 Button.displayName = "Button";
