@@ -94,6 +94,11 @@ export async function POST(request: Request) {
     applyPreAuthCookie(response, token);
     return response;
   } catch (error) {
+    console.error("Login request failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+
     if (error instanceof z.ZodError) {
       return invalidCredentialsResponse(400);
     }
