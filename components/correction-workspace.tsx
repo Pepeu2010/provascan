@@ -264,6 +264,12 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         expectedTemplateId: exam.templateVersion,
       });
 
+      if (omrAnalysis.totalQuestions !== answerKey.length) {
+        throw new Error(
+          `O cartão identificado possui ${omrAnalysis.totalQuestions} questões, mas o gabarito selecionado possui ${answerKey.length}. Selecione ou cadastre o gabarito com a mesma quantidade antes de corrigir.`,
+        );
+      }
+
       const detectedAnswers = omrAnalysis.answers.slice(0, answerKey.length).map((item) => ({
         ...item,
         correctAnswer: answerKey.find((answer) => answer.questao === item.question)?.respostaCorreta ?? exam.alternativas[0] ?? "A",
@@ -1396,7 +1402,7 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
 
   if (shouldRotate) {
     baseContext.translate(width / 2, height / 2);
-    baseContext.rotate(-Math.PI / 2);
+    baseContext.rotate(Math.PI / 2);
     baseContext.drawImage(image, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight);
     baseContext.setTransform(1, 0, 0, 1, 0, 0);
   } else {

@@ -217,13 +217,6 @@ export async function analyzeAnswerSheetCanvas(params: {
   }
 
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-  // PS-CARD é o cartão impresso pelo próprio ProvaScan. Sua geometria é linear e
-  // depende diretamente do número de questões, então nunca deve cair nos modelos
-  // legados de blocos por matéria.
-  if (isProvaScanCard(expectedTemplateId)) {
-    return analyzeProvaScanCard({ alternatives, answerKeyLength, imageData });
-  }
-
   const headerCanvas = cropCanvas(canvas, {
     height: Math.round(canvas.height * HEADER_CROP.height),
     width: Math.round(canvas.width * HEADER_CROP.width),
@@ -247,6 +240,13 @@ export async function analyzeAnswerSheetCanvas(params: {
     expectedTemplateId,
     headerText,
   });
+
+  // A prova pode estar cadastrada como PS-CARD e, ainda assim, o professor
+  // enviar uma folha externa da escola. Só substituímos a geometria linear
+  // quando o cabeçalho identifica inequivocamente um modelo por matérias.
+  if (isProvaScanCard(expectedTemplateId) && !isExternalSchoolAnswerSheet(headerText)) {
+    return analyzeProvaScanCard({ alternatives, answerKeyLength, imageData });
+  }
 
   const answers: BubbleAnswerDetection[] = [];
   const blockAudits: AnswerSheetBlockAudit[] = [];
@@ -353,6 +353,11 @@ function analyzeProvaScanCard(params: {
 
 function isProvaScanCard(templateId?: string) {
   return normalizeTemplateToken(templateId ?? "").startsWith("pscard");
+}
+
+function isExternalSchoolAnswerSheet(headerText: string) {
+  const normalized = normalizeText(headerText);
+  return ["humanas", "exatas", "tecnico"].some((marker) => normalized.includes(marker));
 }
 
 export function resolveIdentityFromQr(params: {
