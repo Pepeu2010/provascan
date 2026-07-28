@@ -24,19 +24,27 @@ export function getQuestionLayout(questionCount: number, alternatives: string[])
   const y = answerArea.y * page.height;
   const width = answerArea.width * page.width;
   const height = answerArea.height * page.height;
-  const rowHeight = height / Math.max(questionCount, 1);
-  const numberColumnWidth = Math.max(54, width * 0.12);
-  const bubbleTrackWidth = width - numberColumnWidth - 20;
+  const columnCount = questionCount > 30 ? 3 : questionCount > 15 ? 2 : 1;
+  const columnGap = columnCount > 1 ? 20 : 0;
+  const columnWidth = (width - columnGap * (columnCount - 1)) / columnCount;
+  const rowsPerColumn = Math.ceil(questionCount / columnCount);
+  const rowHeight = height / Math.max(rowsPerColumn, 1);
+  const numberColumnWidth = Math.max(32, Math.min(54, columnWidth * 0.18));
+  const bubbleTrackWidth = columnWidth - numberColumnWidth - 12;
   const bubbleGap = bubbleTrackWidth / Math.max(alternatives.length, 1);
-  const bubbleRadius = Math.min(15, rowHeight * 0.22, bubbleGap * 0.18);
+  const bubbleRadius = Math.min(15, rowHeight * 0.26, bubbleGap * 0.24);
 
   return {
     bubbleGap,
     bubbleRadius,
     bubbleTrackWidth,
+    columnCount,
+    columnGap,
+    columnWidth,
     height,
     numberColumnWidth,
     rowHeight,
+    rowsPerColumn,
     width,
     x,
     y,
@@ -54,11 +62,14 @@ export function getBubbleBounds(params: {
   const scaleX = canvasWidth / ANSWER_SHEET_TEMPLATE.page.width;
   const scaleY = canvasHeight / ANSWER_SHEET_TEMPLATE.page.height;
   const layout = getQuestionLayout(questionCount, alternatives);
-  const rowTop = layout.y + layout.rowHeight * questionIndex;
+  const columnIndex = Math.floor(questionIndex / layout.rowsPerColumn);
+  const rowIndex = questionIndex % layout.rowsPerColumn;
+  const columnLeft = layout.x + columnIndex * (layout.columnWidth + layout.columnGap);
+  const rowTop = layout.y + layout.rowHeight * rowIndex;
   const cy = rowTop + layout.rowHeight / 2;
 
   return alternatives.map((alternative, index) => {
-    const cx = layout.x + layout.numberColumnWidth + layout.bubbleGap * index + layout.bubbleGap / 2;
+    const cx = columnLeft + layout.numberColumnWidth + layout.bubbleGap * index + layout.bubbleGap / 2;
 
     return {
       alternative,

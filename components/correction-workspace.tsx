@@ -206,7 +206,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
     try {
       await waitWithCancel(120, cancelProcessingRef);
-      const preprocessing = await preprocessImage(fileToProcess);
+      const preprocessing = await preprocessImage(fileToProcess, {
+        preserveCardGeometry: isProvaScanCardTemplate(exam.templateVersion),
+      });
       if (cancelProcessingRef.current) {
         throw new Error("Processamento cancelado.");
       }
@@ -471,20 +473,20 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   };
 
   return (
-    <div className="correction-workspace grid gap-5 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
-      <Card className="correction-workspace__control p-5 sm:p-6">
+    <div className="correction-workspace grid gap-5 2xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.65fr)]">
+      <Card className="correction-workspace__control border-[var(--border-strong)] p-5 sm:p-6">
         <div className={cn("grid gap-5", compact ? "" : "")}>
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
               <ScanSearch className="size-4 text-[var(--accent)]" />
-              Leitura rápida
+              1. Envie o cartão
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              Escolha a prova e fotografe. A leitura começa sozinha; a conferência continua obrigatória antes de salvar.
+              Escolha a prova e envie a foto. A leitura começa sozinha e você só confere o que estiver sinalizado.
             </p>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <FieldLabel label="Prova para corrigir">
               <Select
                 value={examId}
@@ -527,9 +529,16 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Select>
             </FieldLabel>
 
-            <FieldLabel label="Aluno, caso o cartão não seja identificado">
+          </div>
+
+          <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">
+              Aluno de apoio, se o cartão não for identificado
+            </summary>
+            <div className="mt-3">
               <Select
                 value={activePreferredStudentId}
+                aria-label="Aluno de apoio"
                 onChange={(event) => setPreferredStudentId(event.target.value)}
               >
                 {studentsForSelectedClass.map((item) => (
@@ -538,10 +547,17 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   </option>
                 ))}
               </Select>
-            </FieldLabel>
-          </div>
+            </div>
+          </details>
 
-          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-4 sm:p-5">
+          <div className="rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-[var(--foreground)]">Gabarito da prova</p>
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">{answerKey.length} questões para leitura</p>
+              </div>
+              <Badge tone="accent">Automático</Badge>
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button size="lg" className="min-h-12 flex-1" onClick={() => cameraInputRef.current?.click()}>
                 <Camera className="size-4" />
@@ -558,7 +574,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Button>
             </div>
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
-              Aceita JPG, PNG, WebP e PDF até 12 MB. A rotação, o recorte e o contraste são ajustados automaticamente.
+              Aceita JPG, PNG, WebP e PDF até 12 MB. A rotação e o contraste são ajustados automaticamente.
             </p>
           </div>
 
@@ -584,23 +600,21 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             }}
           />
 
-          <ImagePreviewCard
-            fileName={selectedFile?.name ?? "Nenhuma imagem enviada"}
-            phase={phase}
-            processedPreviewUrl={processedPreviewUrl}
-            rawPreviewUrl={rawPreviewUrl}
-            zoom={previewZoom}
-            onZoomChange={setPreviewZoom}
-          />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MetricCard label="Público" value={exam.audienceLabel} helper="base atual da prova" />
-            <MetricCard
-              label="Questões"
-              value={String(answerKey.length)}
-              helper="alternativas A, B, C, D e E"
-            />
-          </div>
+          {selectedFile ? (
+            <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4" open={phase === "processing"}>
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver imagem e tratamento</summary>
+              <div className="mt-4">
+                <ImagePreviewCard
+                  fileName={selectedFile.name}
+                  phase={phase}
+                  processedPreviewUrl={processedPreviewUrl}
+                  rawPreviewUrl={rawPreviewUrl}
+                  zoom={previewZoom}
+                  onZoomChange={setPreviewZoom}
+                />
+              </div>
+            </details>
+          ) : null}
 
           <div className="grid gap-3">
             <Button
@@ -612,7 +626,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               disabled={!selectedFile || phase === "processing"}
             >
               {phase === "processing" ? <LoaderCircle className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
-              {phase === "processing" ? "Lendo cartão..." : "Ler novamente"}
+              {phase === "processing" ? "Lendo cartão..." : selectedFile ? "Ler novamente" : "Aguardando imagem"}
             </Button>
             <div className="grid gap-3 sm:grid-cols-2">
               <Button
@@ -673,10 +687,10 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="grid gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">Revisão manual obrigatória</p>
-                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Confira somente o necessário</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">2. Revise antes de salvar</p>
+                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Corrija somente as exceções</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-                  A leitura preenche o cartão. Confirme a identidade e ajuste as respostas sinalizadas antes de salvar.
+                  A leitura já preencheu o cartão. Confirme o aluno e toque apenas nas respostas que precisam de ajuste.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -695,17 +709,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 <Badge tone={review.confidence >= MIN_CONFIDENCE_REVIEW ? "accent" : "warning"}>
                   {review.confidence}% de confiança
                 </Badge>
-                <Badge tone="neutral">{review.templateId}</Badge>
-                <Badge tone="neutral">{review.pageType}</Badge>
-                <Badge tone="neutral">{review.processingLabel}</Badge>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-3">
               <MetricCard label="Acertos" value={String(summary.acertos)} helper="comparado com o gabarito" />
-              <MetricCard label="Erros" value={String(summary.erros)} helper="pedem conferência" />
               <MetricCard label="Percentual" value={`${summary.percentual}%`} helper="resultado atual" />
-              <MetricCard label="Baixa confiança" value={String(summary.revisao)} helper="marcados para revisar" />
+              <MetricCard label="Para revisar" value={String(summary.revisao)} helper="marcados pelo sistema" />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -751,8 +761,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <p className="text-sm font-semibold text-[var(--foreground)]">Qualidade da leitura</p>
+              <details className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Detalhes técnicos da leitura</summary>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <InfoPanel label="Orientacao" value={review.qualitySummary.orientation} />
                   <InfoPanel label="Brilho" value={review.qualitySummary.brightness} />
@@ -777,7 +787,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                     </li>
                   ))}
                 </ul>
-              </Card>
+              </details>
             </div>
 
             <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3">
@@ -977,10 +987,10 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               />
             </FieldLabel>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sticky bottom-3 z-10 grid gap-3 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)] sm:grid-cols-2">
               <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
-                Salvar correção
+                3. Salvar correção
               </Button>
               <Button
                 size="lg"
@@ -1007,23 +1017,21 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
 function EmptyReviewState() {
   return (
-    <div className="flex min-h-[520px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] px-6 py-10 text-center">
+    <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] px-6 py-10 text-center">
       <div className="grid size-16 place-items-center rounded-3xl bg-[var(--accent-soft)] text-[var(--accent)]">
         <FileImage className="size-7" />
       </div>
-      <h3 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">Tela específica de correção por foto</h3>
+      <h3 className="mt-5 text-2xl font-semibold text-[var(--foreground)]">Pronto para corrigir</h3>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">
-        Envie uma foto, visualize o pré-processamento, acompanhe o OCR por etapas e faça a revisão manual obrigatória
-        antes de salvar. O layout se adapta de 360px até telas grandes sem estourar a imagem.
+        Envie um cartão à esquerda. O sistema lê as respostas e abre somente o que precisa da sua conferência.
       </p>
-      <div className="mt-6 grid w-full max-w-3xl gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 flex flex-wrap justify-center gap-2 text-sm font-medium text-[var(--muted-foreground)]">
         {[
-          "Preview responsivo sem sobreposicao",
-          "Camera no celular e upload no desktop",
-          "Revisão manual de nome, matrícula e respostas",
-          "Resultado em cards no mobile e grade no desktop",
+          "1. Enviar",
+          "2. Revisar exceções",
+          "3. Salvar",
         ].map((item) => (
-          <div key={item} className="rounded-[22px] border border-[var(--border)] bg-[var(--card)] px-4 py-4 text-sm text-[var(--foreground)]">
+          <div key={item} className="rounded-full border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-[var(--foreground)]">
             {item}
           </div>
         ))}
@@ -1381,7 +1389,10 @@ async function waitWithCancel(duration: number, cancelRef: React.MutableRefObjec
   });
 }
 
-async function preprocessImage(file: File): Promise<PreprocessResult> {
+async function preprocessImage(
+  file: File,
+  { preserveCardGeometry = false }: { preserveCardGeometry?: boolean } = {},
+): Promise<PreprocessResult> {
   const image = await loadRenderableSource(file);
   const maxSide = Math.max(image.width, image.height);
   const scale = maxSide > 1600 ? 1600 / maxSide : 1;
@@ -1411,7 +1422,10 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
   const sourceImage = baseContext.getImageData(0, 0, width, height);
   const luminanceStats = getLuminanceStats(sourceImage.data);
   const adjusted = applyAdjustments(sourceImage, luminanceStats.average, luminanceStats.deviation);
-  const cropBounds = detectCropBounds(adjusted.data, width, height);
+  // PS-CARD uses fixed relative bubble coordinates. Cropping the page without
+  // reprojecting those coordinates shifts every reading, so its full geometry
+  // must remain intact. Generic answer sheets may still use automatic crop.
+  const cropBounds = preserveCardGeometry ? null : detectCropBounds(adjusted.data, width, height);
 
   let targetCanvas = baseCanvas;
   let cropApplied = false;
@@ -1456,6 +1470,9 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
   const shadowRisk = luminanceStats.deviation > 68;
   const confidencePenalty = (lowLight ? 18 : 0) + (shadowRisk ? 10 : 0) + (cropApplied ? 0 : 4);
   const confidenceBase = Math.max(48, 95 - confidencePenalty);
+  const processedLabel = preserveCardGeometry
+    ? "A geometria completa do cartão foi preservada para manter as marcações alinhadas. Brilho, contraste e binarização foram aplicados."
+    : "Escala de cinza, contraste, binarização, redução de ruído e rotação automática, quando necessária, foram aplicados.";
 
   return {
     compressedBytes: blob.size,
@@ -1467,11 +1484,14 @@ async function preprocessImage(file: File): Promise<PreprocessResult> {
     orientation: shouldRotate ? "Vertical corrigida" : targetCanvas.width >= targetCanvas.height ? "Horizontal" : "Vertical",
     processedCanvas: targetCanvas,
     previewUrl: targetCanvas.toDataURL("image/jpeg", 0.88),
-    processedLabel:
-      "Escala de cinza, contraste, binarização, redução de ruído e rotação automática, quando necessária, foram aplicados.",
+    processedLabel,
     shadowRisk,
     width: targetCanvas.width,
   };
+}
+
+function isProvaScanCardTemplate(templateVersion?: string) {
+  return (templateVersion ?? "").trim().toUpperCase().startsWith("PS-CARD");
 }
 
 async function loadRenderableSource(file: File) {

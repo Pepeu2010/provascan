@@ -97,10 +97,10 @@ function openPrintWindow(title: string, body: string) {
           .qr-block { position: absolute; right: 40px; top: 124px; width: 124px; text-align: center; }
           .qr-block img { width: 124px; height: 124px; display: block; margin-bottom: 8px; }
           .questions { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height)}px; width: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.width * ANSWER_SHEET_TEMPLATE.page.width)}px; height: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.height * ANSWER_SHEET_TEMPLATE.page.height)}px; }
-          .question { position: absolute; left: 0; right: 0; display: grid; align-items: center; }
-          .question-number { font-weight: 700; font-size: 15px; }
+          .question { position: absolute; display: grid; align-items: center; }
+          .question-number { font-weight: 700; font-size: 13px; }
           .bubble-track { display: grid; gap: 0; }
-          .bubble { width: 22px; height: 22px; border: 1.5px solid #111827; border-radius: 999px; display: inline-block; justify-self: center; }
+          .bubble { width: var(--bubble-size, 22px); height: var(--bubble-size, 22px); border: 1.5px solid #111827; border-radius: 999px; display: inline-block; justify-self: center; }
           .footer { position: absolute; left: 32px; right: 32px; bottom: 74px; display: grid; gap: 10px; font-size: 12px; }
           .signature { margin-top: 20px; border-top: 1px solid #111827; width: 280px; padding-top: 8px; font-size: 12px; }
         </style>
@@ -459,7 +459,7 @@ export function ExamsManager() {
             })
           : "";
         const layout = getQuestionLayout(item.questionNumbers.length, activeExam.alternativas);
-        const bubbleTemplateColumns = `42px repeat(${Math.max(1, activeExam.alternativas.length)}, 1fr)`;
+        const bubbleTemplateColumns = `${Math.round(layout.numberColumnWidth)}px repeat(${Math.max(1, activeExam.alternativas.length)}, 1fr)`;
 
         return `
           <section class="sheet">
@@ -489,12 +489,16 @@ export function ExamsManager() {
             <div class="questions">
               ${item.questionNumbers
                 .map(
-                  (question, index) => `
-                    <div class="question" style="top:${Math.round(layout.rowHeight * index)}px;height:${Math.round(layout.rowHeight)}px;grid-template-columns:${bubbleTemplateColumns};">
+                  (question, index) => {
+                    const columnIndex = Math.floor(index / layout.rowsPerColumn);
+                    const rowIndex = index % layout.rowsPerColumn;
+                    return `
+                    <div class="question" style="left:${Math.round(columnIndex * (layout.columnWidth + layout.columnGap))}px;top:${Math.round(layout.rowHeight * rowIndex)}px;width:${Math.round(layout.columnWidth)}px;height:${Math.round(layout.rowHeight)}px;grid-template-columns:${bubbleTemplateColumns};--bubble-size:${Math.max(14, Math.round(layout.bubbleRadius * 2))}px;">
                       <strong class="question-number">${question}</strong>
                       ${activeExam.alternativas.map(() => `<span class="bubble"></span>`).join("")}
                     </div>
-                  `,
+                  `;
+                  },
                 )
                 .join("")}
             </div>
