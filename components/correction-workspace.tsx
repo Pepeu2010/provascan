@@ -97,6 +97,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const cancelProcessingRef = useRef(false);
 
   const [examId, setExamId] = useState(data.exams[0]?.id ?? "");
+  const [classId, setClassId] = useState("");
   const [preferredStudentId, setPreferredStudentId] = useState(data.students[0]?.id ?? "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [rawPreviewUrl, setRawPreviewUrl] = useState("");
@@ -124,8 +125,20 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     return scoped.length ? scoped : data.students;
   }, [data.classes, data.students, exam]);
 
+  const classesForExam = useMemo(
+    () => data.classes.filter((classRoom) => studentsForExam.some((student) => student.turma === classRoom.id)),
+    [data.classes, studentsForExam],
+  );
+  const activeClassId = classesForExam.some((classRoom) => classRoom.id === classId)
+    ? classId
+    : classesForExam[0]?.id ?? "";
+  const studentsForSelectedClass = useMemo(() => {
+    const filtered = studentsForExam.filter((student) => student.turma === activeClassId);
+    return filtered.length ? filtered : studentsForExam;
+  }, [activeClassId, studentsForExam]);
+
   const activePreferredStudentId =
-    studentsForExam.find((item) => item.id === preferredStudentId)?.id ?? studentsForExam[0]?.id ?? "";
+    studentsForSelectedClass.find((item) => item.id === preferredStudentId)?.id ?? studentsForSelectedClass[0]?.id ?? "";
 
   const visibleAnswers = useMemo(() => {
     if (!review) {
@@ -168,8 +181,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const selectedReviewStudent =
     studentsForExam.find((item) => item.id === review?.matchedStudentId) ??
     data.students.find((item) => item.id === review?.matchedStudentId) ??
-    studentsForExam.find((item) => item.id === preferredStudentId) ??
-    studentsForExam[0];
+    studentsForSelectedClass.find((item) => item.id === preferredStudentId) ??
+    studentsForSelectedClass[0];
 
   const processSelectedImage = async (fileToProcess = selectedFile) => {
     if (!fileToProcess) {
@@ -476,6 +489,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                     ? getStudentsForExam(nextExam, data.students, data.classes)
                     : data.students;
                   setExamId(nextExamId);
+                  setClassId((nextStudents[0] ?? data.students[0])?.turma ?? "");
                   setPreferredStudentId((nextStudents[0] ?? data.students[0])?.id ?? "");
                   setReview(null);
                   setScreenMessage("");
@@ -489,12 +503,30 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Select>
             </FieldLabel>
 
+            <FieldLabel label="Filtrar por turma">
+              <Select
+                value={activeClassId}
+                onChange={(event) => {
+                  const nextClassId = event.target.value;
+                  const nextStudent = studentsForExam.find((student) => student.turma === nextClassId);
+                  setClassId(nextClassId);
+                  setPreferredStudentId(nextStudent?.id ?? "");
+                }}
+              >
+                {classesForExam.map((classRoom) => (
+                  <option key={classRoom.id} value={classRoom.id}>
+                    {classRoom.nome}
+                  </option>
+                ))}
+              </Select>
+            </FieldLabel>
+
             <FieldLabel label="Aluno, caso o cartão não seja identificado">
               <Select
                 value={activePreferredStudentId}
                 onChange={(event) => setPreferredStudentId(event.target.value)}
               >
-                {studentsForExam.map((item) => (
+                {studentsForSelectedClass.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.nome}
                   </option>
@@ -703,7 +735,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                         )
                       }
                     >
-                      {studentsForExam.map((item) => (
+                      {studentsForSelectedClass.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.nome} - {item.matricula}
                         </option>
