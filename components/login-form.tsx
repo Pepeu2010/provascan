@@ -46,23 +46,23 @@ export function LoginForm() {
         <div className="w-full max-w-[480px]">
           <Card className="p-5 sm:p-7">
             <ProvaScanLogo size="md" />
-            <div className="mt-8 border-t border-[var(--border)] pt-6">
+            <div className="mt-6 border-t border-[var(--border)] pt-5 sm:mt-8 sm:pt-6">
               <p className="text-sm text-[var(--muted-foreground)]">Acesso do professor</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-[-.045em] text-[var(--foreground)]">Entre no seu espaço de trabalho</h1>
+              <h1 className="mt-2 text-2xl font-semibold tracking-[-.045em] text-[var(--foreground)] sm:text-3xl">Entre no seu espaço de trabalho</h1>
               <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">Use suas credenciais para continuar de onde parou.</p>
             </div>
 
             {securityFlow ? <AuthSecurityFlow onComplete={() => navigateAfterAuth("/dashboard")} /> : (
-              <form className="mt-7 grid gap-5" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
+              <form className="mt-6 grid gap-4 sm:mt-7 sm:gap-5" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
                 <AuthField icon={<Mail className="size-4" />} label="Nome de acesso" type="text" autoComplete="username" placeholder="Digite seu acesso" value={email} onChange={setEmail} />
                 <AuthField icon={<KeyRound className="size-4" />} label="Senha" type="password" autoComplete="current-password" placeholder="Digite sua senha" value={password} onChange={setPassword} />
-                <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between"><Checkbox checked={remember} onChange={(event) => setRemember(event.target.checked)} label="Manter acesso neste dispositivo" /><button type="button" onClick={() => setShowRecovery((previous) => !previous)} className="text-left font-medium text-[var(--accent)] hover:text-[var(--accent-strong)]">Ajuda com a senha</button></div>
+                <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between"><Checkbox checked={remember} onChange={(event) => setRemember(event.target.checked)} label="Lembrar este dispositivo por 30 dias" /><button type="button" onClick={() => setShowRecovery((previous) => !previous)} className="text-left font-medium text-[var(--accent)] hover:text-[var(--accent-strong)]">Ajuda com a senha</button></div>
                 <Button size="lg" className="mt-1 w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar"}</Button>
               </form>
             )}
 
             {message ? <p role="status" className="mt-5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
-            {showRecovery && !securityFlow ? <div className="mt-5 flex gap-3 border-t border-[var(--border)] pt-5"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-[var(--accent)]" /><p className="text-sm leading-6 text-[var(--muted-foreground)]">No primeiro acesso, ou quando a troca for exigida, você definirá uma nova senha antes de abrir o painel.</p></div> : null}
+            {showRecovery && !securityFlow ? <div className="mt-5 flex gap-3 border-t border-[var(--border)] pt-5"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-[var(--accent)]" /><p className="text-sm leading-6 text-[var(--muted-foreground)]">O código do autenticador é pedido no primeiro acesso. Em computador pessoal, marque a opção acima para não repetir o login por 30 dias. Não use em máquina compartilhada.</p></div> : null}
           </Card>
           <CreatorCredit variant="inline" className="mt-4" />
         </div>

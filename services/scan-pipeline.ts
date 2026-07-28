@@ -9,6 +9,7 @@ import {
   type BlockLayoutStyle,
   type NormalizedRect,
 } from "@/services/answer-sheet-models";
+import { ANSWER_SHEET_TEMPLATE, getBubbleBounds } from "@/services/answer-sheet-template";
 import { extractIdentityFromImage, extractTextFromImage } from "@/services/ocr";
 import { buildIdentificationCode } from "@/services/exam-correction";
 import type { Exam, Student } from "@/types/domain";
@@ -204,17 +205,25 @@ export async function detectIdentityWithOcr(params: {
 }
 
 export async function analyzeAnswerSheetCanvas(params: {
+  alternatives?: string[];
   answerKeyLength?: number;
   canvas: HTMLCanvasElement;
   expectedTemplateId?: string;
 }) {
-  const { answerKeyLength, canvas, expectedTemplateId } = params;
+  const { alternatives = ["A", "B", "C", "D", "E"], answerKeyLength, canvas, expectedTemplateId } = params;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) {
     throw new Error("Não foi possível analisar as marcações da imagem.");
   }
 
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  // PS-CARD é o cartão impresso pelo próprio ProvaScan. Sua geometria é linear e
+  // depende diretamente do número de questões, então nunca deve cair nos modelos
+  // legados de blocos por matéria.
+  if (isProvaScanCard(expectedTemplateId)) {
+    return analyzeProvaScanCard({ alternatives, answerKeyLength, imageData });
+  }
+
   const headerCanvas = cropCanvas(canvas, {
     height: Math.round(canvas.height * HEADER_CROP.height),
     width: Math.round(canvas.width * HEADER_CROP.width),
@@ -246,7 +255,7 @@ export async function analyzeAnswerSheetCanvas(params: {
   for (const block of selectedModel.model.blocks) {
     const rect = fitRectToBorder(imageData, block.searchWindow);
     const blockAnswers = readBlockAnswers({
-      alternatives: ["A", "B", "C", "D", "E"],
+      alternatives,
       block,
       imageData,
       layoutStyle: selectedModel.model.layoutStyle,
@@ -280,12 +289,70 @@ export async function analyzeAnswerSheetCanvas(params: {
 }
 
 export async function detectAnswersFromCanvas(params: {
+  alternatives?: string[];
   answerKeyLength?: number;
   canvas: HTMLCanvasElement;
   expectedTemplateId?: string;
 }) {
   const result = await analyzeAnswerSheetCanvas(params);
   return result.answers;
+}
+
+function analyzeProvaScanCard(params: {
+  alternatives: string[];
+  answerKeyLength?: number;
+  imageData: ImageData;
+}) {
+  const { alternatives, answerKeyLength, imageData } = params;
+  if (!answerKeyLength || answerKeyLength < 1) {
+    throw new Error("Informe a quantidade de questões do gabarito antes de ler o cartão.");
+  }
+
+  const answers = Array.from({ length: answerKeyLength }, (_, questionIndex) => {
+    const bounds = getBubbleBounds({
+      alternatives,
+      canvasHeight: imageData.height,
+      canvasWidth: imageData.width,
+      questionCount: answerKeyLength,
+      questionIndex,
+    });
+    const scores = bounds.map((bound) => ({
+      alternative: bound.alternative,
+      score: getBubbleSignal(imageData, bound.cx, bound.cy, bound.radius),
+    }));
+    const decision = classifyBubbleRow(scores);
+    return {
+      blockTitle: "CARTÃO-RESPOSTA",
+      confidence: decision.confidence,
+      markedAnswers: decision.markedAnswers,
+      question: questionIndex + 1,
+      scores,
+      status: decision.status,
+    } satisfies BubbleAnswerDetection;
+  });
+
+  return {
+    answers,
+    blockAudits: [{
+      averageConfidence: average(answers.map((item) => item.confidence)),
+      questionCount: answerKeyLength,
+      questionStart: 1,
+      rect: { height: imageData.height, width: imageData.width, x: 0, y: 0 },
+      title: "CARTÃO-RESPOSTA",
+    }],
+    headerConfidence: 100,
+    headerText: ANSWER_SHEET_TEMPLATE.version,
+    modelConfidence: 100,
+    modelDisplayName: "Cartão-resposta padrão ProvaScan",
+    pageType: "EXATAS_E_HUMANAS" as const,
+    templateId: ANSWER_SHEET_TEMPLATE.version,
+    totalQuestions: answerKeyLength,
+    usedExpectedTemplate: true,
+  } satisfies AnswerSheetAnalysis;
+}
+
+function isProvaScanCard(templateId?: string) {
+  return normalizeTemplateToken(templateId ?? "").startsWith("pscard");
 }
 
 export function resolveIdentityFromQr(params: {

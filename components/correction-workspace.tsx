@@ -171,8 +171,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     studentsForExam.find((item) => item.id === preferredStudentId) ??
     studentsForExam[0];
 
-  const processSelectedImage = async () => {
-    if (!selectedFile) {
+  const processSelectedImage = async (fileToProcess = selectedFile) => {
+    if (!fileToProcess) {
       setErrorMessage("Selecione uma imagem ou PDF antes de iniciar a leitura.");
       setPhase("error");
       return;
@@ -193,7 +193,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
     try {
       await waitWithCancel(120, cancelProcessingRef);
-      const preprocessing = await preprocessImage(selectedFile);
+      const preprocessing = await preprocessImage(fileToProcess);
       if (cancelProcessingRef.current) {
         throw new Error("Processamento cancelado.");
       }
@@ -245,6 +245,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       await waitWithCancel(90, cancelProcessingRef);
 
       const omrAnalysis = await analyzeAnswerSheetCanvas({
+        alternatives: exam.alternativas,
         answerKeyLength: answerKey.length,
         canvas: preprocessing.processedCanvas,
         expectedTemplateId: exam.templateVersion,
@@ -320,6 +321,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       setNotes("Revisão manual obrigatória antes da confirmação final.");
       setPhase("review");
       setPreviewZoom(1);
+      setResultFilter(needsManualReview ? "review" : "wrong");
       setScreenMessage(
         identity.method === "qr"
           ? "QR Code confirmado. Revise os campos abaixo antes de salvar."
@@ -402,7 +404,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
     setSelectedFile(file);
     setRawPreviewUrl(URL.createObjectURL(file));
-    setScreenMessage("Imagem pronta para pré-visualização e processamento.");
+    setScreenMessage("Leitura iniciada automaticamente. Você só revisa o que o sistema sinalizar.");
+    void processSelectedImage(file);
   };
 
   const confirmCorrection = async () => {
@@ -449,16 +452,16 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   };
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(320px,380px)_minmax(0,1fr)]">
-      <Card className="p-5 sm:p-6">
+    <div className="correction-workspace grid gap-5 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+      <Card className="correction-workspace__control p-5 sm:p-6">
         <div className={cn("grid gap-5", compact ? "" : "")}>
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
               <ScanSearch className="size-4 text-[var(--accent)]" />
-              Scanner OMR responsivo
+              Leitura rápida
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              No celular, priorize a câmera. No desktop, envie imagem ou PDF e revise a página processada antes de confirmar.
+              Escolha a prova e fotografe. A leitura começa sozinha; a conferência continua obrigatória antes de salvar.
             </p>
           </div>
 
@@ -486,7 +489,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Select>
             </FieldLabel>
 
-            <FieldLabel label="Aluno preferencial para busca">
+            <FieldLabel label="Aluno, caso o cartão não seja identificado">
               <Select
                 value={activePreferredStudentId}
                 onChange={(event) => setPreferredStudentId(event.target.value)}
@@ -500,7 +503,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             </FieldLabel>
           </div>
 
-          <div className="rounded-[28px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] p-4 sm:p-5">
+          <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button size="lg" className="min-h-12 flex-1" onClick={() => cameraInputRef.current?.click()}>
                 <Camera className="size-4" />
@@ -517,7 +520,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Button>
             </div>
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
-              Aceita JPG, PNG, WebP e PDF até 12 MB. Fotos horizontais, verticais e PDFs de uma página são ajustados automaticamente.
+              Aceita JPG, PNG, WebP e PDF até 12 MB. A rotação, o recorte e o contraste são ajustados automaticamente.
             </p>
           </div>
 
@@ -571,7 +574,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               disabled={!selectedFile || phase === "processing"}
             >
               {phase === "processing" ? <LoaderCircle className="size-4 animate-spin" /> : <WandSparkles className="size-4" />}
-              Ler QR + OMR
+              {phase === "processing" ? "Lendo cartão..." : "Ler novamente"}
             </Button>
             <div className="grid gap-3 sm:grid-cols-2">
               <Button
@@ -581,7 +584,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 onClick={startManualReview}
               >
                 <UserRoundSearch className="size-4" />
-                Preencher manualmente
+                Corrigir sem leitura
               </Button>
               <Button
                 size="lg"
@@ -625,7 +628,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         </div>
       </Card>
 
-      <Card className="p-5 sm:p-6">
+      <Card className="correction-workspace__review p-5 sm:p-6">
         {!review ? (
           <EmptyReviewState />
         ) : (
@@ -633,9 +636,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <p className="text-sm text-[var(--muted-foreground)]">Revisão manual obrigatória</p>
-                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Conferencia da leitura OCR</h3>
+                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Confira somente o necessário</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-                  Ajuste nome, matrícula, aluno encontrado no sistema e todas as respostas antes de confirmar.
+                  A leitura preenche o cartão. Confirme a identidade e ajuste as respostas sinalizadas antes de salvar.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -744,9 +747,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 <p className="text-sm font-semibold text-[var(--foreground)]">Filtros de revisão</p>
                 <div className="flex flex-wrap gap-2">
                   {[
+                    { key: "review", label: "Revisar agora" },
+                    { key: "wrong", label: "Erros" },
                     { key: "all", label: "Todas" },
-                    { key: "review", label: "Baixa confiança" },
-                    { key: "wrong", label: "Apenas erros" },
                   ].map((item) => (
                     <button
                       key={item.key}
@@ -939,7 +942,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <div className="grid gap-3 sm:grid-cols-2">
               <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
-                Confirmar correção
+                Salvar correção
               </Button>
               <Button
                 size="lg"
