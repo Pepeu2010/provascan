@@ -140,7 +140,6 @@ export function ClassesManager() {
   const [form, setForm] = useState({
     ano: "2026",
     nome: "",
-    professor: data.teacherProfile.nome,
   });
 
   return (
@@ -154,17 +153,16 @@ export function ClassesManager() {
         </div>
         <Badge tone="accent">{data.classes.length} turmas salvas</Badge>
       </div>
-      <div className="mt-6 grid gap-3 md:grid-cols-3">
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
         <Input aria-label="Nome da turma" placeholder="Nome da turma" value={form.nome} onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))} />
-        <Input aria-label="Professor responsável" placeholder="Professor responsável" value={form.professor} onChange={(event) => setForm((prev) => ({ ...prev, professor: event.target.value }))} />
         <Input aria-label="Ano letivo" placeholder="Ano letivo" value={form.ano} onChange={(event) => setForm((prev) => ({ ...prev, ano: event.target.value }))} />
       </div>
       <div className="mt-4 flex flex-wrap gap-3">
         <Button
           loading={syncStatus === "saving"}
           onClick={() => {
-            if (!form.nome.trim() || !form.professor.trim()) {
-              setMessage("Informe a turma e o professor responsável.");
+            if (!form.nome.trim()) {
+              setMessage("Informe o nome da turma.");
               return;
             }
             void (async () => {
@@ -184,7 +182,7 @@ export function ClassesManager() {
             variant="secondary"
             onClick={() => {
               setEditingId(null);
-              setForm({ ano: "2026", nome: "", professor: data.teacherProfile.nome });
+              setForm({ ano: "2026", nome: "" });
             }}
           >
             Cancelar edição
@@ -199,8 +197,6 @@ export function ClassesManager() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-lg font-semibold text-[var(--foreground)]">{item.nome}</p>
-                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Professor responsável</p>
-                <p className="mt-1 text-sm text-[var(--foreground)]">{item.professor}</p>
               </div>
             </div>
             <div className="mt-5 flex items-center justify-between text-sm">
@@ -212,7 +208,7 @@ export function ClassesManager() {
                 variant="secondary"
                 onClick={() => {
                   setEditingId(item.id);
-                  setForm({ ano: item.ano, nome: item.nome, professor: item.professor });
+                  setForm({ ano: item.ano, nome: item.nome });
                   setMessage(`Editando ${item.nome}.`);
                 }}
               >

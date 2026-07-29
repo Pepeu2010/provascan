@@ -23,7 +23,6 @@ export type Student = {
 export type ClassRoom = {
   id: string;
   nome: string;
-  professor: string;
   ano: string;
   audienceId?: string;
   audienceLabel?: string;

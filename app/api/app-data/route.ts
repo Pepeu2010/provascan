@@ -22,7 +22,7 @@ export const runtime = "nodejs";
 const text = z.string().trim().min(1).max(500);
 const id = z.string().trim().min(1).max(120);
 const studentSchema = z.object({ id, nome: text, turma: id, status: z.enum(["Ativo", "Transferido", "Inativo"]) }).strict();
-const classSchema = z.object({ id, nome: text, professor: text, ano: z.string().max(80), audienceId: z.string().max(120).optional(), audienceLabel: z.string().max(200).optional(), groupType: z.string().max(40).optional(), requiresManualGrouping: z.boolean().optional(), yearSegment: z.string().max(20).optional() }).strict();
+const classSchema = z.object({ id, nome: text, ano: z.string().max(80), audienceId: z.string().max(120).optional(), audienceLabel: z.string().max(200).optional(), groupType: z.string().max(40).optional(), requiresManualGrouping: z.boolean().optional(), yearSegment: z.string().max(20).optional() }).strict();
 const examSchema = z.object({ id, titulo: text, subject: z.string().max(120), audienceId: z.string().max(120), audienceLabel: z.string().max(200), groupType: z.string().max(40), yearSegment: z.string().max(20), quantidadeQuestoes: z.number().int().min(1).max(200), alternativas: z.array(z.string().trim().min(1).max(30)).min(2).max(10), data: z.string().max(80), codigo: text, templateVersion: z.string().max(80) }).strict();
 const appDataSchema = z.object({
   answerKeys: z.array(z.object({ provaId: id, questao: z.number().int().min(1).max(200), respostaCorreta: text }).strict()).max(20000),

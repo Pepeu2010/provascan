@@ -40,7 +40,6 @@ import type {
 type CreateClassInput = {
   ano: string;
   nome: string;
-  professor: string;
 };
 
 type CreateStudentInput = {
