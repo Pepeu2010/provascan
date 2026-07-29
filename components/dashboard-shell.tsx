@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LoaderCircle, LogOut, Menu } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
@@ -18,10 +18,12 @@ export function DashboardShell({
   active: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { authResolved, data, isHydrated, logoutTeacher, session, syncError, syncStatus } = useAppData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dialogReady, setDialogReady] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{ label: string; path: string } | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,6 +119,30 @@ export function DashboardShell({
     if (isHydrated && authResolved && !session) router.replace("/login");
   }, [authResolved, isHydrated, router, session]);
 
+  useEffect(() => {
+    const showNavigationFeedback = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!target || target.hasAttribute("download") || target.getAttribute("target") === "_blank") return;
+
+      const href = target.getAttribute("href");
+      if (!href) return;
+
+      const destination = new URL(href, window.location.href);
+      const current = new URL(window.location.href);
+      if (destination.origin !== current.origin || destination.pathname === current.pathname) return;
+
+      const label = target.getAttribute("aria-label") || target.textContent?.trim() || "a próxima área";
+      setPendingNavigation({ label: label.replace(/\s+/g, " "), path: destination.pathname });
+    };
+
+    document.addEventListener("click", showNavigationFeedback, true);
+    return () => document.removeEventListener("click", showNavigationFeedback, true);
+  }, []);
+
   if (isHydrated && authResolved && !session) {
     return <SessionNotice label="Sessão necessária" title="Redirecionando para o login do professor" detail="O painel exige uma sessão ativa neste navegador para reduzir a exposição acidental do workspace." />;
   }
@@ -127,6 +153,24 @@ export function DashboardShell({
 
   return (
     <div className="dashboard-shell">
+      {pendingNavigation && pendingNavigation.path !== pathname ? (
+        <div
+          className="fixed inset-0 z-[80] grid place-items-center bg-[rgb(3_16_12_/_42%)] p-5 backdrop-blur-[2px]"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div className="flex min-w-[230px] items-center gap-3 rounded-[20px] border border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] bg-[var(--card-solid)] px-5 py-4 shadow-[var(--shadow-floating)]">
+            <span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+              <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
+            </span>
+            <span className="grid gap-0.5">
+              <strong className="text-sm font-semibold text-[var(--foreground)]">Carregando</strong>
+              <span className="max-w-[220px] truncate text-xs text-[var(--muted-foreground)]">Abrindo {pendingNavigation.label}</span>
+            </span>
+          </div>
+        </div>
+      ) : null}
       {tabletExpanded ? (
         <button
           type="button"
