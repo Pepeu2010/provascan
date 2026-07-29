@@ -15,10 +15,7 @@ import {
 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { ProvaScanLogo } from "@/components/provascan-logo";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { Badge } from "@/components/ui/badge";
 import { canAccessSensitiveSettings } from "@/lib/access-control";
-import { getSubjectLabel } from "@/lib/subject-scope";
 import { cn } from "@/lib/utils";
 
 export const dashboardNavigationItems = [
@@ -52,13 +49,6 @@ export function DashboardSidebar({
   onRequestClose,
 }: DashboardSidebarProps) {
   const { data, session } = useAppData();
-  const subjectLabel = getSubjectLabel(session?.subject);
-  const summary = [
-    `${data.classes.length} turmas`,
-    `${data.students.length} alunos`,
-    `${data.exams.length} provas`,
-    `${data.corrections.length} correções`,
-  ].join(" · ");
 
   return (
     <aside
@@ -95,10 +85,7 @@ export function DashboardSidebar({
       </header>
 
       <section className="dashboard-sidebar__workspace" aria-label="Workspace ativo">
-        <p className="dashboard-sidebar__eyebrow">Workspace ativo</p>
         <p className="dashboard-sidebar__workspace-name">{data.teacherProfile.escola}</p>
-        <p className="dashboard-sidebar__workspace-summary">{summary}</p>
-        {subjectLabel ? <p className="dashboard-sidebar__subject">Matéria: {subjectLabel}</p> : null}
       </section>
 
       <nav className="dashboard-sidebar__navigation" aria-label="Navegação principal">
@@ -128,17 +115,6 @@ export function DashboardSidebar({
           })}
       </nav>
 
-      <footer className="dashboard-sidebar__footer">
-        <div className="dashboard-sidebar__access">
-          <div>
-            <p className="dashboard-sidebar__access-label">Acesso atual</p>
-            <p className="dashboard-sidebar__access-role">{session?.role ?? "professor"}</p>
-          </div>
-          <Badge tone="accent">Online</Badge>
-        </div>
-        {modal ? <ThemeSwitcher compact /> : null}
-        <p className="dashboard-sidebar__credit">Desenvolvido por Pedro Miguel</p>
-      </footer>
     </aside>
   );
 }

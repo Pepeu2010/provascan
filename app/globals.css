@@ -290,11 +290,8 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 
 .dashboard-sidebar__workspace {
   flex: none;
-  margin: 14px 14px 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  padding: 12px;
+  margin: 8px 18px 0;
+  padding: 0;
 }
 
 .dashboard-sidebar__eyebrow,
@@ -308,10 +305,11 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 }
 
 .dashboard-sidebar__workspace-name {
-  margin: 7px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .dashboard-sidebar__workspace-summary {
