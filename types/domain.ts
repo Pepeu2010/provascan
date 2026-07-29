@@ -26,7 +26,6 @@ export type ClassRoom = {
   nome: string;
   professor: string;
   ano: string;
-  periodo: string;
   audienceId?: string;
   audienceLabel?: string;
   groupType?: AudienceGroupType;

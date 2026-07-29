@@ -16,9 +16,9 @@ export const teacherProfile: TeacherProfile = {
 };
 
 export const classes: ClassRoom[] = [
-  { id: "T-101", nome: "3A Ensino Médio", professor: teacherProfile.nome, ano: "2026", periodo: "Manhã" },
-  { id: "T-102", nome: "2B Ensino Médio", professor: teacherProfile.nome, ano: "2026", periodo: "Tarde" },
-  { id: "T-103", nome: "9º Ano A", professor: teacherProfile.nome, ano: "2026", periodo: "Manhã" },
+  { id: "T-101", nome: "3A Ensino Médio", professor: teacherProfile.nome, ano: "2026" },
+  { id: "T-102", nome: "2B Ensino Médio", professor: teacherProfile.nome, ano: "2026" },
+  { id: "T-103", nome: "9º Ano A", professor: teacherProfile.nome, ano: "2026" },
 ];
 
 export const students: Student[] = [

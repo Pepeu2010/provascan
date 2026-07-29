@@ -169,7 +169,7 @@ export async function getOperationalAppData(): Promise<AppDataState> {
     db.from("classes").select("*"), db.from("students").select("*"), db.from("exams").select("*"), db.from("answer_keys").select("*"), db.from("correction_rules").select("*"), db.from("corrections").select("*"), db.from("app_settings_internal").select("key,value"),
   ]);
   [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult].forEach((result) => dbError(result.error));
-  const storedClasses = ((classResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), professor: String(row.teacher), ano: String(row.academic_year), periodo: String(row.period), audienceId: String(row.audience_id || "") || undefined, audienceLabel: String(row.audience_label || "") || undefined, groupType: String(row.group_type || "") || undefined, yearSegment: String(row.year_segment || "") || undefined })) as ClassRoom[];
+  const storedClasses = ((classResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), professor: String(row.teacher), ano: String(row.academic_year), audienceId: String(row.audience_id || "") || undefined, audienceLabel: String(row.audience_label || "") || undefined, groupType: String(row.group_type || "") || undefined, yearSegment: String(row.year_segment || "") || undefined })) as ClassRoom[];
   const normalizedClasses = normalizeClasses(storedClasses);
   return {
     classes: normalizedClasses,
