@@ -29,6 +29,8 @@ import {
   detectIdentityWithOcr,
   resolveIdentityFromQr,
 } from "@/services/scan-pipeline";
+import { rectifyMobilePhoto } from "@/services/mobile-photo-rectification";
+import { ANSWER_SHEET_TEMPLATE } from "@/services/answer-sheet-template";
 import { getStudentsForExam } from "@/lib/exam-audience";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +85,7 @@ type PreprocessResult = {
   height: number;
   lowLight: boolean;
   orientation: string;
+  perspectiveCorrected: boolean;
   processedCanvas: HTMLCanvasElement;
   previewUrl: string;
   processedLabel: string;
@@ -312,6 +315,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 : "QR Code não encontrado. O fluxo caiu para OCR/manual.",
           identity.invalidMessage || "",
           preprocessing.processedLabel,
+          preprocessing.perspectiveCorrected
+            ? "Perspectiva de foto de celular corrigida antes da leitura."
+            : "Não foi possível confirmar as bordas da folha; a imagem foi lida sem correção de perspectiva.",
           preprocessing.cropApplied ? "Recorte automático da área útil aplicado." : "O recorte automático manteve a imagem inteira.",
           preprocessing.lowLight ? "Imagem com pouca luz: revise nome e respostas manualmente." : "Iluminação dentro do esperado.",
           preprocessing.shadowRisk ? "Sombra detectada: marcações foram sinalizadas para revisão." : "Sem sombra relevante no cartão.",
@@ -574,7 +580,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Button>
             </div>
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
-              Aceita JPG, PNG, WebP e PDF até 12 MB. A rotação e o contraste são ajustados automaticamente.
+              Fotografe a folha inteira, com os quatro cantos visíveis e sem sombra forte. A perspectiva, rotação e contraste são ajustados automaticamente.
             </p>
           </div>
 
@@ -1395,7 +1401,9 @@ async function preprocessImage(
 ): Promise<PreprocessResult> {
   const image = await loadRenderableSource(file);
   const maxSide = Math.max(image.width, image.height);
-  const scale = maxSide > 1600 ? 1600 / maxSide : 1;
+  // A 45-question card needs enough pixels per bubble. 1600px was adequate
+  // for a flat scan but loses too much detail in an oblique phone photo.
+  const scale = maxSide > 2200 ? 2200 / maxSide : 1;
   const sourceWidth = Math.max(1, Math.round(image.width * scale));
   const sourceHeight = Math.max(1, Math.round(image.height * scale));
   const shouldRotate = sourceWidth > sourceHeight;
@@ -1419,15 +1427,26 @@ async function preprocessImage(
   } else {
     baseContext.drawImage(image, 0, 0, width, height);
   }
-  const sourceImage = baseContext.getImageData(0, 0, width, height);
+  const rectification = rectifyMobilePhoto(
+    baseCanvas,
+    ANSWER_SHEET_TEMPLATE.page.width / ANSWER_SHEET_TEMPLATE.page.height,
+  );
+  const normalizedCanvas = rectification.canvas;
+  const normalizedContext = normalizedCanvas.getContext("2d", { willReadFrequently: true });
+  if (!normalizedContext) {
+    throw new Error("Não foi possível normalizar a foto do cartão.");
+  }
+  const sourceImage = normalizedContext.getImageData(0, 0, normalizedCanvas.width, normalizedCanvas.height);
   const luminanceStats = getLuminanceStats(sourceImage.data);
   const adjusted = applyAdjustments(sourceImage, luminanceStats.average, luminanceStats.deviation);
   // PS-CARD uses fixed relative bubble coordinates. Cropping the page without
   // reprojecting those coordinates shifts every reading, so its full geometry
   // must remain intact. Generic answer sheets may still use automatic crop.
-  const cropBounds = preserveCardGeometry ? null : detectCropBounds(adjusted.data, width, height);
+  const cropBounds = preserveCardGeometry
+    ? null
+    : detectCropBounds(adjusted.data, normalizedCanvas.width, normalizedCanvas.height);
 
-  let targetCanvas = baseCanvas;
+  let targetCanvas = normalizedCanvas;
   let cropApplied = false;
 
   if (cropBounds) {
@@ -1444,7 +1463,7 @@ async function preprocessImage(
     cropContext.putImageData(adjusted, -cropBounds.left, -cropBounds.top);
     targetCanvas = cropCanvas;
   } else {
-    baseContext.putImageData(adjusted, 0, 0);
+    normalizedContext.putImageData(adjusted, 0, 0);
   }
 
   const targetContext = targetCanvas.getContext("2d", { willReadFrequently: true });
@@ -1471,7 +1490,9 @@ async function preprocessImage(
   const confidencePenalty = (lowLight ? 18 : 0) + (shadowRisk ? 10 : 0) + (cropApplied ? 0 : 4);
   const confidenceBase = Math.max(48, 95 - confidencePenalty);
   const processedLabel = preserveCardGeometry
-    ? "A geometria completa do cartão foi preservada para manter as marcações alinhadas. Brilho, contraste e binarização foram aplicados."
+    ? rectification.applied
+      ? "A folha fotografada foi retificada para o formato do cartão. Brilho, contraste e binarização adaptativa foram aplicados."
+      : "A geometria completa do cartão foi preservada para manter as marcações alinhadas. Brilho, contraste e binarização adaptativa foram aplicados."
     : "Escala de cinza, contraste, binarização, redução de ruído e rotação automática, quando necessária, foram aplicados.";
 
   return {
@@ -1482,6 +1503,7 @@ async function preprocessImage(
     height: targetCanvas.height,
     lowLight,
     orientation: shouldRotate ? "Vertical corrigida" : targetCanvas.width >= targetCanvas.height ? "Horizontal" : "Vertical",
+    perspectiveCorrected: rectification.applied,
     processedCanvas: targetCanvas,
     previewUrl: targetCanvas.toDataURL("image/jpeg", 0.88),
     processedLabel,
@@ -1596,15 +1618,34 @@ function applyAdjustments(imageData: ImageData, average: number, deviation: numb
 
 function binarizeImage(imageData: ImageData) {
   const output = new ImageData(imageData.width, imageData.height);
-  const { average } = getLuminanceStats(imageData.data);
-  const threshold = clamp(Math.round(average + 12), 118, 188);
-
-  for (let index = 0; index < imageData.data.length; index += 4) {
-    const value = imageData.data[index] > threshold ? 255 : 18;
-    output.data[index] = value;
-    output.data[index + 1] = value;
-    output.data[index + 2] = value;
-    output.data[index + 3] = 255;
+  // Cell-local thresholds keep a shaded part of a photographed page white
+  // while preserving pencil/pen fills as dark marks. A single global cutoff
+  // turns shadows into false answers.
+  const cellSize = Math.max(28, Math.round(Math.min(imageData.width, imageData.height) / 34));
+  for (let cellTop = 0; cellTop < imageData.height; cellTop += cellSize) {
+    for (let cellLeft = 0; cellLeft < imageData.width; cellLeft += cellSize) {
+      const cellRight = Math.min(imageData.width, cellLeft + cellSize);
+      const cellBottom = Math.min(imageData.height, cellTop + cellSize);
+      let total = 0;
+      let count = 0;
+      for (let y = cellTop; y < cellBottom; y += 2) {
+        for (let x = cellLeft; x < cellRight; x += 2) {
+          total += imageData.data[(y * imageData.width + x) * 4];
+          count += 1;
+        }
+      }
+      const threshold = clamp(Math.round(total / Math.max(count, 1) - 18), 92, 214);
+      for (let y = cellTop; y < cellBottom; y += 1) {
+        for (let x = cellLeft; x < cellRight; x += 1) {
+          const index = (y * imageData.width + x) * 4;
+          const value = imageData.data[index] > threshold ? 255 : 18;
+          output.data[index] = value;
+          output.data[index + 1] = value;
+          output.data[index + 2] = value;
+          output.data[index + 3] = 255;
+        }
+      }
+    }
   }
 
   return output;

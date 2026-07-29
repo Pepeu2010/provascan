@@ -308,14 +308,33 @@ function analyzeProvaScanCard(params: {
     throw new Error("Informe a quantidade de questões do gabarito antes de ler o cartão.");
   }
 
+  // A phone photo may retain a few pixels of table/background even after the
+  // page is rectified. Anchor the bubbles to the printed answer-frame itself
+  // so this residual margin cannot shift an entire column.
+  const answerRect = fitRectToBorder(imageData, ANSWER_SHEET_TEMPLATE.answerArea);
+  const expectedRect = normalizedRectToPixels(
+    ANSWER_SHEET_TEMPLATE.answerArea,
+    imageData.width,
+    imageData.height,
+  );
+
   const answers = Array.from({ length: answerKeyLength }, (_, questionIndex) => {
-    const bounds = getBubbleBounds({
+    const expectedBounds = getBubbleBounds({
       alternatives,
       canvasHeight: imageData.height,
       canvasWidth: imageData.width,
       questionCount: answerKeyLength,
       questionIndex,
     });
+    const bounds = expectedBounds.map((bound) => ({
+      alternative: bound.alternative,
+      cx: answerRect.x + ((bound.cx - expectedRect.x) / expectedRect.width) * answerRect.width,
+      cy: answerRect.y + ((bound.cy - expectedRect.y) / expectedRect.height) * answerRect.height,
+      radius: Math.max(
+        7,
+        bound.radius * Math.min(answerRect.width / expectedRect.width, answerRect.height / expectedRect.height),
+      ),
+    }));
     const scores = bounds.map((bound) => ({
       alternative: bound.alternative,
       score: getBubbleSignal(imageData, bound.cx, bound.cy, bound.radius),
