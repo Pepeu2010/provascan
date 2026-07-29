@@ -88,21 +88,42 @@ function openPrintWindow(title: string, body: string) {
       <head>
         <title>ProvaScan - Impressão</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
-          .sheet { position: relative; width: ${ANSWER_SHEET_TEMPLATE.page.width}px; min-height: ${ANSWER_SHEET_TEMPLATE.page.height}px; page-break-inside: avoid; border: 1px solid #111827; padding: 24px; margin: 0 auto 24px; box-sizing: border-box; }
-          .header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 1px solid #111827; padding-bottom: 16px; margin-bottom: 16px; }
-          .meta { font-size: 13px; line-height: 1.6; }
-          .title { font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-          .code { font-family: monospace; font-size: 13px; padding: 8px 12px; border: 1px solid #111827; display: inline-block; }
-          .qr-block { position: absolute; right: 40px; top: 124px; width: 124px; text-align: center; }
-          .qr-block img { width: 124px; height: 124px; display: block; margin-bottom: 8px; }
+          @page { size: A4 portrait; margin: 0; }
+          * { box-sizing: border-box; }
+          body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #101828; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .sheet { position: relative; width: ${ANSWER_SHEET_TEMPLATE.page.width}px; height: ${ANSWER_SHEET_TEMPLATE.page.height}px; overflow: hidden; page-break-inside: avoid; border: 2px solid #101828; padding: 30px; margin: 0 auto; background: #fff; }
+          .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: #101828; }
+          .brand-mark { display: inline-flex; width: 19px; height: 19px; align-items: center; justify-content: center; border: 2px solid #101828; border-radius: 4px; font-size: 13px; font-weight: 800; line-height: 1; }
+          .brand-name { font-size: 11px; font-weight: 800; letter-spacing: 2px; }
+          .brand-divider { width: 1px; height: 15px; background: #98a2b3; }
+          .brand-context { font-size: 10px; font-weight: 700; letter-spacing: .8px; color: #475467; }
+          .header { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 26px; min-height: 145px; border-top: 3px solid #101828; border-bottom: 1px solid #98a2b3; padding: 18px 0; }
+          .title { max-width: 455px; font-size: 26px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; margin: 0 0 6px; }
+          .subtitle { margin: 0 0 16px; color: #475467; font-size: 11px; line-height: 1.45; }
+          .student-data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 18px; max-width: 475px; }
+          .data-item { min-width: 0; border-bottom: 1px solid #d0d5dd; padding-bottom: 5px; }
+          .data-item--wide { grid-column: 1 / -1; }
+          .data-label { display: block; color: #667085; font-size: 9px; font-weight: 800; letter-spacing: .8px; margin-bottom: 3px; text-transform: uppercase; }
+          .data-value { display: block; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+          .exam-data { align-self: start; border: 1px solid #344054; padding: 12px; }
+          .code { display: inline-block; margin-bottom: 10px; padding: 6px 8px; background: #101828; color: #fff; font-family: "Courier New", monospace; font-size: 11px; font-weight: 700; letter-spacing: .3px; }
+          .exam-data .meta { display: grid; gap: 5px; color: #344054; font-size: 10px; line-height: 1.3; }
+          .exam-data .meta strong { color: #101828; }
+          .qr-block { position: absolute; right: 38px; top: 231px; width: 132px; border: 1px solid #344054; padding: 7px; text-align: center; background: #fff; }
+          .qr-label { margin: 0 0 5px; color: #475467; font-size: 8px; font-weight: 800; letter-spacing: .75px; text-transform: uppercase; }
+          .qr-block img { width: 116px; height: 116px; display: block; margin: 0 auto 5px; }
+          .qr-id { margin: 0; color: #101828; font-family: "Courier New", monospace; font-size: 9px; font-weight: 700; overflow-wrap: anywhere; }
+          .answer-caption { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height) - 47}px; color: #101828; font-size: 11px; font-weight: 800; letter-spacing: .45px; }
+          .answer-caption span { color: #475467; font-size: 9px; font-weight: 600; letter-spacing: 0; }
           .questions { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height)}px; width: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.width * ANSWER_SHEET_TEMPLATE.page.width)}px; height: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.height * ANSWER_SHEET_TEMPLATE.page.height)}px; }
+          .answer-legend { position: absolute; top: -22px; display: grid; align-items: center; color: #475467; font-size: 9px; font-weight: 800; letter-spacing: .65px; text-align: center; }
+          .answer-legend span:first-child { text-align: left; }
           .question { position: absolute; display: grid; align-items: center; }
-          .question-number { font-weight: 700; font-size: 13px; }
-          .bubble-track { display: grid; gap: 0; }
-          .bubble { width: var(--bubble-size, 22px); height: var(--bubble-size, 22px); border: 1.5px solid #111827; border-radius: 999px; display: inline-block; justify-self: center; }
-          .footer { position: absolute; left: 32px; right: 32px; bottom: 74px; display: grid; gap: 10px; font-size: 12px; }
-          .signature { margin-top: 20px; border-top: 1px solid #111827; width: 280px; padding-top: 8px; font-size: 12px; }
+          .question-number { color: #101828; font-size: 13px; font-weight: 800; }
+          .bubble { width: var(--bubble-size, 22px); height: var(--bubble-size, 22px); border: 1.7px solid #101828; border-radius: 999px; display: inline-block; justify-self: center; }
+          .footer { position: absolute; left: 30px; right: 30px; bottom: 30px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; border-top: 1px solid #98a2b3; padding-top: 10px; color: #344054; font-size: 9px; line-height: 1.35; }
+          .footer div::before { content: "•"; margin-right: 5px; color: #101828; font-weight: 800; }
+          @media print { .sheet { margin: 0; border-width: 2px; } }
         </style>
       </head>
       <body>${body}</body>
@@ -450,32 +471,48 @@ export function ExamsManager() {
           : "";
         const layout = getQuestionLayout(item.questionNumbers.length, activeExam.alternativas);
         const bubbleTemplateColumns = `${Math.round(layout.numberColumnWidth)}px repeat(${Math.max(1, activeExam.alternativas.length)}, 1fr)`;
+        const answerLegends = Array.from({ length: layout.columnCount }, (_, columnIndex) => `
+          <div class="answer-legend" style="left:${Math.round(columnIndex * (layout.columnWidth + layout.columnGap))}px;width:${Math.round(layout.columnWidth)}px;grid-template-columns:${bubbleTemplateColumns};">
+            <span>Q</span>
+            ${activeExam.alternativas.map((alternative) => `<span>${escapeForHtml(alternative)}</span>`).join("")}
+          </div>
+        `).join("");
 
         return `
           <section class="sheet">
-            <div class="header">
+            <div class="brand-row">
+              <span class="brand-mark">✓</span>
+              <span class="brand-name">PROVASCAN</span>
+              <span class="brand-divider"></span>
+              <span class="brand-context">CARTÃO-RESPOSTA</span>
+            </div>
+            <header class="header">
               <div>
                 <div class="title">${escapeForHtml(item.examTitle)}</div>
-                <div class="meta">
-                  <div><strong>Escola/Professor:</strong> ${escapeForHtml(item.teacherSchool)} - ${escapeForHtml(item.teacherName)}</div>
-                  <div><strong>Turma:</strong> ${escapeForHtml(item.turmaName)}</div>
-                  <div><strong>Aluno:</strong> ${escapeForHtml(item.studentName)}</div>
+                <p class="subtitle">Marque somente uma alternativa por questão, preenchendo a bolha por completo.</p>
+                <div class="student-data">
+                  <div class="data-item data-item--wide"><span class="data-label">Aluno(a)</span><span class="data-value">${escapeForHtml(item.studentName)}</span></div>
+                  <div class="data-item"><span class="data-label">Turma</span><span class="data-value">${escapeForHtml(item.turmaName)}</span></div>
+                  <div class="data-item"><span class="data-label">Escola / Professor(a)</span><span class="data-value">${escapeForHtml(item.teacherSchool)} · ${escapeForHtml(item.teacherName)}</span></div>
                 </div>
               </div>
-              <div>
+              <aside class="exam-data">
                 <div class="code">${escapeForHtml(item.uniqueCode)}</div>
-                <div class="meta" style="margin-top: 12px;">
+                <div class="meta">
                   <div><strong>Código da prova:</strong> ${escapeForHtml(item.examCode)}</div>
                   <div><strong>Template:</strong> ${ANSWER_SHEET_TEMPLATE.version}</div>
                   <div><strong>Turma:</strong> ${escapeForHtml(item.turmaName)}</div>
                 </div>
-              </div>
-            </div>
-            <div class="qr-block">
+              </aside>
+            </header>
+            <aside class="qr-block">
+              <p class="qr-label">Identificação de leitura</p>
               ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR Code do cartão-resposta" />` : ""}
-              <div class="meta"><strong>ID:</strong> ${escapeForHtml(item.uniqueCode)}</div>
-            </div>
+              <p class="qr-id">ID: ${escapeForHtml(item.uniqueCode)}</p>
+            </aside>
+            <div class="answer-caption">RESPOSTAS <span>Preencha uma única bolha em cada questão.</span></div>
             <div class="questions">
+              ${answerLegends}
               ${item.questionNumbers
                 .map(
                   (question, index) => {
@@ -494,7 +531,6 @@ export function ExamsManager() {
             <div class="footer">
               ${item.instructions.map((instruction) => `<div>${escapeForHtml(instruction)}</div>`).join("")}
             </div>
-            <div class="signature">Assinatura / nome adicional</div>
           </section>
         `;
       }),
