@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { CREATOR_NAME } from "@/lib/creator-credit";
@@ -37,11 +36,9 @@ export default function RootLayout({
     <html
       lang="pt-BR"
       suppressHydrationWarning
+      data-theme="dark"
       className={`${manrope.variable} ${plexMono.variable}`}
     >
-      <head>
-        <Script id="provascan-theme" strategy="beforeInteractive">{`(function(){try{var key='provascan-theme';var saved=localStorage.getItem(key);var theme=saved==='light'||saved==='dark'?saved:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=theme}catch(e){}})()`}</Script>
-      </head>
       <body>
         <Providers>{children}</Providers>
       </body>

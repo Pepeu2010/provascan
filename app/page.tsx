@@ -5,7 +5,6 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ScanLine, ShieldCheck, UsersRound } from "lucide-react";
 import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,7 +35,6 @@ export default function HomePage() {
           <a className="nav-link" href="#por-que">Por que ProvaScan</a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <ThemeSwitcher compact />
           <Button asChild variant="ghost" className="hidden sm:inline-flex"><Link href="/login">Entrar</Link></Button>
           <Button asChild className="h-10 px-3 text-xs !text-white sm:h-11 sm:px-4 sm:text-sm"><Link href="/dashboard">Abrir painel <ArrowRight className="size-4" /></Link></Button>
         </div>

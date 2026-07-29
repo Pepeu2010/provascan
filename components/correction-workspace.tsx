@@ -479,7 +479,12 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   };
 
   return (
-    <div className="correction-workspace grid gap-5 2xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.65fr)]">
+    <div
+      className={cn(
+        "correction-workspace grid gap-5",
+        review ? "2xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.65fr)]" : "max-w-4xl",
+      )}
+    >
       <Card className="correction-workspace__control border-[var(--border-strong)] p-5 sm:p-6">
         <div className={cn("grid gap-5", compact ? "" : "")}>
           <div>
@@ -686,10 +691,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         </div>
       </Card>
 
-      <Card className="correction-workspace__review p-5 sm:p-6">
-        {!review ? (
-          <EmptyReviewState />
-        ) : (
+      {review ? (
+        <Card className="correction-workspace__review p-5 sm:p-6">
           <div className="grid gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
@@ -1015,13 +1018,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Button>
             </div>
           </div>
-        )}
-      </Card>
+        </Card>
+      ) : null}
     </div>
   );
 }
 
-function EmptyReviewState() {
+export function EmptyReviewState() {
   return (
     <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] px-6 py-10 text-center">
       <div className="grid size-16 place-items-center rounded-3xl bg-[var(--accent-soft)] text-[var(--accent)]">

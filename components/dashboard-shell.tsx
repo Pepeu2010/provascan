@@ -5,7 +5,6 @@ import { LoaderCircle, LogOut, Menu } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -168,7 +167,6 @@ export function DashboardShell({
             </div>
 
             <div className="flex flex-none items-center justify-end gap-2">
-              <ThemeSwitcher />
               {syncStatus === "saving" ? (
                 <div aria-live="polite" className="inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--accent)_36%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface))] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
                   <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />

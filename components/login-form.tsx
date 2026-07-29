@@ -5,7 +5,6 @@ import { KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { AuthSecurityFlow } from "@/components/auth-security-flow";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,8 +40,7 @@ export function LoginForm() {
 
   return (
     <main className="min-h-[100dvh] px-4 py-4 sm:px-6 sm:py-6">
-      <div className="mx-auto flex max-w-[1160px] justify-end"><ThemeSwitcher compact /></div>
-      <div className="mx-auto flex min-h-[calc(100dvh-96px)] max-w-[1160px] items-center justify-center py-10">
+      <div className="mx-auto flex min-h-[calc(100dvh-32px)] max-w-[1160px] items-center justify-center py-10">
         <div className="w-full max-w-[480px]">
           <Card className="p-5 sm:p-7">
             <ProvaScanLogo size="md" />
