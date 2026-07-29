@@ -10,9 +10,10 @@ import {
   type NormalizedRect,
 } from "@/services/answer-sheet-models";
 import { ANSWER_SHEET_TEMPLATE, getBubbleBounds } from "@/services/answer-sheet-template";
+import { getSegmentedAnswerBlocks } from "@/services/exam-sections";
 import { extractIdentityFromImage, extractTextFromImage } from "@/services/ocr";
 import { buildIdentificationCode } from "@/services/exam-correction";
-import type { Exam, Student } from "@/types/domain";
+import type { Exam, ExamSection, Student } from "@/types/domain";
 
 export type QrPayload = {
   alunoId: string;
@@ -206,8 +207,9 @@ export async function analyzeAnswerSheetCanvas(params: {
   answerKeyLength?: number;
   canvas: HTMLCanvasElement;
   expectedTemplateId?: string;
+  sections?: ExamSection[];
 }) {
-  const { alternatives = ["A", "B", "C", "D", "E"], answerKeyLength, canvas, expectedTemplateId } = params;
+  const { alternatives = ["A", "B", "C", "D", "E"], answerKeyLength, canvas, expectedTemplateId, sections } = params;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) {
     throw new Error("Não foi possível analisar as marcações da imagem.");
@@ -237,6 +239,10 @@ export async function analyzeAnswerSheetCanvas(params: {
     expectedTemplateId,
     headerText,
   });
+
+  if (isSegmentedProvaScanCard(expectedTemplateId) && answerKeyLength && sections?.length) {
+    return analyzeSegmentedProvaScanCard({ alternatives, imageData, sections, totalQuestions: answerKeyLength });
+  }
 
   // A prova pode estar cadastrada como PS-CARD e, ainda assim, o professor
   // enviar uma folha externa da escola. Só substituímos a geometria linear
@@ -293,6 +299,46 @@ export async function detectAnswersFromCanvas(params: {
 }) {
   const result = await analyzeAnswerSheetCanvas(params);
   return result.answers;
+}
+
+function analyzeSegmentedProvaScanCard(params: {
+  alternatives: string[];
+  imageData: ImageData;
+  sections: ExamSection[];
+  totalQuestions: number;
+}) {
+  const { alternatives, imageData, sections, totalQuestions } = params;
+  const blocks = getSegmentedAnswerBlocks({ quantidadeQuestoes: totalQuestions, sections, subject: "" });
+  const answers = blocks.flatMap((block) => {
+    const rect = normalizedRectToPixels(block.searchWindow, imageData.width, imageData.height);
+    return readBlockAnswers({
+      alternatives,
+      block: { questionCount: block.questionCount, searchWindow: block.searchWindow, title: block.subject },
+      imageData,
+      layoutStyle: "banded",
+      questionStart: block.questionStart,
+      rect,
+    });
+  });
+
+  return {
+    answers,
+    blockAudits: blocks.map((block) => ({
+      averageConfidence: average(answers.filter((answer) => answer.question >= block.questionStart && answer.question <= block.questionEnd).map((answer) => answer.confidence)),
+      questionCount: block.questionCount,
+      questionStart: block.questionStart,
+      rect: normalizedRectToPixels(block.searchWindow, imageData.width, imageData.height),
+      title: block.subject,
+    })),
+    headerConfidence: 100,
+    headerText: "PS-CARD-3",
+    modelConfidence: 100,
+    modelDisplayName: "Cartão-resposta por disciplinas ProvaScan",
+    pageType: "EXATAS_E_HUMANAS" as const,
+    templateId: "PS-CARD-3",
+    totalQuestions,
+    usedExpectedTemplate: true,
+  } satisfies AnswerSheetAnalysis;
 }
 
 function analyzeProvaScanCard(params: {
@@ -369,6 +415,10 @@ function analyzeProvaScanCard(params: {
 
 function isProvaScanCard(templateId?: string) {
   return normalizeTemplateToken(templateId ?? "").startsWith("pscard");
+}
+
+function isSegmentedProvaScanCard(templateId?: string) {
+  return normalizeTemplateToken(templateId ?? "") === "pscard3";
 }
 
 function isExternalSchoolAnswerSheet(headerText: string) {

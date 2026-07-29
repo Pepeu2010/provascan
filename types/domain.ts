@@ -44,6 +44,13 @@ export type Exam = {
   data: string;
   codigo: string;
   templateVersion: string;
+  sections?: ExamSection[];
+};
+
+export type ExamSection = {
+  id: string;
+  subject: string;
+  questionCount: number;
 };
 
 export type AnswerKey = {

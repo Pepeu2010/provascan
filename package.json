@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test:ocr-fixture": "npx --no-install tsx scripts/verify-ocr-fixture.ts",
     "test:mobile-photo-fixture": "npx --no-install tsx scripts/verify-mobile-photo-fixture.ts",
+    "test:segmented-card-fixture": "npx --no-install tsx scripts/verify-segmented-card-fixture.ts",
     "test:auth-flow": "npx --no-install tsx scripts/verify-auth-flow.ts"
   },
   "dependencies": {

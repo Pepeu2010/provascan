@@ -32,6 +32,7 @@ import type {
   CorrectionSession,
   Exam,
   ExamCorrectionRule,
+  ExamSection,
   Student,
   StudentStatus,
   YearSegment,
@@ -55,6 +56,7 @@ type CreateExamInput = {
   data: string;
   groupType: AudienceGroupType;
   quantidadeQuestoes: number;
+  sections: ExamSection[];
   titulo: string;
   yearSegment: YearSegment;
 };
@@ -480,7 +482,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         ...input,
         codigo: `${codeBase || "PROVA"}-${input.data.slice(0, 4)}`,
         subject: session?.subject ?? "",
-        templateVersion: "PS-CARD-2",
+        templateVersion: input.sections.length > 1 ? "PS-CARD-3" : "PS-CARD-2",
       };
 
       return persistAppData(
@@ -534,7 +536,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                 ...input,
                 codigo: currentExam?.codigo ?? item.codigo,
                 subject: currentExam?.subject ?? session?.subject ?? item.subject,
-                  templateVersion: "PS-CARD-2",
+                templateVersion: input.sections.length > 1 ? "PS-CARD-3" : "PS-CARD-2",
               }
               : item,
           ),

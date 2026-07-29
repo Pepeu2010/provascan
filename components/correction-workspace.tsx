@@ -265,6 +265,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         answerKeyLength: answerKey.length,
         canvas: preprocessing.processedCanvas,
         expectedTemplateId: exam.templateVersion,
+        sections: exam.sections,
       });
 
       if (omrAnalysis.totalQuestions !== answerKey.length) {
