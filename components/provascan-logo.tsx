@@ -2,6 +2,7 @@ import { Check, Circle, ScanSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ProvaScanLogoProps = {
+  compact?: boolean;
   size?: "sm" | "md" | "lg";
   variant?: "full" | "sidebar";
   className?: string;
@@ -84,6 +85,7 @@ function LogoMark({ className }: { className?: string }) {
 }
 
 export function ProvaScanLogo({
+  compact = false,
   size = "md",
   variant = "full",
   className,
@@ -91,6 +93,14 @@ export function ProvaScanLogo({
   const styles = sizeMap[size];
 
   if (variant === "sidebar") {
+    if (compact) {
+      return (
+        <div className={cn("grid size-10 place-items-center", className)} aria-label="ProvaScan">
+          <LogoMark className="size-10 rounded-xl" />
+        </div>
+      );
+    }
+
     return (
       <div
         className={cn(

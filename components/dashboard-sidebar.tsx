@@ -61,7 +61,7 @@ export function DashboardSidebar({
       aria-label="Navegação do dashboard"
     >
       <header className="dashboard-sidebar__header">
-        <ProvaScanLogo variant="sidebar" className="dashboard-sidebar__logo" />
+        <ProvaScanLogo variant="sidebar" compact={compact} className="dashboard-sidebar__logo" />
         {modal ? (
           <button
             type="button"
