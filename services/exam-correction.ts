@@ -67,7 +67,7 @@ export function sanitizeWeights(raw: string, totalQuestions: number) {
 }
 
 export function buildIdentificationCode(exam: Exam, student: Student) {
-  return `${exam.codigo}-${student.matricula}-${student.id}`;
+  return `${exam.codigo}-${student.id}`;
 }
 
 export function buildQrPayload(exam: Exam, student: Student, turma: ClassRoom) {
@@ -102,7 +102,6 @@ export function buildAnswerSheetModel(params: {
     qrPayload: student && turma ? buildQrPayload(exam, student, turma) : "",
     questionNumbers: Array.from({ length: exam.quantidadeQuestoes }, (_, index) => index + 1),
     studentName: student?.nome ?? "____________________________",
-    studentRegistration: student?.matricula ?? "________________",
     teacherName,
     teacherSchool,
     turmaName: turma?.nome ?? turmaLabel,

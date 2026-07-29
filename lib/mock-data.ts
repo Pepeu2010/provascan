@@ -22,11 +22,11 @@ export const classes: ClassRoom[] = [
 ];
 
 export const students: Student[] = [
-  { id: "A-001", nome: "Ana Beatriz Rocha", matricula: "2026001", turma: "T-101", status: "Ativo" },
-  { id: "A-002", nome: "Caio Mendes", matricula: "2026002", turma: "T-101", status: "Ativo" },
-  { id: "A-003", nome: "Lucas Prado", matricula: "2026003", turma: "T-102", status: "Ativo" },
-  { id: "A-004", nome: "Marina Salles", matricula: "2026004", turma: "T-103", status: "Ativo" },
-  { id: "A-005", nome: "Rafael Costa", matricula: "2026005", turma: "T-103", status: "Transferido" },
+  { id: "A-001", nome: "Ana Beatriz Rocha", turma: "T-101", status: "Ativo" },
+  { id: "A-002", nome: "Caio Mendes", turma: "T-101", status: "Ativo" },
+  { id: "A-003", nome: "Lucas Prado", turma: "T-102", status: "Ativo" },
+  { id: "A-004", nome: "Marina Salles", turma: "T-103", status: "Ativo" },
+  { id: "A-005", nome: "Rafael Costa", turma: "T-103", status: "Transferido" },
 ];
 
 export const exams: Exam[] = [

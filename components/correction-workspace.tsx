@@ -59,7 +59,6 @@ type ScanReview = {
   answers: ScanAnswer[];
   confidence: number;
   detectedName: string;
-  detectedRegistration: string;
   identificationMethod: "qr" | "ocr" | "manual";
   matchedStudentId: string;
   notes: string[];
@@ -252,7 +251,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         : {
             confidence: ocrIdentity?.confidence ?? 0,
             detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome,
-            detectedRegistration: ocrIdentity?.detectedRegistration ?? selectedReviewStudent.matricula,
             invalidMessage: qrIdentity?.invalidMessage ?? "",
             method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual",
             matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId,
@@ -295,7 +293,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         answers: detectedAnswers,
         confidence: Math.max(42, Math.min(99, Math.round((identity.confidence + preprocessing.confidenceBase) / 2))),
         detectedName: identity.detectedName,
-        detectedRegistration: identity.detectedRegistration,
         identificationMethod: identity.method,
         matchedStudentId: identity.matchedStudentId,
         notes: [
@@ -378,7 +375,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       })),
       confidence: 30,
       detectedName: selectedReviewStudent.nome,
-      detectedRegistration: selectedReviewStudent.matricula,
       identificationMethod: "manual",
       matchedStudentId: activePreferredStudentId,
       notes: [
@@ -463,7 +459,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         notes,
         `Confianca geral do OCR: ${review.confidence}%`,
         `Nome detectado: ${review.detectedName}`,
-        `Matrícula detectada: ${review.detectedRegistration}`,
         ...review.notes,
       ],
       studentId: review.matchedStudentId,
@@ -741,16 +736,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                       }
                     />
                   </FieldLabel>
-                  <FieldLabel label="Matrícula detectada">
-                    <Input
-                      value={review.detectedRegistration}
-                      onChange={(event) =>
-                        setReview((previous) =>
-                          previous ? { ...previous, detectedRegistration: event.target.value } : previous,
-                        )
-                      }
-                    />
-                  </FieldLabel>
                   <FieldLabel label="Aluno encontrado no sistema">
                     <Select
                       value={review.matchedStudentId}
@@ -762,7 +747,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                     >
                       {studentsForSelectedClass.map((item) => (
                         <option key={item.id} value={item.id}>
-                          {item.nome} - {item.matricula}
+                          {item.nome}
                         </option>
                       ))}
                     </Select>

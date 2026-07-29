@@ -36,7 +36,6 @@ export type QrScanResult =
 export type OcrFallbackResult = {
   confidence: number;
   detectedName: string;
-  detectedRegistration: string;
   rawText: string;
   status: "matched" | "not-found";
   studentId: string;
@@ -186,18 +185,16 @@ export async function detectIdentityWithOcr(params: {
     y: Math.round(canvas.height * 0.08),
   });
   const result = await extractIdentityFromImage(headerCanvas.toDataURL("image/jpeg", 0.92));
-  const normalized = normalizeText(result.rawText || result.nomeOuMatricula);
-  const byRegistration = students.find((student) => normalized.includes(normalizeText(student.matricula)));
+  const normalized = normalizeText(result.rawText || result.nomeDetectado);
   const byName = students.find((student) => {
     const tokens = student.nome.split(" ").map((token) => normalizeText(token)).filter((token) => token.length >= 3);
     return tokens.some((token) => normalized.includes(token));
   });
-  const matchedStudent = byRegistration ?? byName;
+  const matchedStudent = byName;
 
   return {
     confidence: result.confianca,
     detectedName: matchedStudent?.nome ?? "",
-    detectedRegistration: matchedStudent?.matricula ?? "",
     rawText: result.rawText,
     status: matchedStudent ? "matched" : "not-found",
     studentId: matchedStudent?.id ?? "",
@@ -395,7 +392,6 @@ export function resolveIdentityFromQr(params: {
     return {
       confidence: 0,
       detectedName: "",
-      detectedRegistration: "",
       invalidMessage: "QR Code lido, mas o aluno nao existe mais na base local.",
       method: "qr" as const,
       matchedStudentId: "",
@@ -411,7 +407,6 @@ export function resolveIdentityFromQr(params: {
     return {
       confidence: 0,
       detectedName: student.nome,
-      detectedRegistration: student.matricula,
       invalidMessage: "QR Code invalido para esta prova, turma ou cartao-resposta.",
       method: "qr" as const,
       matchedStudentId: student.id,
@@ -421,7 +416,6 @@ export function resolveIdentityFromQr(params: {
   return {
     confidence: 99,
     detectedName: student.nome,
-    detectedRegistration: student.matricula,
     invalidMessage: "",
     method: "qr" as const,
     matchedStudentId:

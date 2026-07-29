@@ -241,7 +241,6 @@ export function StudentsManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [student, setStudent] = useState({
-    matricula: "",
     nome: "",
     turma: data.classes[0]?.id ?? "",
   });
@@ -256,9 +255,8 @@ export function StudentsManager() {
           </div>
           <Badge tone="accent">{data.students.length} alunos salvos</Badge>
         </div>
-        <div className="mt-6 grid gap-3 lg:grid-cols-4">
+        <div className="mt-6 grid gap-3 lg:grid-cols-3">
           <Input placeholder="Nome do aluno" value={student.nome} onChange={(event) => setStudent((prev) => ({ ...prev, nome: event.target.value }))} />
-          <Input placeholder="Matrícula" value={student.matricula} onChange={(event) => setStudent((prev) => ({ ...prev, matricula: event.target.value }))} />
           <FieldSelect value={student.turma} onChange={(turma) => setStudent((prev) => ({ ...prev, turma }))}>
             {data.classes.map((item) => (
               <option key={item.id} value={item.id}>
@@ -276,7 +274,7 @@ export function StudentsManager() {
           <Button
           loading={syncStatus === "saving"}
           onClick={() => {
-            if (!student.nome.trim() || !student.matricula.trim() || !student.turma) return;
+            if (!student.nome.trim() || !student.turma) return;
             void (async () => {
               const result = editingId
                 ? await updateStudent(editingId, { ...student, status })
@@ -284,7 +282,7 @@ export function StudentsManager() {
               setMessage(result.message);
               if (result.ok) {
                 setEditingId(null);
-                setStudent({ matricula: "", nome: "", turma: data.classes[0]?.id ?? "" });
+                setStudent({ nome: "", turma: data.classes[0]?.id ?? "" });
                 setStatus("Ativo");
               }
             })();
@@ -297,7 +295,7 @@ export function StudentsManager() {
               variant="secondary"
               onClick={() => {
                 setEditingId(null);
-                setStudent({ matricula: "", nome: "", turma: data.classes[0]?.id ?? "" });
+                setStudent({ nome: "", turma: data.classes[0]?.id ?? "" });
                 setStatus("Ativo");
               }}
             >
@@ -322,7 +320,7 @@ export function StudentsManager() {
             const current = data.students.find((item) => item.id === studentId);
             if (!current) return;
             setEditingId(current.id);
-            setStudent({ matricula: current.matricula, nome: current.nome, turma: current.turma });
+            setStudent({ nome: current.nome, turma: current.turma });
             setStatus(current.status);
             setMessage(`Editando ${current.nome}.`);
           }}
@@ -466,7 +464,6 @@ export function ExamsManager() {
                   <div><strong>Escola/Professor:</strong> ${escapeForHtml(item.teacherSchool)} - ${escapeForHtml(item.teacherName)}</div>
                   <div><strong>Turma:</strong> ${escapeForHtml(item.turmaName)}</div>
                   <div><strong>Aluno:</strong> ${escapeForHtml(item.studentName)}</div>
-                  <div><strong>Matrícula:</strong> ${escapeForHtml(item.studentRegistration)}</div>
                 </div>
               </div>
               <div>

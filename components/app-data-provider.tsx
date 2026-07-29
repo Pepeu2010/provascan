@@ -44,7 +44,6 @@ type CreateClassInput = {
 };
 
 type CreateStudentInput = {
-  matricula: string;
   nome: string;
   status: StudentStatus;
   turma: string;

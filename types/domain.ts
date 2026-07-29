@@ -16,7 +16,6 @@ export type AudienceGroupType =
 export type Student = {
   id: string;
   nome: string;
-  matricula: string;
   turma: string;
   status: StudentStatus;
 };
