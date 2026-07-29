@@ -92,31 +92,30 @@ function openPrintWindow(title: string, body: string) {
           * { box-sizing: border-box; }
           body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #101828; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .sheet { position: relative; width: ${ANSWER_SHEET_TEMPLATE.page.width}px; height: ${ANSWER_SHEET_TEMPLATE.page.height}px; overflow: hidden; page-break-inside: avoid; border: 2px solid #101828; padding: 30px; margin: 0 auto; background: #fff; }
-          .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: #101828; }
+          .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: #101828; }
           .brand-mark { display: inline-flex; width: 19px; height: 19px; align-items: center; justify-content: center; border: 2px solid #101828; border-radius: 4px; font-size: 13px; font-weight: 800; line-height: 1; }
           .brand-name { font-size: 11px; font-weight: 800; letter-spacing: 2px; }
           .brand-divider { width: 1px; height: 15px; background: #98a2b3; }
           .brand-context { font-size: 10px; font-weight: 700; letter-spacing: .8px; color: #475467; }
-          .header { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 26px; min-height: 145px; border-top: 3px solid #101828; border-bottom: 1px solid #98a2b3; padding: 18px 0; }
-          .title { max-width: 455px; font-size: 26px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; margin: 0 0 6px; }
-          .subtitle { margin: 0 0 16px; color: #475467; font-size: 11px; line-height: 1.45; }
+          .header { display: grid; grid-template-columns: minmax(0, 1fr) 162px; gap: 22px; min-height: 170px; border-top: 3px solid #101828; border-bottom: 1px solid #98a2b3; padding: 12px 0; }
+          .title { max-width: 455px; font-size: 26px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; margin: 0 0 5px; }
+          .subtitle { margin: 0 0 12px; color: #475467; font-size: 11px; line-height: 1.45; }
           .student-data { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 18px; max-width: 475px; }
           .data-item { min-width: 0; border-bottom: 1px solid #d0d5dd; padding-bottom: 5px; }
           .data-item--wide { grid-column: 1 / -1; }
           .data-label { display: block; color: #667085; font-size: 9px; font-weight: 800; letter-spacing: .8px; margin-bottom: 3px; text-transform: uppercase; }
           .data-value { display: block; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
-          .exam-data { align-self: start; border: 1px solid #344054; padding: 12px; }
-          .code { display: inline-block; margin-bottom: 10px; padding: 6px 8px; background: #101828; color: #fff; font-family: "Courier New", monospace; font-size: 11px; font-weight: 700; letter-spacing: .3px; }
-          .exam-data .meta { display: grid; gap: 5px; color: #344054; font-size: 10px; line-height: 1.3; }
-          .exam-data .meta strong { color: #101828; }
-          .qr-block { position: absolute; right: 38px; top: 231px; width: 132px; border: 1px solid #344054; padding: 7px; text-align: center; background: #fff; }
-          .qr-label { margin: 0 0 5px; color: #475467; font-size: 8px; font-weight: 800; letter-spacing: .75px; text-transform: uppercase; }
-          .qr-block img { width: 116px; height: 116px; display: block; margin: 0 auto 5px; }
-          .qr-id { margin: 0; color: #101828; font-family: "Courier New", monospace; font-size: 9px; font-weight: 700; overflow-wrap: anywhere; }
-          .answer-caption { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height) - 47}px; color: #101828; font-size: 11px; font-weight: 800; letter-spacing: .45px; }
+          .identity-block { align-self: stretch; border-left: 1px solid #98a2b3; padding-left: 15px; text-align: center; }
+          .code { display: inline-block; margin-bottom: 5px; padding: 4px 6px; background: #101828; color: #fff; font-family: "Courier New", monospace; font-size: 9px; font-weight: 700; letter-spacing: .2px; }
+          .identity-meta { margin: 0 0 5px; color: #475467; font-size: 8px; font-weight: 700; line-height: 1.25; }
+          .qr-block { display: grid; justify-items: center; }
+          .qr-label { margin: 0 0 3px; color: #475467; font-size: 7px; font-weight: 800; letter-spacing: .55px; text-transform: uppercase; }
+          .qr-block img { width: 112px; height: 112px; display: block; }
+          .qr-id { margin: 3px 0 0; color: #101828; font-family: "Courier New", monospace; font-size: 8px; font-weight: 700; overflow-wrap: anywhere; }
+          .answer-caption { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height) - 40}px; color: #101828; font-size: 11px; font-weight: 800; letter-spacing: .45px; }
           .answer-caption span { color: #475467; font-size: 9px; font-weight: 600; letter-spacing: 0; }
           .questions { position: absolute; left: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.x * ANSWER_SHEET_TEMPLATE.page.width)}px; top: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.y * ANSWER_SHEET_TEMPLATE.page.height)}px; width: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.width * ANSWER_SHEET_TEMPLATE.page.width)}px; height: ${Math.round(ANSWER_SHEET_TEMPLATE.answerArea.height * ANSWER_SHEET_TEMPLATE.page.height)}px; }
-          .answer-legend { position: absolute; top: -22px; display: grid; align-items: center; color: #475467; font-size: 9px; font-weight: 800; letter-spacing: .65px; text-align: center; }
+          .answer-legend { position: absolute; top: -20px; display: grid; align-items: center; color: #475467; font-size: 9px; font-weight: 800; letter-spacing: .65px; text-align: center; }
           .answer-legend span:first-child { text-align: left; }
           .question { position: absolute; display: grid; align-items: center; }
           .question-number { color: #101828; font-size: 13px; font-weight: 800; }
@@ -496,20 +495,16 @@ export function ExamsManager() {
                   <div class="data-item"><span class="data-label">Escola / Professor(a)</span><span class="data-value">${escapeForHtml(item.teacherSchool)} · ${escapeForHtml(item.teacherName)}</span></div>
                 </div>
               </div>
-              <aside class="exam-data">
+              <aside class="identity-block">
                 <div class="code">${escapeForHtml(item.uniqueCode)}</div>
-                <div class="meta">
-                  <div><strong>Código da prova:</strong> ${escapeForHtml(item.examCode)}</div>
-                  <div><strong>Template:</strong> ${ANSWER_SHEET_TEMPLATE.version}</div>
-                  <div><strong>Turma:</strong> ${escapeForHtml(item.turmaName)}</div>
+                <p class="identity-meta">${escapeForHtml(item.examCode)} · ${ANSWER_SHEET_TEMPLATE.version}</p>
+                <div class="qr-block">
+                  <p class="qr-label">Leitura por QR</p>
+                  ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR Code do cartão-resposta" />` : ""}
+                  <p class="qr-id">ID: ${escapeForHtml(item.uniqueCode)}</p>
                 </div>
               </aside>
             </header>
-            <aside class="qr-block">
-              <p class="qr-label">Identificação de leitura</p>
-              ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR Code do cartão-resposta" />` : ""}
-              <p class="qr-id">ID: ${escapeForHtml(item.uniqueCode)}</p>
-            </aside>
             <div class="answer-caption">RESPOSTAS <span>Preencha uma única bolha em cada questão.</span></div>
             <div class="questions">
               ${answerLegends}
