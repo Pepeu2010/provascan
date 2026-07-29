@@ -21,9 +21,9 @@ export const metadata: Metadata = {
   description:
     "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Supabase.",
   icons: {
-    icon: "/provascan-mark-v2.png",
-    shortcut: "/provascan-mark-v2.png",
-    apple: "/provascan-mark-v2.png",
+    icon: "/provascan-mark-purple-v1.png",
+    shortcut: "/provascan-mark-purple-v1.png",
+    apple: "/provascan-mark-purple-v1.png",
   },
 };
 

@@ -38,12 +38,12 @@ function LogoMark({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden border border-[color-mix(in_srgb,var(--accent)_34%,var(--border))] bg-[#0c1714] shadow-[0_16px_32px_rgb(0_0_0_/_32%)]",
+        "relative isolate overflow-hidden border border-[color-mix(in_srgb,var(--accent)_44%,var(--border))] bg-[#09090b] shadow-[0_16px_32px_rgb(0_0_0_/_48%)]",
         className,
       )}
     >
       <Image
-        src="/provascan-mark-v2.png"
+        src="/provascan-mark-purple-v1.png"
         alt=""
         fill
         sizes="(max-width: 767px) 40px, 82px"

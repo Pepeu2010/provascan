@@ -1253,7 +1253,7 @@ function ProcessingCard({
       </div>
       <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--card-solid)]">
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,#1e63ff,#37d8ff)] transition-all"
+          className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-strong))] transition-all"
           style={{ width: `${progress}%` }}
         />
       </div>

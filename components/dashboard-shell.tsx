@@ -155,7 +155,7 @@ export function DashboardShell({
     <div className="dashboard-shell">
       {pendingNavigation && pendingNavigation.path !== pathname ? (
         <div
-          className="fixed inset-0 z-[80] grid place-items-center bg-[rgb(3_16_12_/_42%)] p-5 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[80] grid place-items-center bg-[rgb(4_3_7_/_66%)] p-5 backdrop-blur-[2px]"
           role="status"
           aria-live="polite"
           aria-atomic="true"
