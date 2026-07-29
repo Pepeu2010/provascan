@@ -1,94 +1,152 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
+import { ArrowRight, Camera, CheckCircle2, ClipboardList, FileText, UsersRound } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
-import { AnalyticsPanels } from "@/components/analytics-panels";
-import { CorrectionWorkspace } from "@/components/correction-workspace";
-import { StudentTable } from "@/components/student-table";
-import { SummaryCard } from "@/components/summary-card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export function DashboardWorkspace() {
-  const { analytics, data } = useAppData();
-  const topStudent = analytics.studentRanking[0];
-  const topOutcome = [...analytics.outcomeBreakdown].sort((a, b) => b.total - a.total)[0];
+  const { data } = useAppData();
+  const recentCorrections = [...data.corrections]
+    .sort((left, right) => right.correction.data.localeCompare(left.correction.data))
+    .slice(0, 4);
+  const upcomingExams = [...data.exams]
+    .sort((left, right) => right.data.localeCompare(left.data))
+    .slice(0, 4);
+  const activeStudents = data.students.filter((student) => student.status === "Ativo").length;
 
   return (
-    <>
+    <div className="dashboard-command-center mx-auto grid max-w-[1380px] gap-5">
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="grid gap-5 2xl:grid-cols-[1.15fr_0.85fr]"
+        transition={{ duration: 0.32, ease: "easeOut" }}
+        className="dashboard-next-action"
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          {analytics.dashboardMetrics.map((metric) => (
-            <SummaryCard key={metric.label} metric={metric} />
-          ))}
+        <div className="dashboard-next-action__icon" aria-hidden="true">
+          <Camera className="size-7" strokeWidth={1.8} />
         </div>
-
-        <Card className="dashboard-grid-card hairline-grid relative overflow-hidden p-6">
-          <div className="relative z-10">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge tone="neutral">Insights operacionais</Badge>
-              <Badge tone="accent">Atualização imediata</Badge>
-            </div>
-            <h2 className="dashboard-section-title mt-4 max-w-xl text-3xl font-semibold text-[var(--foreground)]">
-              Um cockpit de revisão pensado para a rotina de correção
-            </h2>
-            <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--muted-foreground)]">
-              As métricas e os gráficos abaixo respondem em tempo real aos cadastros, gabaritos e correções salvas.
-            </p>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_90%,transparent),transparent)] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  Melhor desempenho
-                </p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">
-                  {topStudent ? topStudent.aluno : "Sem ranking ainda"}
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                  {topStudent ? `${topStudent.percentual}% de aproveitamento` : "As correções aparecerão aqui."}
-                </p>
-              </div>
-
-              <div className="rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_90%,transparent),transparent)] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  Sinal dominante
-                </p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">
-                  {topOutcome ? topOutcome.label : "Sem histórico"}
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                  {topOutcome ? `${topOutcome.total} ocorrências processadas` : "O painel vai consolidar a operação."}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-strong)_82%,transparent),transparent)] p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                Capacidade atual
-              </p>
-              <p className="mt-2 text-sm leading-7 text-[var(--foreground)]">
-                {data.classes.length} turmas ativas, {data.students.length} alunos monitorados e {data.exams.length} provas
-                prontas para operação.
-              </p>
-            </div>
-          </div>
-        </Card>
+        <div className="min-w-0 flex-1">
+          <h2>Corrigir provas por foto</h2>
+          <p>Envie o cartão-resposta. O sistema lê as marcações e deixa para você apenas a conferência final.</p>
+        </div>
+        <div className="dashboard-next-action__meta">
+          <span>{data.exams.length}</span>
+          <small>provas disponíveis</small>
+        </div>
+        <Button asChild size="lg" className="dashboard-next-action__button">
+          <Link href="/dashboard/correcao">
+            Abrir correção
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </Button>
       </motion.section>
 
-      <div className="mt-5">
-        <AnalyticsPanels analytics={analytics} />
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(330px,0.75fr)]">
+        <Card className="dashboard-worklist">
+          <div className="dashboard-worklist__heading">
+            <div>
+              <h2>Provas prontas</h2>
+              <p>Escolha uma prova e comece a correção.</p>
+            </div>
+            <Link href="/dashboard/provas" className="dashboard-text-link">
+              Gerenciar provas <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          {upcomingExams.length ? (
+            <div className="dashboard-worklist__rows">
+              {upcomingExams.map((exam) => {
+                const audienceSize = data.students.filter((student) => student.status === "Ativo" && student.turma === exam.audienceId).length;
+                return (
+                  <div key={exam.id} className="dashboard-worklist__row">
+                    <div className="dashboard-row-icon" aria-hidden="true"><FileText className="size-5" strokeWidth={1.8} /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="dashboard-row-title">{exam.titulo}</p>
+                      <p className="dashboard-row-detail">{exam.audienceLabel} · {exam.quantidadeQuestoes} questões{audienceSize ? ` · ${audienceSize} alunos` : ""}</p>
+                    </div>
+                    <Link href="/dashboard/correcao" className="dashboard-row-action" aria-label={`Corrigir ${exam.titulo}`}>
+                      Corrigir <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <DashboardEmptyState
+              icon={<ClipboardList className="size-5" strokeWidth={1.8} />}
+              title="Nenhuma prova pronta"
+              detail="Crie uma prova e salve o gabarito para começar a corrigir."
+              href="/dashboard/provas"
+              action="Criar prova"
+            />
+          )}
+        </Card>
+
+        <Card className="dashboard-activity">
+          <div className="dashboard-worklist__heading">
+            <div>
+              <h2>Últimas correções</h2>
+              <p>{data.corrections.length ? "Resultado salvo no histórico." : "A atividade aparecerá aqui."}</p>
+            </div>
+            <Link href="/dashboard/relatorios" className="dashboard-text-link">
+              Relatórios <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          {recentCorrections.length ? (
+            <div className="dashboard-activity__rows">
+              {recentCorrections.map((item) => (
+                <div key={item.correction.id} className="dashboard-activity__row">
+                  <CheckCircle2 className="size-5 text-[var(--accent)]" aria-hidden="true" strokeWidth={1.8} />
+                  <div className="min-w-0">
+                    <p>{item.aluno.nome}</p>
+                    <span>{item.prova.titulo}</span>
+                  </div>
+                  <strong className="numeric">{item.correction.percentual}%</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <DashboardEmptyState
+              icon={<UsersRound className="size-5" strokeWidth={1.8} />}
+              title={`${activeStudents} alunos ativos`}
+              detail="Depois da primeira correção, o histórico fica disponível aqui."
+              href="/dashboard/correcao"
+              action="Corrigir agora"
+            />
+          )}
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+function DashboardEmptyState({
+  action,
+  detail,
+  href,
+  icon,
+  title,
+}: {
+  action: string;
+  detail: string;
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <div className="dashboard-empty-state">
+      <div className="dashboard-row-icon" aria-hidden="true">{icon}</div>
+      <div>
+        <p>{title}</p>
+        <span>{detail}</span>
       </div>
-      <div className="mt-5">
-        <CorrectionWorkspace compact />
-      </div>
-      <div className="mt-5">
-        <StudentTable classes={data.classes} students={data.students} />
-      </div>
-    </>
+      <Link href={href} className="dashboard-text-link">
+        {action} <ArrowRight className="size-4" aria-hidden="true" />
+      </Link>
+    </div>
   );
 }

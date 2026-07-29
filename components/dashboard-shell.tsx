@@ -6,10 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getSubjectLabel } from "@/lib/subject-scope";
 
 const DIALOG_TRANSITION_MS = 200;
 
@@ -29,7 +27,6 @@ export function DashboardShell({
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
-  const subjectLabel = getSubjectLabel(session?.subject);
   const activeLabel = dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
 
   const summary = useMemo(
@@ -151,10 +148,9 @@ export function DashboardShell({
       </div>
 
       <main className="dashboard-shell__main">
-        <header className="dashboard-shell-panel relative z-20 mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(107,231,216,0.1),transparent_26%)]" />
-          <div className="relative flex flex-col gap-4 2xl:flex-row 2xl:items-center 2xl:justify-between">
-            <div className="flex items-start justify-between gap-3 2xl:block">
+        <header className="dashboard-shell-panel mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
               <button
                 ref={menuTriggerRef}
                 type="button"
@@ -165,33 +161,13 @@ export function DashboardShell({
               >
                 <Menu className="size-5" aria-hidden="true" />
               </button>
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge tone="neutral">Workspace do professor</Badge>
-                  <Badge tone="accent">Monitoramento ao vivo</Badge>
-                  {subjectLabel ? <Badge tone="warning">Matéria: {subjectLabel}</Badge> : null}
-                </div>
-                <h1 className="dashboard-section-title mt-4 text-2xl font-semibold text-[var(--foreground)] sm:text-3xl">{activeLabel}</h1>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)]">{summary}</p>
-                {subjectLabel ? <p className="mt-2 text-sm font-medium text-[var(--accent)]">As provas, os gabaritos e as correções desta sessão estão vinculados a {subjectLabel}.</p> : null}
+              <div className="min-w-0">
+                <h1 className="dashboard-section-title text-2xl font-semibold text-[var(--foreground)] sm:text-3xl">{activeLabel}</h1>
+                <p className="mt-1 truncate text-sm text-[var(--muted-foreground)]">{summary}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:hidden">
-              <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Sessão</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
-              </div>
-              <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_srgb,var(--card-solid)_88%,transparent)] p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Perfil</p>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold capitalize text-[var(--foreground)]">{session?.role ?? "professor"}</p>
-                  <Badge tone="accent">Online</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-3 2xl:max-w-[360px]">
+            <div className="flex flex-none items-center justify-end gap-2">
               <ThemeSwitcher />
               {syncStatus === "saving" ? (
                 <div aria-live="polite" className="inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--accent)_36%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface))] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
@@ -199,11 +175,7 @@ export function DashboardShell({
                   Salvando alterações
                 </div>
               ) : null}
-              <div className="hidden min-w-[150px] rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_96%,transparent),transparent)] px-4 py-3 text-right sm:block">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Sessão atual</p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">{session?.nome ?? data.teacherProfile.nome}</p>
-              </div>
-              <Button variant="ghost" onClick={async () => { await logoutTeacher(); router.push("/login"); }}>
+              <Button variant="ghost" className="hidden sm:inline-flex" onClick={async () => { await logoutTeacher(); router.push("/login"); }}>
                 <LogOut className="size-4" />
                 Sair
               </Button>
