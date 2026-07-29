@@ -5,7 +5,7 @@ import type { ClassRoom, Student } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
+import { ClassFilterSelect } from "@/components/class-filter-select";
 
 export function StudentTable({
   classes,
@@ -36,15 +36,10 @@ export function StudentTable({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
-            Filtrar por sala
-            <Select aria-label="Filtrar alunos por sala" value={classFilter} onChange={(event) => setClassFilter(event.target.value)} className="min-w-[170px] normal-case tracking-normal">
-              <option value="all">Todas as salas</option>
-              {classes.map((item) => (
-                <option key={item.id} value={item.id}>{item.nome}</option>
-              ))}
-            </Select>
-          </label>
+          <div className="grid gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+            <span>Filtrar por sala</span>
+            <ClassFilterSelect classes={classes} value={classFilter} onChange={setClassFilter} />
+          </div>
           <Badge tone="accent">{visibleStudents.length} alunos{selectedClass ? ` · ${selectedClass.nome}` : ""}</Badge>
         </div>
       </div>
