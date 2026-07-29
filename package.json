@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:ocr-fixture": "npx --no-install tsx scripts/verify-ocr-fixture.ts",
-    "test:mobile-photo-fixture": "npx --no-install tsx scripts/verify-mobile-photo-fixture.ts"
+    "test:mobile-photo-fixture": "npx --no-install tsx scripts/verify-mobile-photo-fixture.ts",
+    "test:auth-flow": "npx --no-install tsx scripts/verify-auth-flow.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",
