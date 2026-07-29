@@ -1,7 +1,11 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import type { ClassRoom, Student } from "@/types/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 
 export function StudentTable({
   classes,
@@ -15,17 +19,34 @@ export function StudentTable({
   onEdit?: (studentId: string) => void;
 }) {
   const hasActions = Boolean(onDelete || onEdit);
+  const [classFilter, setClassFilter] = useState("all");
+  const visibleStudents = useMemo(
+    () => (classFilter === "all" ? students : students.filter((student) => student.turma === classFilter)),
+    [classFilter, students],
+  );
+  const selectedClass = classes.find((item) => item.id === classFilter);
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
+      <div className="flex flex-col gap-4 border-b border-[var(--border)] px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--foreground)]">Últimos alunos</h3>
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">Alunos cadastrados</h3>
           <p className="text-sm text-[var(--muted-foreground)]">
             Cadastros organizados por turma e prontos para correção com persistência segura.
           </p>
         </div>
-        <Badge tone="accent">Modo operacional</Badge>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="grid gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
+            Filtrar por sala
+            <Select aria-label="Filtrar alunos por sala" value={classFilter} onChange={(event) => setClassFilter(event.target.value)} className="min-w-[170px] normal-case tracking-normal">
+              <option value="all">Todas as salas</option>
+              {classes.map((item) => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </Select>
+          </label>
+          <Badge tone="accent">{visibleStudents.length} alunos{selectedClass ? ` · ${selectedClass.nome}` : ""}</Badge>
+        </div>
       </div>
       <p id="students-table-hint" className="px-6 pt-4 text-xs text-[var(--muted-foreground)] sm:hidden">Deslize horizontalmente para ver todas as colunas.</p>
       <div className="overflow-x-auto" aria-describedby="students-table-hint">
@@ -40,7 +61,7 @@ export function StudentTable({
             </tr>
           </thead>
           <tbody>
-            {students.map((student) => {
+            {visibleStudents.map((student) => {
               const turma = classes.find((item) => item.id === student.turma);
               return (
                 <tr key={student.id} className="border-t border-[var(--border)] text-sm">
@@ -78,13 +99,13 @@ export function StudentTable({
                 </tr>
               );
             })}
-            {!students.length ? (
+            {!visibleStudents.length ? (
               <tr>
                 <td
                   colSpan={hasActions ? 4 : 3}
                   className="px-6 py-8 text-center text-sm text-[var(--muted-foreground)]"
                 >
-                  Nenhum aluno cadastrado ainda.
+                  {classFilter === "all" ? "Nenhum aluno cadastrado ainda." : "Nenhum aluno nesta sala."}
                 </td>
               </tr>
             ) : null}
