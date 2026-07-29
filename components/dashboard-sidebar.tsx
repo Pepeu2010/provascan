@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import {
   BarChart3,
   BookCheck,
@@ -33,6 +34,7 @@ type DashboardSidebarProps = {
   active: string;
   compact?: boolean;
   expanded?: boolean;
+  closing?: boolean;
   modal?: boolean;
   onNavigate: () => void;
   onToggleCompact?: () => void;
@@ -43,6 +45,7 @@ export function DashboardSidebar({
   active,
   compact = false,
   expanded = false,
+  closing = false,
   modal = false,
   onNavigate,
   onToggleCompact,
@@ -56,6 +59,7 @@ export function DashboardSidebar({
         "dashboard-sidebar",
         compact && "dashboard-sidebar--compact",
         expanded && "dashboard-sidebar--expanded",
+        closing && "dashboard-sidebar--closing",
         modal && "dashboard-sidebar--modal",
       )}
       aria-label="Navegação do dashboard"
@@ -91,7 +95,7 @@ export function DashboardSidebar({
       <nav className="dashboard-sidebar__navigation" aria-label="Navegação principal">
         {dashboardNavigationItems
           .filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor"))
-          .map((item) => {
+          .map((item, index) => {
             const Icon = item.icon;
             const isActive = active === item.href;
 
@@ -104,6 +108,7 @@ export function DashboardSidebar({
                 aria-label={compact ? item.label : undefined}
                 title={compact ? item.label : undefined}
                 className={cn("dashboard-sidebar__item", isActive && "dashboard-sidebar__item--active")}
+                style={{ "--sidebar-item-index": index } as CSSProperties}
               >
                 <span className="dashboard-sidebar__item-icon">
                   <Icon className="size-[18px]" aria-hidden="true" />

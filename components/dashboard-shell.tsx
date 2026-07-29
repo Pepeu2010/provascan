@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 const DIALOG_TRANSITION_MS = 200;
+const TABLET_SIDEBAR_TRANSITION_MS = 280;
 
 export function DashboardShell({
   children,
@@ -23,11 +24,13 @@ export function DashboardShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dialogReady, setDialogReady] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
+  const [tabletSidebarClosing, setTabletSidebarClosing] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ label: string; path: string } | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
+  const tabletCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeLabel = dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
 
   const summary = useMemo(
@@ -89,6 +92,32 @@ export function DashboardShell({
     dialogCloseTimerRef.current = setTimeout(finishMobileClose, DIALOG_TRANSITION_MS + 80);
   }, [clearDialogCloseTransition, finishMobileClose]);
 
+  const requestTabletClose = useCallback(() => {
+    if (!tabletExpanded || tabletSidebarClosing) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setTabletExpanded(false);
+      return;
+    }
+
+    setTabletSidebarClosing(true);
+    tabletCloseTimerRef.current = setTimeout(() => {
+      setTabletExpanded(false);
+      setTabletSidebarClosing(false);
+      tabletCloseTimerRef.current = null;
+    }, TABLET_SIDEBAR_TRANSITION_MS);
+  }, [tabletExpanded, tabletSidebarClosing]);
+
+  const toggleTabletSidebar = useCallback(() => {
+    if (tabletExpanded) {
+      requestTabletClose();
+      return;
+    }
+
+    setTabletSidebarClosing(false);
+    setTabletExpanded(true);
+  }, [requestTabletClose, tabletExpanded]);
+
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const dialog = dialogRef.current;
@@ -114,6 +143,12 @@ export function DashboardShell({
       if (dialog?.open) dialog.close();
     };
   }, [clearDialogCloseTransition, mobileMenuOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (tabletCloseTimerRef.current) clearTimeout(tabletCloseTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isHydrated && authResolved && !session) router.replace("/login");
@@ -174,9 +209,9 @@ export function DashboardShell({
       {tabletExpanded ? (
         <button
           type="button"
-          className="dashboard-tablet-scrim"
+          className={tabletSidebarClosing ? "dashboard-tablet-scrim dashboard-tablet-scrim--closing" : "dashboard-tablet-scrim"}
           aria-label="Fechar navegação expandida"
-          onClick={() => setTabletExpanded(false)}
+          onClick={requestTabletClose}
         />
       ) : null}
 
@@ -185,8 +220,9 @@ export function DashboardShell({
           active={active}
           compact={!tabletExpanded}
           expanded={tabletExpanded}
-          onNavigate={() => setTabletExpanded(false)}
-          onToggleCompact={() => setTabletExpanded((value) => !value)}
+          closing={tabletSidebarClosing}
+          onNavigate={requestTabletClose}
+          onToggleCompact={toggleTabletSidebar}
         />
       </div>
 
@@ -234,7 +270,9 @@ export function DashboardShell({
           </Card>
         ) : null}
 
-        {children}
+        <div key={pathname} className="dashboard-page-transition">
+          {children}
+        </div>
       </main>
 
       {mobileMenuOpen ? (

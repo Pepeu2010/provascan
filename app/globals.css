@@ -328,10 +328,10 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   color: var(--muted-foreground);
   font-size: 14px;
   font-weight: 600;
-  transition: background-color var(--motion-normal) ease, border-color var(--motion-normal) ease, color var(--motion-normal) ease;
+  transition: transform var(--motion-fast) ease, background-color var(--motion-normal) ease, border-color var(--motion-normal) ease, color var(--motion-normal) ease, box-shadow var(--motion-normal) ease;
 }
 
-.dashboard-sidebar__item:hover { border-color: var(--border); background: var(--surface); color: var(--foreground); }
+.dashboard-sidebar__item:hover { transform: translateX(3px); border-color: var(--border); background: var(--surface); color: var(--foreground); box-shadow: 0 8px 18px -16px rgb(0 0 0 / 85%); }
 .dashboard-sidebar__item--active { border-color: var(--border-strong); background: var(--accent-soft); color: var(--foreground); }
 
 .dashboard-sidebar__item-icon {
@@ -344,9 +344,9 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   color: currentColor;
 }
 
-.dashboard-sidebar__item--active .dashboard-sidebar__item-icon { color: var(--accent); }
+.dashboard-sidebar__item--active .dashboard-sidebar__item-icon { color: var(--accent); animation: sidebar-icon-settle 360ms cubic-bezier(.22, 1, .36, 1) both; }
 .dashboard-sidebar__item-label { min-width: 0; flex: 1; }
-.dashboard-sidebar__active-indicator { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--accent); }
+.dashboard-sidebar__active-indicator { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--accent); animation: active-indicator-in 320ms cubic-bezier(.22, 1, .36, 1) both; }
 
 .dashboard-sidebar__footer {
   display: grid;
@@ -407,9 +407,19 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   .dashboard-sidebar--compact .dashboard-sidebar__item-label,
   .dashboard-sidebar--compact .dashboard-sidebar__active-indicator { display: none; }
 
-  .dashboard-sidebar--expanded { position: fixed; z-index: 50; width: var(--dashboard-sidebar-width); box-shadow: var(--shadow-floating); }
+  .dashboard-sidebar--expanded { position: fixed; z-index: 50; width: var(--dashboard-sidebar-width); box-shadow: var(--shadow-floating); animation: sidebar-reveal var(--motion-emphasis) cubic-bezier(.22, 1, .36, 1) both; }
   .dashboard-sidebar--expanded .dashboard-sidebar__expand { position: absolute; top: 20px; right: 16px; }
-  .dashboard-tablet-scrim { display: block; position: fixed; inset: 0; z-index: 40; border: 0; background: var(--overlay-scrim); }
+  .dashboard-sidebar--expanded .dashboard-sidebar__workspace,
+  .dashboard-sidebar--expanded .dashboard-sidebar__footer,
+  .dashboard-sidebar--expanded .dashboard-sidebar__item { animation: sidebar-content-in 260ms cubic-bezier(.22, 1, .36, 1) both; animation-delay: calc(44ms + var(--sidebar-item-index, 0) * 24ms); }
+  .dashboard-sidebar--expanded .dashboard-sidebar__workspace { animation-delay: 48ms; }
+  .dashboard-sidebar--expanded .dashboard-sidebar__footer { animation-delay: 132ms; }
+  .dashboard-sidebar--closing { animation: sidebar-dismiss var(--motion-emphasis) cubic-bezier(.4, 0, 1, 1) both; }
+  .dashboard-sidebar--closing .dashboard-sidebar__workspace,
+  .dashboard-sidebar--closing .dashboard-sidebar__footer,
+  .dashboard-sidebar--closing .dashboard-sidebar__item { animation: none; }
+  .dashboard-tablet-scrim { display: block; position: fixed; inset: 0; z-index: 40; border: 0; background: var(--overlay-scrim); animation: scrim-in var(--motion-normal) ease-out both; }
+  .dashboard-tablet-scrim--closing { animation: scrim-out var(--motion-normal) ease-in both; }
 }
 
 @media (min-width: 1024px) {
@@ -435,6 +445,48 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 
 .nav-link { color: var(--muted-foreground); transition: color var(--motion-fast) ease; }
 .nav-link:hover { color: var(--foreground); }
+
+.dashboard-page-transition { animation: page-reveal 360ms cubic-bezier(.22, 1, .36, 1) both; }
+
+@keyframes sidebar-reveal {
+  from { opacity: 0; transform: translateX(-22px) scaleX(.96); }
+  to { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+@keyframes sidebar-dismiss {
+  from { opacity: 1; transform: translateX(0) scaleX(1); }
+  to { opacity: 0; transform: translateX(-18px) scaleX(.97); }
+}
+
+@keyframes sidebar-content-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scrim-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes page-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sidebar-icon-settle {
+  0% { transform: scale(.78); opacity: .4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes active-indicator-in {
+  0% { transform: scale(.3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
