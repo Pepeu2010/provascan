@@ -7,7 +7,6 @@ export type UserRecord = {
   senha: string;
   senha_formato?: "PLAIN" | "BCRYPT";
   perfil: UserRole;
-  disciplina?: string;
   ativo: string;
   trocar_senha: string;
   mfa_ativo?: string;
@@ -23,7 +22,6 @@ export type SafeAuthUser = {
   nome: string;
   email: string;
   role: UserRole;
-  subject: string | null;
   forcePasswordChange: boolean;
 };
 

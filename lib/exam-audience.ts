@@ -150,8 +150,6 @@ export function normalizeExam(
     groupType: audience.groupType,
     id: exam.id,
     quantidadeQuestoes: exam.quantidadeQuestoes,
-    subject: "subject" in exam && typeof exam.subject === "string" ? exam.subject : "",
-    sections: "sections" in exam && Array.isArray(exam.sections) ? exam.sections : undefined,
     templateVersion: exam.templateVersion,
     titulo: exam.titulo,
     yearSegment: audience.yearSegment,

@@ -293,13 +293,6 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   color: var(--muted-foreground);
 }
 
-.dashboard-sidebar__subject {
-  margin: 7px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
 .dashboard-sidebar__navigation {
   display: flex;
   min-height: 0;

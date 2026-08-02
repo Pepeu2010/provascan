@@ -58,7 +58,7 @@ function mapStudentStatus(value: unknown): Student["status"] {
 }
 
 type DbUser = {
-  legacy_id: string; access_key: string; full_name: string; role: string; subject: string; password_hash: string;
+  legacy_id: string; access_key: string; full_name: string; role: string; password_hash: string;
   active: boolean; force_password_change: boolean; mfa_active: boolean; mfa_method: string; mfa_secret_encrypted: string;
   recovery_codes_hashes: string[]; sessions_revoked_at: string | null;
 };
@@ -66,7 +66,7 @@ type DbUser = {
 function mapUser(row: DbUser): UserRecord {
   return {
     id: row.legacy_id, nome: row.full_name, email: row.access_key, senha: row.password_hash, senha_formato: "BCRYPT",
-    perfil: row.role, disciplina: row.subject, ativo: row.active ? "SIM" : "NAO", trocar_senha: row.force_password_change ? "SIM" : "NAO",
+    perfil: row.role, ativo: row.active ? "SIM" : "NAO", trocar_senha: row.force_password_change ? "SIM" : "NAO",
     mfa_ativo: row.mfa_active ? "SIM" : "NAO", mfa_metodo: row.mfa_method === "TOTP" ? "TOTP" : "",
     mfa_secret_encrypted: row.mfa_secret_encrypted, recovery_codes_configurados: row.recovery_codes_hashes.length ? "SIM" : "NAO",
     recovery_codes_hashes: JSON.stringify(row.recovery_codes_hashes), sessao_revogada_em: toDate(row.sessions_revoked_at),
@@ -147,9 +147,9 @@ export async function updateUserPasswordChangeFlag(userId: string, shouldForce: 
 export async function updateAllUsersPasswordChangeFlag(shouldForce: boolean) { const { data, error } = await client().from("app_users").update({ force_password_change: shouldForce }).select("legacy_id"); dbError(error); return { updated: data?.length ?? 0 }; }
 export async function migrateUsersSecuritySchema() { return { addedHeaders: [] as string[], auditCreated: true, usersTab: "Supabase" }; }
 export async function listUsersForAdmin() {
-  const { data, error } = await client().from("app_users").select("legacy_id,access_key,full_name,role,subject,active,force_password_change").order("full_name");
+  const { data, error } = await client().from("app_users").select("legacy_id,access_key,full_name,role,active,force_password_change").order("full_name");
   dbError(error);
-  return (data ?? []).map((row) => ({ id: row.legacy_id, nome: row.full_name, email: row.access_key, perfil: row.role, disciplina: row.subject, ativo: row.active ? "SIM" : "NAO", trocar_senha: row.force_password_change ? "SIM" : "NAO" }));
+  return (data ?? []).map((row) => ({ id: row.legacy_id, nome: row.full_name, email: row.access_key, perfil: row.role, ativo: row.active ? "SIM" : "NAO", trocar_senha: row.force_password_change ? "SIM" : "NAO" }));
 }
 
 export async function appendAuditEvent(input: { actorId: string; event: string; targetId?: string; ipHash?: string; metadata?: Record<string, string | number | boolean> }) {
@@ -174,7 +174,7 @@ export async function getOperationalAppData(): Promise<AppDataState> {
   return {
     classes: normalizedClasses,
     students: ((studentResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), turma: String(row.class_id ?? ""), status: mapStudentStatus(row.status) })) as Student[],
-    exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), subject: String(row.subject), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version), sections: Array.isArray(row.sections) ? row.sections.map((section) => ({ id: String((section as Record<string, unknown>).id ?? ""), subject: String((section as Record<string, unknown>).subject ?? ""), questionCount: Number((section as Record<string, unknown>).questionCount ?? 0) })) : undefined })) as Exam[],
+    exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version) })) as Exam[],
     answerKeys: ((keyResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), questao: Number(row.question_number), respostaCorreta: String(row.correct_answer) })),
     correctionRules: ((ruleResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), notaMaxima: Number(row.max_score), arredondamentoCasas: Number(row.rounding_places), pesoPadrao: Number(row.default_weight), pesosPorQuestao: Array.isArray(row.weights_by_question) ? row.weights_by_question : [], questoesAnuladas: Array.isArray(row.voided_questions) ? row.voided_questions.map(Number) : [], modoQuestaoAnulada: String(row.voided_question_mode) as ExamCorrectionRule["modoQuestaoAnulada"] })),
     corrections: ((correctionResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ correction: { id: String(row.id), provaId: String(row.exam_id), alunoId: String(row.student_id ?? ""), nomeDetectado: String(row.detected_name), nota: Number(row.score), acertos: Number(row.correct_count), erros: Number(row.incorrect_count), emBranco: Number(row.blank_count), multiplasMarcacoes: Number(row.multiple_marks_count), anuladas: Number(row.voided_count), percentual: Number(row.percentage), data: String(row.corrected_at), imagem: String(row.source_image), tempoCorrecao: String(row.correction_time), metodoIdentificacao: String(row.identification_method) as CorrectionSession["correction"]["metodoIdentificacao"] }, aluno: row.student_snapshot as Student, prova: row.exam_snapshot as Exam, turma: row.class_snapshot as ClassRoom, respostas: (row.answers as CorrectionSession["respostas"]) ?? [], confiancaOcr: Number(row.ocr_confidence), imagemProcessada: String(row.processed_image), observacoes: (row.observations as string[]) ?? [], identificacao: row.identification as CorrectionSession["identificacao"] })) as CorrectionSession[],

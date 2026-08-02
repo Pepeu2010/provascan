@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { calculateAnalytics } from "@/lib/app-data";
-import { canManageAllSubjects, filterAppDataForSubject, requireScopedSubject } from "@/lib/subject-scope";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import { getOperationalAppData, getSystemSnapshot } from "@/services/supabase-data";
 
@@ -23,16 +22,11 @@ export async function GET() {
 
   try {
     const [snapshot, data] = await Promise.all([getSystemSnapshot(), getOperationalAppData()]);
-    const subject = requireScopedSubject(validation.session);
-    if (!canManageAllSubjects(validation.session.role) && !subject) {
-      return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
-    }
-    const scopedData = filterAppDataForSubject(data, subject);
-    const analytics = calculateAnalytics(scopedData);
+    const analytics = calculateAnalytics(data);
     const response = NextResponse.json(
       {
         metrics: analytics.dashboardMetrics,
-        latestCorrection: scopedData.corrections[0] ?? null,
+        latestCorrection: data.corrections[0] ?? null,
         storage: snapshot,
       },
       {

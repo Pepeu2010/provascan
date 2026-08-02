@@ -266,7 +266,7 @@ export function DashboardShell({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--error)]">Falha na carga operacional</p>
             <p className="mt-3 text-base font-semibold text-[var(--foreground)]">O painel não conseguiu carregar os dados.</p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">{syncError}</p>
-            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">Se este login for de professor, confira a coluna `disciplina` na aba `usuários`.</p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">Confira se o perfil e o status de acesso deste usuário estão corretos.</p>
           </Card>
         ) : null}
 

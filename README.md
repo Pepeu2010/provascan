@@ -45,8 +45,7 @@ O backend acessa o Supabase exclusivamente pelo servidor. A chave de serviço n�
 
 ## Acesso e escopo
 
-- `admin` e `vice_diretor` acessam todas as disciplinas.
-- `professor` precisa ter `subject` preenchido em `app_users`.
+- Todos os perfis autenticados trabalham sobre a mesma base de provas; não há escopo por disciplina.
 - Usuários legados com senha em texto simples são convertidos para bcrypt no primeiro login válido ou na troca obrigatória de senha.
 - O MFA usa TOTP e desafios persistidos; em produção, Redis é necessário para que o fluxo funcione entre execuções serverless.
 

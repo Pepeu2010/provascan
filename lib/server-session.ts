@@ -6,7 +6,6 @@ import {
   createSessionToken,
   parseSessionToken,
 } from "@/lib/auth";
-import { normalizeSubject } from "@/lib/subject-scope";
 import { createPasswordStamp } from "@/lib/passwords";
 import { getUserByEmail, isActiveUser, shouldForcePasswordChange } from "@/services/supabase-data";
 import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
@@ -29,7 +28,6 @@ function buildSafeUserFromSheetUser(user: {
   nome: string;
   email: string;
   perfil: string;
-  disciplina?: string;
   trocar_senha: string;
 }) {
   return {
@@ -37,7 +35,6 @@ function buildSafeUserFromSheetUser(user: {
     nome: user.nome,
     email: user.email,
     role: user.perfil,
-    subject: normalizeSubject(user.disciplina),
     forcePasswordChange: shouldForcePasswordChange(user.trocar_senha),
   } satisfies SafeAuthUser;
 }
@@ -67,7 +64,6 @@ export async function validateSessionToken(token: string | undefined): Promise<V
     shouldRefreshCookie:
       safeUser.nome !== parsed.nome ||
       safeUser.role !== parsed.role ||
-      safeUser.subject !== parsed.subject ||
       safeUser.forcePasswordChange !== parsed.forcePasswordChange,
     user: safeUser,
     passwordStamp,

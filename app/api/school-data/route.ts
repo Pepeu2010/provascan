@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
-import { canManageAllSubjects } from "@/lib/subject-scope";
+import { isPrivilegedRole } from "@/lib/access-control";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
   SupabaseConfigError,
@@ -25,7 +25,7 @@ export async function GET() {
     return response;
   }
 
-  if (!canManageAllSubjects(validation.session.role)) {
+  if (!isPrivilegedRole(validation.session.role)) {
     return NextResponse.json(
       { error: "A lista escolar completa é restrita a perfis de gestão." },
       { status: 403, headers: { "Cache-Control": "no-store" } },

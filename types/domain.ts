@@ -34,7 +34,6 @@ export type ClassRoom = {
 export type Exam = {
   id: string;
   titulo: string;
-  subject: string;
   audienceId: string;
   audienceLabel: string;
   groupType: AudienceGroupType;
@@ -44,13 +43,6 @@ export type Exam = {
   data: string;
   codigo: string;
   templateVersion: string;
-  sections?: ExamSection[];
-};
-
-export type ExamSection = {
-  id: string;
-  subject: string;
-  questionCount: number;
 };
 
 export type AnswerKey = {

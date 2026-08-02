@@ -32,7 +32,6 @@ import type {
   CorrectionSession,
   Exam,
   ExamCorrectionRule,
-  ExamSection,
   Student,
   StudentStatus,
   YearSegment,
@@ -56,7 +55,6 @@ type CreateExamInput = {
   data: string;
   groupType: AudienceGroupType;
   quantidadeQuestoes: number;
-  sections: ExamSection[];
   titulo: string;
   yearSegment: YearSegment;
 };
@@ -183,7 +181,6 @@ function normalizeSession(value: unknown): AuthSessionUser | null {
     typeof candidate.nome !== "string" ||
     typeof candidate.email !== "string" ||
     typeof candidate.role !== "string" ||
-    !(typeof candidate.subject === "string" || candidate.subject === null || candidate.subject === undefined) ||
     typeof candidate.forcePasswordChange !== "boolean" ||
     typeof candidate.loggedInAt !== "string"
   ) {
@@ -198,7 +195,6 @@ function normalizeSession(value: unknown): AuthSessionUser | null {
     loggedInAt: candidate.loggedInAt,
     remember: Boolean(candidate.remember),
     role: candidate.role,
-    subject: candidate.subject ?? null,
   };
 }
 
@@ -481,8 +477,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         id: examId,
         ...input,
         codigo: `${codeBase || "PROVA"}-${input.data.slice(0, 4)}`,
-        subject: session?.subject ?? "",
-        templateVersion: input.sections.length > 1 ? "PS-CARD-3" : "PS-CARD-2",
+        templateVersion: "PS-CARD-2",
       };
 
       return persistAppData(
@@ -535,8 +530,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                 ...item,
                 ...input,
                 codigo: currentExam?.codigo ?? item.codigo,
-                subject: currentExam?.subject ?? session?.subject ?? item.subject,
-                templateVersion: input.sections.length > 1 ? "PS-CARD-3" : "PS-CARD-2",
+                templateVersion: "PS-CARD-2",
               }
               : item,
           ),

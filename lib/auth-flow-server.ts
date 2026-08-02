@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, PRE_AUTH_COOKIE_NAME, applyAuthCookie, clearPreAuthCookie, createSessionToken } from "@/lib/auth";
 import { createPasswordStamp } from "@/lib/passwords";
 import { parsePreAuthToken } from "@/lib/pre-auth";
-import { normalizeSubject } from "@/lib/subject-scope";
 import { getUserByAccess, isActiveUser, updateLastLogin } from "@/services/supabase-data";
 
 export async function requirePreAuth() {
@@ -22,7 +21,7 @@ export async function createFinalSession(response: NextResponse, input: Awaited<
   const user = await getUserByAccess(preAuth.access);
   if (!user || user.id !== preAuth.sub || !isActiveUser(user.ativo)) throw new Error("Conta indisponível para criar sessão.");
   const loggedInAt = new Date().toISOString();
-  const safeUser = { id: user.id, nome: user.nome, email: user.email, role: user.perfil, subject: normalizeSubject(user.disciplina), forcePasswordChange: false };
+  const safeUser = { id: user.id, nome: user.nome, email: user.email, role: user.perfil, forcePasswordChange: false };
   const token = await createSessionToken({ user: safeUser, remember: preAuth.remember, loggedInAt, passwordStamp: createPasswordStamp(`${user.senha}|${user.sessao_revogada_em ?? ""}`) });
   applyAuthCookie(response, token, preAuth.remember);
   clearPreAuthCookie(response);

@@ -18,10 +18,8 @@ import {
   getStudentsForExam,
   hasAmbiguousClasses,
 } from "@/lib/exam-audience";
-import { getSubjectLabel } from "@/lib/subject-scope";
 import { formatDate } from "@/lib/utils";
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
-import { getSegmentedAnswerBlocks, resolveExamSections, SEGMENTED_BLOCK_METRICS } from "@/services/exam-sections";
 import {
   buildAnswerSheetModel,
   buildDefaultCorrectionRule,
@@ -34,7 +32,6 @@ type AdminUserRow = {
   nome: string;
   email: string;
   perfil: string;
-  disciplina?: string;
   ativo: string;
   trocar_senha: string;
 };
@@ -121,15 +118,6 @@ function openPrintWindow(title: string, body: string) {
           .question { position: absolute; display: grid; align-items: center; }
           .question-number { color: #101828; font-size: 13px; font-weight: 800; }
           .bubble { width: var(--bubble-size, 22px); height: var(--bubble-size, 22px); border: 1.7px solid #101828; border-radius: 999px; display: inline-block; justify-self: center; }
-          .subject-block { position: absolute; border: 1.5px solid #101828; background: #fff; }
-          .subject-block__heading { display: flex; align-items: center; justify-content: space-between; min-height: 22px; padding: 4px 8px; border-bottom: 1px solid #101828; background: #101828; color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .55px; text-transform: uppercase; }
-          .subject-block__range { color: #d0d5dd; font-family: "Courier New", monospace; font-size: 8px; letter-spacing: 0; }
-          .subject-block__legend { position: absolute; left: 0; right: 0; top: 24px; color: #475467; font-size: 8px; font-weight: 800; letter-spacing: .45px; }
-          .subject-block__legend span { position: absolute; transform: translateX(-50%); }
-          .subject-block__legend span:first-child { left: 8%; transform: none; }
-          .subject-question { position: absolute; left: 0; right: 0; height: var(--row-height); }
-          .subject-question__number { position: absolute; left: 8%; top: 50%; color: #101828; font-size: 10px; font-weight: 800; transform: translateY(-50%); }
-          .subject-question .bubble { position: absolute; top: 50%; transform: translate(-50%, -50%); }
           .footer { position: absolute; left: 30px; right: 30px; bottom: 30px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; border-top: 1px solid #98a2b3; padding-top: 10px; color: #344054; font-size: 9px; line-height: 1.35; }
           .footer div::before { content: "•"; margin-right: 5px; color: #101828; font-weight: 800; }
           @media print { .sheet { margin: 0; border-width: 2px; } }
@@ -357,7 +345,7 @@ export function StudentsManager() {
 }
 
 export function ExamsManager() {
-  const { createExam, data, deleteExam, saveCorrectionRule, session, syncError, syncStatus, updateExam } = useAppData();
+  const { createExam, data, deleteExam, saveCorrectionRule, syncError, syncStatus, updateExam } = useAppData();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [selectedExamId, setSelectedExamId] = useState(data.exams[0]?.id ?? "");
@@ -369,7 +357,7 @@ export function ExamsManager() {
     alternativas: "A,B,C,D,E",
     audienceId: fallbackAudience?.id ?? "",
     data: new Date().toISOString().slice(0, 10),
-    sections: [{ id: "B1", questionCount: "10", subject: "Português" }],
+    quantidadeQuestoes: "10",
     titulo: "",
   });
   const selectedAudienceId = audienceOptions.some((option) => option.id === form.audienceId)
@@ -385,22 +373,14 @@ export function ExamsManager() {
   );
   const hasYearTwoAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "2"), [data.classes]);
   const hasYearThreeAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "3"), [data.classes]);
-  const subjectLabel = getSubjectLabel(session?.subject);
-  const sectionTotal = form.sections.reduce((sum, section) => sum + Math.max(0, Number(section.questionCount) || 0), 0);
-
-  const updateSection = (sectionId: string, patch: Partial<(typeof form.sections)[number]>) => {
-    setForm((previous) => ({
-      ...previous,
-      sections: previous.sections.map((section) => (section.id === sectionId ? { ...section, ...patch } : section)),
-    }));
-  };
+  const questionCount = Math.max(0, Number(form.quantidadeQuestoes) || 0);
 
   const resetExamForm = () => {
     setForm({
       alternativas: "A,B,C,D,E",
       audienceId: audienceOptions[0]?.id ?? "",
       data: new Date().toISOString().slice(0, 10),
-      sections: [{ id: "B1", questionCount: "10", subject: "Português" }],
+      quantidadeQuestoes: "10",
       titulo: "",
     });
   };
@@ -498,36 +478,12 @@ export function ExamsManager() {
           : "";
         const layout = getQuestionLayout(item.questionNumbers.length, activeExam.alternativas);
         const bubbleTemplateColumns = `${Math.round(layout.numberColumnWidth)}px repeat(${Math.max(1, activeExam.alternativas.length)}, 1fr)`;
-        const subjectBlocks = getSegmentedAnswerBlocks(activeExam);
-        const isSegmentedCard = activeExam.templateVersion === "PS-CARD-3" && subjectBlocks.length > 1;
         const answerLegends = Array.from({ length: layout.columnCount }, (_, columnIndex) => `
           <div class="answer-legend" style="left:${Math.round(columnIndex * (layout.columnWidth + layout.columnGap))}px;width:${Math.round(layout.columnWidth)}px;grid-template-columns:${bubbleTemplateColumns};">
             <span>Q</span>
             ${activeExam.alternativas.map((alternative) => `<span>${escapeForHtml(alternative)}</span>`).join("")}
           </div>
         `).join("");
-        const segmentedQuestions = subjectBlocks.map((block) => {
-          const left = Math.round(block.searchWindow.x * ANSWER_SHEET_TEMPLATE.page.width);
-          const top = Math.round(block.searchWindow.y * ANSWER_SHEET_TEMPLATE.page.height);
-          const width = Math.round(block.searchWindow.width * ANSWER_SHEET_TEMPLATE.page.width);
-          const height = Math.round(block.searchWindow.height * ANSWER_SHEET_TEMPLATE.page.height);
-          const questionAreaHeight = height * (SEGMENTED_BLOCK_METRICS.contentBottom - SEGMENTED_BLOCK_METRICS.contentTop);
-          const rowHeight = questionAreaHeight / block.questionCount;
-          const labels = activeExam.alternativas.map((alternative, index) => {
-            const position = SEGMENTED_BLOCK_METRICS.bubbleStart + ((SEGMENTED_BLOCK_METRICS.bubbleEnd - SEGMENTED_BLOCK_METRICS.bubbleStart) * index) / Math.max(activeExam.alternativas.length - 1, 1);
-            return `<span style="left:${position * 100}%">${escapeForHtml(alternative)}</span>`;
-          }).join("");
-          const questions = Array.from({ length: block.questionCount }, (_, index) => {
-            const number = block.questionStart + index;
-            const bubbles = activeExam.alternativas.map((alternative, alternativeIndex) => {
-              const position = SEGMENTED_BLOCK_METRICS.bubbleStart + ((SEGMENTED_BLOCK_METRICS.bubbleEnd - SEGMENTED_BLOCK_METRICS.bubbleStart) * alternativeIndex) / Math.max(activeExam.alternativas.length - 1, 1);
-              const size = Math.max(12, Math.min(20, Math.round(Math.min(width, rowHeight) * SEGMENTED_BLOCK_METRICS.radiusFactor * 2)));
-              return `<span class="bubble" aria-label="${escapeForHtml(alternative)}" style="left:${position * 100}%;width:${size}px;height:${size}px"></span>`;
-            }).join("");
-            return `<div class="subject-question" style="top:${Math.round(height * SEGMENTED_BLOCK_METRICS.contentTop + rowHeight * index)}px;--row-height:${Math.ceil(rowHeight)}px"><span class="subject-question__number">${number}</span>${bubbles}</div>`;
-          }).join("");
-          return `<section class="subject-block" style="left:${left}px;top:${top}px;width:${width}px;height:${height}px"><div class="subject-block__heading"><span>${escapeForHtml(block.subject)}</span><span class="subject-block__range">${block.questionStart}–${block.questionEnd}</span></div><div class="subject-block__legend"><span>Q</span>${labels}</div>${questions}</section>`;
-        }).join("");
 
         return `
           <section class="sheet">
@@ -557,8 +513,8 @@ export function ExamsManager() {
                 </div>
               </aside>
             </header>
-            ${isSegmentedCard ? "" : `<div class="answer-caption">RESPOSTAS <span>Preencha uma única bolha em cada questão.</span></div>`}
-            ${isSegmentedCard ? segmentedQuestions : `<div class="questions">
+            <div class="answer-caption">RESPOSTAS <span>Preencha uma única bolha em cada questão.</span></div>
+            <div class="questions">
               ${answerLegends}
               ${item.questionNumbers
                 .map(
@@ -574,7 +530,7 @@ export function ExamsManager() {
                   },
                 )
                 .join("")}
-            </div>`}
+            </div>
             <div class="footer">
               ${item.instructions.map((instruction) => `<div>${escapeForHtml(instruction)}</div>`).join("")}
             </div>
@@ -616,50 +572,19 @@ export function ExamsManager() {
           </FieldSelect>
           <Input type="date" value={form.data} onChange={(event) => setForm((prev) => ({ ...prev, data: event.target.value }))} />
           <Input placeholder="Alternativas: A,B,C,D,E" value={form.alternativas} onChange={(event) => setForm((prev) => ({ ...prev, alternativas: event.target.value }))} />
-        </div>
-        <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">Blocos da prova</p>
-              <p className="mt-1 text-sm text-[var(--muted-foreground)]">Cada bloco vira uma divisória no cartão e no gabarito.</p>
-            </div>
-            <Badge tone={sectionTotal === 45 ? "accent" : "neutral"}>{sectionTotal} questões</Badge>
-          </div>
-          <div className="mt-4 grid gap-2">
-            {form.sections.map((section, index) => (
-              <div key={section.id} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
-                <Input aria-label={`Disciplina do bloco ${index + 1}`} placeholder="Disciplina" value={section.subject} onChange={(event) => updateSection(section.id, { subject: event.target.value })} />
-                <Input aria-label={`Quantidade de questões do bloco ${index + 1}`} type="number" min="1" max="45" value={section.questionCount} onChange={(event) => updateSection(section.id, { questionCount: event.target.value })} />
-                <Button type="button" variant="ghost" disabled={form.sections.length === 1} onClick={() => setForm((previous) => ({ ...previous, sections: previous.sections.filter((item) => item.id !== section.id) }))}>
-                  <Trash2 className="size-4" />
-                  Remover
-                </Button>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-[var(--muted-foreground)]">Exemplo: Português 10 · História 10 · Geografia 10 · Filosofia 8 · Inglês 5 · Artes 5.</p>
-            <Button type="button" variant="secondary" onClick={() => setForm((previous) => ({ ...previous, sections: [...previous.sections, { id: `B${Date.now()}`, questionCount: "5", subject: "Nova disciplina" }] }))}>
-              Adicionar disciplina
-            </Button>
-          </div>
+          <Input aria-label="Quantidade de questões" type="number" min="1" max="200" placeholder="Quantidade de questões" value={form.quantidadeQuestoes} onChange={(event) => setForm((prev) => ({ ...prev, quantidadeQuestoes: event.target.value }))} />
         </div>
         {hasYearTwoAmbiguity || hasYearThreeAmbiguity ? (
           <p className="mt-4 text-sm text-[var(--muted-foreground)]">
             Existem turmas de 2º/3º ano sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
           </p>
         ) : null}
-        {subjectLabel ? (
-          <p className="mt-4 text-sm text-[var(--accent)]">
-            Matéria ativa desta sessão: {subjectLabel}. Toda prova criada aqui será vinculada automaticamente a essa matéria.
-          </p>
-        ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
             <Button
               loading={syncStatus === "saving"}
               onClick={() => {
-              if (!form.titulo.trim() || !selectedAudienceId || !sectionTotal || form.sections.some((section) => !section.subject.trim() || Number(section.questionCount) < 1)) {
-                setMessage("Informe o título e todos os blocos da prova.");
+              if (!form.titulo.trim() || !selectedAudienceId || !questionCount) {
+                setMessage("Informe o título e a quantidade de questões da prova.");
                 return;
               }
               const audience = audienceOptions.find((item) => item.id === selectedAudienceId);
@@ -670,8 +595,7 @@ export function ExamsManager() {
                 audienceLabel: audience.label,
                 data: form.data,
                 groupType: audience.groupType,
-                quantidadeQuestoes: sectionTotal,
-                sections: form.sections.map((section, index) => ({ id: section.id || `B${index + 1}`, questionCount: Number(section.questionCount), subject: section.subject.trim() })),
+                quantidadeQuestoes: questionCount,
                 titulo: form.titulo,
                 yearSegment: audience.yearSegment,
               };
@@ -715,17 +639,8 @@ export function ExamsManager() {
                 <Badge tone="neutral">{item.quantidadeQuestoes} questões</Badge>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                {item.subject ? <Badge tone="warning">Matéria: {getSubjectLabel(item.subject)}</Badge> : null}
                 <Badge tone="accent">{item.codigo}</Badge>
                 <Badge tone="neutral">{item.templateVersion}</Badge>
-              </div>
-              <div className="mt-4 grid gap-2 border-t border-[var(--border)] pt-4">
-                {resolveExamSections(item).map((section) => (
-                  <div key={section.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-medium text-[var(--foreground)]">{section.subject}</span>
-                    <span className="text-[var(--muted-foreground)]">Questões {section.questionStart}–{section.questionEnd}</span>
-                  </div>
-                ))}
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 {item.alternativas.map((alternative) => (
@@ -743,7 +658,7 @@ export function ExamsManager() {
                       alternativas: item.alternativas.join(","),
                       audienceId: item.audienceId,
                       data: item.data,
-                      sections: resolveExamSections(item).map((section) => ({ id: section.id, questionCount: String(section.questionCount), subject: section.subject })),
+                      quantidadeQuestoes: String(item.quantidadeQuestoes),
                       titulo: item.titulo,
                     });
                     syncRuleForm(item.id);
@@ -929,8 +844,6 @@ export function AnswerKeyEditor() {
   const [message, setMessage] = useState("");
   const exam = data.exams.find((item) => item.id === examId) ?? activeExam;
   const alternatives = exam?.alternativas ?? ["A", "B", "C", "D", "E"];
-  const sections = exam ? resolveExamSections(exam) : [];
-  const getSectionForQuestion = (question: number) => sections.find((section) => question >= section.questionStart && question <= section.questionEnd);
   const [answers, setAnswers] = useState<string[]>(
     data.answerKeys.filter((item) => item.provaId === exam?.id).sort((a, b) => a.questao - b.questao).map((item) => item.respostaCorreta),
   );
@@ -975,8 +888,7 @@ export function AnswerKeyEditor() {
           <Card key={`mobile-${index + 1}`} className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-base font-semibold text-[var(--foreground)]">{getSectionForQuestion(index + 1)?.subject ?? "Geral"} · Questão {index + 1}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">Bloco {getSectionForQuestion(index + 1)?.questionStart ?? 1}–{getSectionForQuestion(index + 1)?.questionEnd ?? exam.quantidadeQuestoes}</p>
+                <p className="text-base font-semibold text-[var(--foreground)]">Questão {index + 1}</p>
               </div>
               <Badge tone="neutral">{selected || "Sem resposta"}</Badge>
             </div>
@@ -1018,8 +930,7 @@ export function AnswerKeyEditor() {
           <div key={`${index + 1}-${selected}`} className="rounded-[24px] border border-[var(--border)] p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">{getSectionForQuestion(index + 1)?.subject ?? "Geral"} · Questão {index + 1}</p>
-                <p className="text-sm text-[var(--muted-foreground)]">Bloco {getSectionForQuestion(index + 1)?.questionStart ?? 1}–{getSectionForQuestion(index + 1)?.questionEnd ?? exam.quantidadeQuestoes}</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">Questão {index + 1}</p>
               </div>
               <Badge tone="neutral">{selected || "Sem resposta"}</Badge>
             </div>
@@ -1057,11 +968,6 @@ export function AnswerKeyEditor() {
           Salvar gabarito
         </Button>
         <Badge tone="accent">{exam.quantidadeQuestoes} questões</Badge>
-      </div>
-      <div className="mt-5 flex flex-wrap gap-2">
-        {sections.map((section) => (
-          <Badge key={section.id} tone="neutral">{section.subject}: {section.questionStart}–{section.questionEnd}</Badge>
-        ))}
       </div>
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
       {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
@@ -1319,7 +1225,6 @@ export function SettingsWorkspace() {
                   </div>
                   <p className="mt-2 text-sm text-[var(--muted-foreground)]">
                     {user.email || "Sem identificador de acesso"} • perfil {user.perfil || "sem perfil"}
-                    {user.disciplina ? ` • matéria ${getSubjectLabel(user.disciplina)}` : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">

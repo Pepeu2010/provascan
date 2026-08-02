@@ -4,10 +4,8 @@ import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { OperationalLockBusyError, OperationalLockUnavailableError, withOperationalWriteLock } from "@/lib/operational-lock";
-import { canManageAllSubjects, filterAppDataForSubject, mergeScopedAppData, requireScopedSubject } from "@/lib/subject-scope";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
-  getOperationalAppData,
   getOperationalSnapshot,
   getOperationalRevision,
   SupabaseConfigError,
@@ -23,12 +21,7 @@ const text = z.string().trim().min(1).max(500);
 const id = z.string().trim().min(1).max(120);
 const studentSchema = z.object({ id, nome: text, turma: id, status: z.enum(["Ativo", "Transferido", "Inativo"]) }).strict();
 const classSchema = z.object({ id, nome: text, ano: z.string().max(80), audienceId: z.string().max(120).optional(), audienceLabel: z.string().max(200).optional(), groupType: z.string().max(40).optional(), requiresManualGrouping: z.boolean().optional(), yearSegment: z.string().max(20).optional() }).strict();
-const examSectionSchema = z.object({ id, subject: z.string().trim().min(1).max(120), questionCount: z.number().int().min(1).max(200) }).strict();
-const examSchema = z.object({ id, titulo: text, subject: z.string().max(120), audienceId: z.string().max(120), audienceLabel: z.string().max(200), groupType: z.string().max(40), yearSegment: z.string().max(20), quantidadeQuestoes: z.number().int().min(1).max(200), alternativas: z.array(z.string().trim().min(1).max(30)).min(2).max(10), data: z.string().max(80), codigo: text, templateVersion: z.string().max(80), sections: z.array(examSectionSchema).max(12).optional() }).strict().superRefine((exam, context) => {
-  if (exam.sections?.length && exam.sections.reduce((sum, section) => sum + section.questionCount, 0) !== exam.quantidadeQuestoes) {
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "A soma dos blocos deve corresponder ao total de questões." });
-  }
-});
+const examSchema = z.object({ id, titulo: text, audienceId: z.string().max(120), audienceLabel: z.string().max(200), groupType: z.string().max(40), yearSegment: z.string().max(20), quantidadeQuestoes: z.number().int().min(1).max(200), alternativas: z.array(z.string().trim().min(1).max(30)).min(2).max(10), data: z.string().max(80), codigo: text, templateVersion: z.string().max(80) }).strict();
 const appDataSchema = z.object({
   answerKeys: z.array(z.object({ provaId: id, questao: z.number().int().min(1).max(200), respostaCorreta: text }).strict()).max(20000),
   classes: z.array(classSchema).max(1000),
@@ -65,12 +58,7 @@ export async function GET() {
   try {
     const snapshot = await getOperationalSnapshot();
     const data = snapshot.data;
-    const subject = requireScopedSubject(validation.session);
-    if (!canManageAllSubjects(validation.session.role) && !subject) {
-      return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
-    }
-    const filteredData = filterAppDataForSubject(data, subject);
-    const finalResponse = NextResponse.json({ data: filteredData, revision: snapshot.revision }, {
+    const finalResponse = NextResponse.json({ data, revision: snapshot.revision }, {
       headers: { "Cache-Control": "no-store" },
     });
 
@@ -119,19 +107,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Revisão obrigatória para salvar." }, { status: 400 });
     }
 
-    const subject = requireScopedSubject(validation.session);
-    if (!canManageAllSubjects(validation.session.role) && !subject) {
-      return NextResponse.json({ error: "Usuário sem disciplina vinculada na aba usuários." }, { status: 403 });
-    }
-
     const revision = await withOperationalWriteLock(process.env.SUPABASE_URL ?? "unconfigured", async () => {
       const currentRevision = await getOperationalRevision();
       if (currentRevision !== payload.revision) {
         throw new SupabaseSchemaError("CONFLICT");
       }
-      const currentData = await getOperationalAppData();
-      const nextData = mergeScopedAppData(currentData, parsedData.data as AppDataState, subject);
-      return saveOperationalAppData(nextData, { actorId: validation.session.id, revision: currentRevision });
+      return saveOperationalAppData(parsedData.data as AppDataState, { actorId: validation.session.id, revision: currentRevision });
     });
 
     const response = NextResponse.json(
