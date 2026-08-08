@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { getNextAuthStep, hasConfiguredTotp } from "../lib/auth-flow";
 import type { UserRecord } from "../types/auth";
 
 function user(overrides: Partial<UserRecord> = {}): UserRecord {
   return {
-    ativo: "SIM", email: "professor@escola.edu.br", id: "user-1", mfa_ativo: "NAO", mfa_metodo: "", mfa_secret_encrypted: "", nome: "Professor", perfil: "professor", senha: "segredo", trocar_senha: "NAO", ...overrides,
+    ativo: "SIM", email: "professor@escola.edu.br", id: "user-1", mfa_ativo: "NAO", mfa_metodo: "", mfa_secret_encrypted: "", nome: "Professor", perfil: "professor", senha: `fixture-${randomUUID()}`, trocar_senha: "NAO", ...overrides,
   };
 }
 
