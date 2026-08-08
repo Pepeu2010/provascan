@@ -43,6 +43,7 @@ export type Exam = {
   data: string;
   codigo: string;
   templateVersion: string;
+  releasedAt?: string | null;
 };
 
 export type AnswerKey = {

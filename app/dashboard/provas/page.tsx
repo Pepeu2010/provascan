@@ -1,10 +1,10 @@
 import { DashboardShell } from "@/components/dashboard-shell";
-import { ExamsManager } from "@/components/management-workspace";
+import { CollaborativeExamsWorkspace } from "@/components/collaborative-exams-workspace";
 
 export default function ProvasPage() {
   return (
     <DashboardShell active="/dashboard/provas">
-      <ExamsManager />
+      <CollaborativeExamsWorkspace />
     </DashboardShell>
   );
 }

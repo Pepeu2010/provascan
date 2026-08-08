@@ -93,8 +93,9 @@ export function DashboardSidebar({
       </section>
 
       <nav className="dashboard-sidebar__navigation" aria-label="Navegação principal">
-        {dashboardNavigationItems
-          .filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor"))
+        {(session?.role === "professor"
+          ? [{ href: "/dashboard/minhas-provas", label: "Minhas provas", icon: ClipboardCheck }]
+          : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor")))
           .map((item, index) => {
             const Icon = item.icon;
             const isActive = active === item.href;

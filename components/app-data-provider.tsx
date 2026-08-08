@@ -591,6 +591,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
 
     const saveCorrectionHandler = async (input: SaveCorrectionInput) => {
+      const exam = data.exams.find((item) => item.id === input.examId);
+      if (exam && !exam.releasedAt) {
+        return { ok: false, message: "Esta prova ainda não foi liberada pela gestão após a aprovação dos blocos." };
+      }
       const student = data.students.find((item) => item.id === input.studentId);
       const answerKey = data.answerKeys
         .filter((item) => item.provaId === input.examId)

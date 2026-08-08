@@ -13,7 +13,8 @@ import {
   SupabaseSchemaError,
   saveOperationalAppData,
 } from "@/services/supabase-data";
-import type { AppDataState } from "@/lib/app-data";
+import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
+import { isTeacherRole } from "@/lib/collaborative-access";
 
 export const runtime = "nodejs";
 
@@ -53,6 +54,10 @@ export async function GET() {
     const response = buildAuthErrorResponse();
     clearInvalidSessionCookie(response);
     return response;
+  }
+
+  if (isTeacherRole(validation.session.role)) {
+    return NextResponse.json({ data: cloneDefaultAppData(), revision: "0" }, { headers: { "Cache-Control": "no-store" } });
   }
 
   try {
@@ -95,6 +100,10 @@ export async function PUT(request: Request) {
     const response = buildAuthErrorResponse();
     clearInvalidSessionCookie(response);
     return response;
+  }
+
+  if (isTeacherRole(validation.session.role)) {
+    return NextResponse.json({ error: "Professores não podem alterar os dados operacionais completos." }, { status: 403 });
   }
 
   try {
