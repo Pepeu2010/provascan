@@ -54,4 +54,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.env*
+
+# local OCR models downloaded for manual scanning
+*.traineddata
+
+# local visual-audit captures
+/visual-audit-*.png
+/visual-audit-sidebar/
