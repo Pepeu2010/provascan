@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Command, LoaderCircle, LogOut, Menu, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import DashboardLoading from "@/app/dashboard/loading";
 import { useAppData } from "@/components/app-data-provider";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ export function DashboardShell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { authResolved, data, isHydrated, logoutTeacher, session, syncError, syncStatus } = useAppData();
+  const { authResolved, data, isHydrated, logoutTeacher, operationalDataReady, session, syncError, syncStatus } = useAppData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dialogReady, setDialogReady] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
@@ -211,8 +212,8 @@ export function DashboardShell({
     return <SessionNotice label="Sessão necessária" title="Redirecionando para o login do professor" detail="O painel exige uma sessão ativa neste navegador para reduzir a exposição acidental do workspace." />;
   }
 
-  if (isHydrated && !authResolved) {
-    return <SessionNotice label="Validando sessão" title="Confirmando acesso ao painel" detail="O painel aguarda a validação da sessão antes de decidir qualquer redirecionamento." />;
+  if (!isHydrated || !authResolved || (session && !operationalDataReady)) {
+    return <DashboardLoading />;
   }
 
   return (

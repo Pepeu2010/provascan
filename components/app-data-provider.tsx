@@ -85,13 +85,14 @@ type MutationResult = {
   message: string;
 };
 
-type SyncStatus = "idle" | "saving" | "error";
+type SyncStatus = "idle" | "loading" | "saving" | "error";
 
 type AppDataContextValue = {
   analytics: ReturnType<typeof calculateAnalytics>;
   authResolved: boolean;
   data: AppDataState;
   isHydrated: boolean;
+  operationalDataReady: boolean;
   session: AuthSessionUser | null;
   syncError: string;
   syncStatus: SyncStatus;
@@ -244,6 +245,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
   const [data, setData] = useState<AppDataState>(() => cloneDefaultAppData());
   const [authResolved, setAuthResolved] = useState(false);
+  const [operationalDataReady, setOperationalDataReady] = useState(false);
   const [session, setSession] = useState<AuthSessionUser | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncError, setSyncError] = useState("");
@@ -300,6 +302,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const syncAppData = async () => {
+      setOperationalDataReady(false);
+      setSyncStatus("loading");
+      setSyncError("");
       try {
         const response = await fetch("/api/app-data", { cache: "no-store" });
         if (!response.ok) {
@@ -321,11 +326,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           hasLoadedRemoteDataRef.current = true;
           setSyncStatus("idle");
           setSyncError("");
+          setOperationalDataReady(true);
         }
       } catch (error) {
         if (!cancelled) {
           hasLoadedRemoteDataRef.current = false;
           setSyncStatus("error");
+          setOperationalDataReady(true);
           setSyncError(
             error instanceof Error && error.message
               ? error.message
@@ -759,6 +766,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       getOperationalCsv: getOperationalCsvHandler,
       importData: importDataHandler,
       isHydrated,
+      operationalDataReady,
       loginTeacher: loginTeacherHandler,
       logoutTeacher: logoutTeacherHandler,
       resetData: resetDataHandler,
@@ -772,7 +780,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateExam: updateExamHandler,
       updateStudent: updateStudentHandler,
     };
-  }, [authResolved, data, isHydrated, session, syncError, syncStatus]);
+  }, [authResolved, data, isHydrated, operationalDataReady, session, syncError, syncStatus]);
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }

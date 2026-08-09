@@ -66,7 +66,7 @@ export function CollaborativeExamsWorkspace() {
       setMessage("Prova-base criada e distribuída aos professores."); setTitle(""); setSections([{ subject: "", teacherId: "", questionCount: "10" }]); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível criar a prova."); }
   };
-  if (!session || loading) return <Card className="p-6"><p className="text-sm text-[var(--muted-foreground)]">Carregando provas colaborativas…</p></Card>;
+  if (!session || loading) return <CollaborativeExamsLoading />;
 
   return <div className="grid gap-5">
     <Card className="collaborative-exams__intro p-6">
@@ -76,6 +76,30 @@ export function CollaborativeExamsWorkspace() {
     </Card>
     {exams.length ? exams.map((exam) => <ExamCard key={exam.id} exam={exam} management={management} onChange={load} />) : <Card className="p-6"><p className="text-sm text-[var(--muted-foreground)]">{management ? "Nenhuma prova-base criada." : "Nenhum bloco de prova foi atribuído a você."}</p></Card>}
   </div>;
+}
+
+function CollaborativeExamsLoading() {
+  return (
+    <div className="grid gap-5" aria-busy="true" aria-live="polite">
+      <Card className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="h-7 w-52 animate-pulse rounded-full bg-[var(--surface-strong)]" />
+            <div className="h-4 max-w-2xl animate-pulse rounded-full bg-[var(--surface-strong)]" />
+            <div className="h-4 w-2/3 animate-pulse rounded-full bg-[var(--surface-strong)]" />
+          </div>
+          <div className="h-7 w-28 animate-pulse rounded-full bg-[var(--surface-strong)]" />
+        </div>
+        <p className="mt-6 text-sm text-[var(--muted-foreground)]">Carregando distribuição de provas…</p>
+      </Card>
+      <Card className="p-6">
+        <div className="space-y-3">
+          <div className="h-5 w-40 animate-pulse rounded-full bg-[var(--surface-strong)]" />
+          <div className="h-16 animate-pulse rounded-[18px] bg-[var(--surface-strong)]" />
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 function ExamCard({ exam, management, onChange }: { exam: CollaborativeExam; management: boolean; onChange: () => Promise<void> }) {
