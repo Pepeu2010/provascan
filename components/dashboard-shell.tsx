@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardLoading from "@/app/dashboard/loading";
 import { useAppData } from "@/components/app-data-provider";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
+import { SupportDialog } from "@/components/support-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { canAccessSensitiveSettings } from "@/lib/access-control";
@@ -361,6 +362,7 @@ export function DashboardShell({
           {!visibleCommandItems.length ? <p className="command-palette__empty">Nenhuma área encontrada.</p> : null}
         </div>
       </dialog>
+      <SupportDialog canPrompt={active !== "/dashboard/correcao" && !pathname.startsWith("/dashboard/correcao")} />
     </div>
   );
 }

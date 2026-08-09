@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   GraduationCap,
+  Heart,
   LayoutDashboard,
   ScanLine,
   Settings,
@@ -120,6 +121,21 @@ export function DashboardSidebar({
             );
           })}
       </nav>
+      <div className="dashboard-sidebar__support">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate();
+            window.dispatchEvent(new Event("provascan:open-support"));
+          }}
+          aria-label={compact ? "Apoiar o ProvaScan" : undefined}
+          title={compact ? "Apoiar o ProvaScan" : undefined}
+          className="dashboard-sidebar__item dashboard-sidebar__support-button"
+        >
+          <span className="dashboard-sidebar__item-icon"><Heart className="size-[18px]" aria-hidden="true" /></span>
+          <span className="dashboard-sidebar__item-label">Apoiar o ProvaScan</span>
+        </button>
+      </div>
 
     </aside>
   );

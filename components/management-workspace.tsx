@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Download, Edit3, FileUp, KeyRound, Printer, QrCode, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { Download, Edit3, FileUp, Heart, KeyRound, Printer, QrCode, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
 import { StudentTable } from "@/components/student-table";
@@ -1249,6 +1249,17 @@ export function SettingsWorkspace() {
           {adminMessage ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{adminMessage}</p> : null}
         </Card>
       ) : null}
+
+      <Card className="border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_10%,var(--card-solid)),var(--card-solid))] p-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-[var(--accent)]"><Heart className="size-4" fill="currentColor" aria-hidden="true" /><span className="text-xs font-semibold tracking-[0.14em]">APOIE O PROJETO</span></div>
+            <h2 className="mt-3 text-2xl font-semibold text-[var(--foreground)]">O ProvaScan continua gratuito</h2>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">Caso queira contribuir com a manutenção e desenvolvimento da ferramenta, você pode apoiar o projeto via PIX. É totalmente opcional.</p>
+          </div>
+          <Button variant="secondary" onClick={() => window.dispatchEvent(new Event("provascan:open-support"))}><Heart className="size-4" aria-hidden="true" /> Apoiar o ProvaScan</Button>
+        </div>
+      </Card>
 
       <div className="grid gap-5 xl:grid-cols-2">
       <Card className="p-6">
