@@ -12,10 +12,10 @@ function key() {
   return value;
 }
 
-export function encryptTotpSecret(secret: string) {
+export function encryptTotpSecret(plaintext: string) {
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv("aes-256-gcm", key(), iv, { authTagLength: AUTH_TAG_LENGTH });
-  const ciphertext = Buffer.concat([cipher.update(secret, "utf8"), cipher.final()]);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   return [VERSION, iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), ciphertext.toString("base64url")].join(".");
 }
 
