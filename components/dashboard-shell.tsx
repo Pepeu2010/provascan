@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { LoaderCircle, LogOut, Menu } from "lucide-react";
+import { Command, LoaderCircle, LogOut, Menu, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppData } from "@/components/app-data-provider";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { canAccessSensitiveSettings } from "@/lib/access-control";
 
 const DIALOG_TRANSITION_MS = 200;
 const TABLET_SIDEBAR_TRANSITION_MS = 280;
@@ -26,7 +27,10 @@ export function DashboardShell({
   const [tabletExpanded, setTabletExpanded] = useState(false);
   const [tabletSidebarClosing, setTabletSidebarClosing] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ label: string; path: string } | null>(null);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const commandDialogRef = useRef<HTMLDialogElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
@@ -43,6 +47,13 @@ export function DashboardShell({
       ].join(" • "),
     [data.classes.length, data.corrections.length, data.exams.length, data.students.length],
   );
+  const commandItems = useMemo(
+    () => (session?.role === "professor"
+      ? [{ href: "/dashboard/minhas-provas", label: "Minhas provas", icon: Command }]
+      : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor"))),
+    [session?.role],
+  );
+  const visibleCommandItems = commandItems.filter((item) => item.label.toLocaleLowerCase("pt-BR").includes(commandQuery.trim().toLocaleLowerCase("pt-BR")));
 
   const clearDialogCloseTransition = useCallback(() => {
     const dialog = dialogRef.current;
@@ -145,6 +156,24 @@ export function DashboardShell({
   }, [clearDialogCloseTransition, mobileMenuOpen]);
 
   useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const dialog = commandDialogRef.current;
+    if (!dialog) return;
+    if (commandOpen && !dialog.open) dialog.showModal();
+    if (!commandOpen && dialog.open) dialog.close();
+  }, [commandOpen]);
+
+  useEffect(() => {
     return () => {
       if (tabletCloseTimerRef.current) clearTimeout(tabletCloseTimerRef.current);
     };
@@ -228,7 +257,7 @@ export function DashboardShell({
 
       <main className="dashboard-shell__main">
         <header className="dashboard-shell-panel mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-4 sm:px-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="app-page-header">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 ref={menuTriggerRef}
@@ -241,12 +270,18 @@ export function DashboardShell({
                 <Menu className="size-5" aria-hidden="true" />
               </button>
               <div className="min-w-0">
-                <h1 className="dashboard-section-title text-2xl font-semibold text-[var(--foreground)] sm:text-3xl">{activeLabel}</h1>
-                <p className="mt-1 truncate text-sm text-[var(--muted-foreground)]">{summary}</p>
+                <p className="app-page-header__eyebrow">Workspace · {session?.role === "professor" ? "Professor" : "Gestão acadêmica"}</p>
+                <h1 className="app-page-header__title">{activeLabel}</h1>
+                <p className="app-page-header__meta truncate">{summary}</p>
               </div>
             </div>
 
             <div className="flex flex-none items-center justify-end gap-2">
+              <button type="button" className="app-page-header__command" onClick={() => setCommandOpen(true)} aria-label="Abrir busca rápida">
+                <Search className="size-4" aria-hidden="true" />
+                <span>Ir para uma área</span>
+                <kbd>Ctrl K</kbd>
+              </button>
               {syncStatus === "saving" ? (
                 <div aria-live="polite" className="inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--accent)_36%,var(--border))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface))] px-3 py-2 text-xs font-semibold text-[var(--accent)]">
                   <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
@@ -301,6 +336,30 @@ export function DashboardShell({
           <DashboardSidebar active={active} modal onNavigate={requestMobileClose} onRequestClose={requestMobileClose} />
         </dialog>
       ) : null}
+      <dialog
+        ref={commandDialogRef}
+        className="command-palette"
+        aria-label="Busca rápida"
+        onClose={() => { setCommandOpen(false); setCommandQuery(""); }}
+      >
+        <form method="dialog">
+          <input
+            autoFocus
+            className="command-palette__input"
+            value={commandQuery}
+            onChange={(event) => setCommandQuery(event.target.value)}
+            placeholder="Ir para…"
+            aria-label="Filtrar áreas"
+          />
+        </form>
+        <div className="command-palette__list" role="list">
+          {visibleCommandItems.map((item) => {
+            const Icon = item.icon;
+            return <button key={item.href} type="button" className="command-palette__item" onClick={() => { setCommandOpen(false); router.push(item.href); }}><span><Icon className="size-4" aria-hidden="true" /></span>{item.label}</button>;
+          })}
+          {!visibleCommandItems.length ? <p className="command-palette__empty">Nenhuma área encontrada.</p> : null}
+        </div>
+      </dialog>
     </div>
   );
 }

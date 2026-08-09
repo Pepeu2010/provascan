@@ -11,7 +11,9 @@ const encrypted = encryptTotpSecret(fixturePlaintext);
 assert.equal(decryptTotpSecret(encrypted), fixturePlaintext);
 
 const [version, iv, tag, ciphertext] = encrypted.split(".");
-const alteredTag = `${tag.slice(0, -1)}${tag.endsWith("A") ? "B" : "A"}`;
+const alteredTagBytes = Buffer.from(tag, "base64url");
+alteredTagBytes[0] ^= 1;
+const alteredTag = alteredTagBytes.toString("base64url");
 assert.throws(() => decryptTotpSecret(`${version}.${iv}.${alteredTag}.${ciphertext}`));
 assert.throws(() => decryptTotpSecret(`${version}.short.${tag}.${ciphertext}`));
 

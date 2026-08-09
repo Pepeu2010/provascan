@@ -5,10 +5,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
   type ReactNode,
 } from "react";
 import { AppDataProvider } from "@/components/app-data-provider";
-import type { ResolvedTheme, ThemePreference } from "@/lib/theme";
+import { THEME_STORAGE_KEY, type ResolvedTheme, type ThemePreference } from "@/lib/theme";
 
 type ThemeContextValue = {
   theme: ThemePreference;
@@ -19,17 +20,46 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function Providers({ children }: { children: ReactNode }) {
+  const [theme, setThemePreference] = useState<ThemePreference>("dark");
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>("dark");
+
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", "dark");
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const nextTheme: ThemePreference = stored === "light" || stored === "dark" || stored === "system" ? stored : "dark";
+    const resolve = (value: ThemePreference): ResolvedTheme => value === "system" ? (media.matches ? "dark" : "light") : value;
+    const apply = (value: ThemePreference) => {
+      const resolved = resolve(value);
+      setThemePreference(value);
+      setResolvedTheme(resolved);
+      document.documentElement.setAttribute("data-theme", resolved);
+    };
+
+    apply(nextTheme);
+    const onChange = () => {
+      if (nextTheme === "system") apply("system");
+    };
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
   }, []);
+
+  const setTheme = (nextTheme: ThemePreference) => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    const resolved = nextTheme === "system"
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : nextTheme;
+    setThemePreference(nextTheme);
+    setResolvedTheme(resolved);
+    document.documentElement.setAttribute("data-theme", resolved);
+  };
 
   const value = useMemo(
     () => ({
-      theme: "dark" as ThemePreference,
-      resolvedTheme: "dark" as ResolvedTheme,
-      setTheme: () => {},
+      theme,
+      resolvedTheme,
+      setTheme,
     }),
-    [],
+    [resolvedTheme, theme],
   );
 
   return (

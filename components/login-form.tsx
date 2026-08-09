@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Mail, ShieldCheck } from "lucide-react";
+import { CheckCircle2, KeyRound, Mail, ScanLine, ShieldCheck } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { CreatorCredit } from "@/components/creator-credit";
 import { ProvaScanLogo } from "@/components/provascan-logo";
@@ -39,9 +39,23 @@ export function LoginForm() {
   };
 
   return (
-    <main className="min-h-[100dvh] px-4 py-4 sm:px-6 sm:py-6">
-      <div className="mx-auto flex min-h-[calc(100dvh-32px)] max-w-[1160px] items-center justify-center py-10">
-        <div className="w-full max-w-[480px]">
+    <main className="login-page min-h-[100dvh] px-4 py-4 sm:px-6 sm:py-6">
+      <div className="login-page__frame mx-auto grid min-h-[calc(100dvh-32px)] max-w-[1160px] items-center py-6 lg:grid-cols-[1.08fr_.92fr] lg:py-10">
+        <section className="login-page__instrument" aria-label="Como o ProvaScan trabalha">
+          <p className="login-page__eyebrow"><ScanLine className="size-3.5" /> ProvaScan · leitura assistida</p>
+          <h1>Da folha à decisão, com rastreabilidade.</h1>
+          <p>O ProvaScan identifica a leitura, marca as exceções e mantém a confirmação final nas suas mãos.</p>
+          <div className="login-page__scan-card" aria-hidden="true">
+            <span className="login-page__scan-grid" />
+            <span className="login-page__scan-line" />
+            <span className="login-page__scan-chip">OCR</span>
+          </div>
+          <div className="login-page__assurances">
+            <span><CheckCircle2 className="size-4" /> Revisão obrigatória</span>
+            <span><CheckCircle2 className="size-4" /> Dados por turma</span>
+          </div>
+        </section>
+        <div className="login-page__form w-full max-w-[480px] justify-self-center lg:justify-self-end">
           <Card className="p-5 sm:p-7">
             <ProvaScanLogo size="md" />
             <div className="mt-6 border-t border-[var(--border)] pt-5 sm:mt-8 sm:pt-6">
