@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { AppDataProvider } from "@/components/app-data-provider";
 import { SupportDialog } from "@/components/support-dialog";
 import { THEME_STORAGE_KEY, type ResolvedTheme, type ThemePreference } from "@/lib/theme";
 
@@ -65,10 +64,8 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={value}>
-      <AppDataProvider>
-        {children}
-        <SupportDialog />
-      </AppDataProvider>
+      {children}
+      <SupportDialog />
     </ThemeContext.Provider>
   );
 }

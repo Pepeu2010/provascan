@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AppDataProvider } from "@/components/app-data-provider";
 import { requireProtectedPage } from "@/lib/server-route-guard";
 
 export default async function DashboardLayout({
@@ -6,6 +7,6 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  await requireProtectedPage("/dashboard");
-  return children;
+  const session = await requireProtectedPage("/dashboard");
+  return <AppDataProvider initialSession={session}>{children}</AppDataProvider>;
 }

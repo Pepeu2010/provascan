@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cache } from "react";
 import {
   applyAuthCookie,
   buildSessionUser,
@@ -39,7 +40,7 @@ function buildSafeUserFromSheetUser(user: {
   } satisfies SafeAuthUser;
 }
 
-export async function validateSessionToken(token: string | undefined): Promise<ValidSessionResult> {
+export const validateSessionToken = cache(async (token: string | undefined): Promise<ValidSessionResult> => {
   const parsed = await parseSessionToken(token);
   if (!parsed) {
     return { ok: false, reason: "missing" };
@@ -68,7 +69,7 @@ export async function validateSessionToken(token: string | undefined): Promise<V
     user: safeUser,
     passwordStamp,
   };
-}
+});
 
 export async function syncValidatedSessionCookie(
   response: NextResponse,

@@ -241,12 +241,18 @@ function applyRemoteAppData(remote: AppDataState, session: AuthSessionUser | nul
   } satisfies AppDataState;
 }
 
-export function AppDataProvider({ children }: { children: ReactNode }) {
+export function AppDataProvider({
+  children,
+  initialSession,
+}: {
+  children: ReactNode;
+  initialSession?: AuthSessionUser | null;
+}) {
   const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
   const [data, setData] = useState<AppDataState>(() => cloneDefaultAppData());
-  const [authResolved, setAuthResolved] = useState(false);
+  const [authResolved, setAuthResolved] = useState(() => initialSession !== undefined);
   const [operationalDataReady, setOperationalDataReady] = useState(false);
-  const [session, setSession] = useState<AuthSessionUser | null>(null);
+  const [session, setSession] = useState<AuthSessionUser | null>(() => initialSession ?? null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncError, setSyncError] = useState("");
   const hasLoadedRemoteDataRef = useRef(false);
@@ -256,6 +262,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined") {
+      return;
+    }
+    if (initialSession !== undefined) {
       return;
     }
 
@@ -290,7 +299,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialSession]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !session) {

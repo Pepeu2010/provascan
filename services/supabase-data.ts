@@ -166,7 +166,13 @@ function teacherProfile(rows: Array<{ key: string; value: string }>): TeacherPro
 export async function getOperationalAppData(): Promise<AppDataState> {
   const db = client();
   const [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult] = await Promise.all([
-    db.from("classes").select("*"), db.from("students").select("*"), db.from("exams").select("*"), db.from("answer_keys").select("*"), db.from("correction_rules").select("*"), db.from("corrections").select("*"), db.from("app_settings_internal").select("key,value"),
+    db.from("classes").select("id,name,academic_year,audience_id,audience_label,group_type,year_segment"),
+    db.from("students").select("id,name,class_id,status"),
+    db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at"),
+    db.from("answer_keys").select("exam_id,question_number,correct_answer"),
+    db.from("correction_rules").select("exam_id,max_score,rounding_places,default_weight,weights_by_question,voided_questions,voided_question_mode"),
+    db.from("corrections").select("id,exam_id,student_id,detected_name,score,correct_count,incorrect_count,blank_count,multiple_marks_count,voided_count,percentage,corrected_at,source_image,correction_time,identification_method,student_snapshot,exam_snapshot,class_snapshot,answers,ocr_confidence,processed_image,observations,identification"),
+    db.from("app_settings_internal").select("key,value"),
   ]);
   [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult].forEach((result) => dbError(result.error));
   const storedClasses = ((classResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), ano: String(row.academic_year), audienceId: String(row.audience_id || "") || undefined, audienceLabel: String(row.audience_label || "") || undefined, groupType: String(row.group_type || "") || undefined, yearSegment: String(row.year_segment || "") || undefined })) as ClassRoom[];
