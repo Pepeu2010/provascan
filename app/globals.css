@@ -767,10 +767,10 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   box-shadow: 0 12px 30px rgb(106 65 203 / 22%);
   color: #fff !important;
 }
-.landing-primary-button:hover { background: linear-gradient(135deg, #8660e6, #b582ff) !important; box-shadow: 0 16px 34px rgb(106 65 203 / 30%); }
+.landing-primary-button:hover { border-color: #ded2ff !important; background: linear-gradient(135deg, #8660e6, #b582ff) !important; box-shadow: 0 0 0 3px rgb(178 138 255 / 22%), 0 16px 34px rgb(106 65 203 / 30%); }
 .landing-primary-button--large { min-height: 50px; padding-inline: 22px !important; }
 .landing-secondary-button { border-color: rgb(235 229 255 / 18%) !important; background: rgb(17 16 25 / 66%) !important; color: #f4f0fb !important; }
-.landing-secondary-button:hover { border-color: rgb(178 138 255 / 55%) !important; background: rgb(157 108 255 / 10%) !important; }
+.landing-secondary-button:hover { border-color: rgb(203 183 255 / 86%) !important; background: rgb(157 108 255 / 10%) !important; box-shadow: 0 0 0 3px rgb(178 138 255 / 14%); }
 
 .landing-hero { padding: 76px 0 84px; }
 .landing-hero__grid { display: grid; grid-template-columns: minmax(0, .86fr) minmax(460px, 1.14fr); align-items: center; gap: clamp(36px, 6vw, 92px); }
