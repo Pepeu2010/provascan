@@ -323,7 +323,10 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 }
 
 .dashboard-command-center { padding-bottom: 16px; }
+.dashboard-shell-panel { animation: dashboard-header-arrive 520ms var(--motion-spring) both; }
 .dashboard-next-action {
+  position: relative;
+  overflow: hidden;
   display: grid;
   align-items: center;
   gap: 20px;
@@ -332,7 +335,9 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   background: var(--card-solid);
   box-shadow: var(--shadow-soft);
   padding: 24px;
+  animation: dashboard-action-arrive 620ms var(--motion-spring) both;
 }
+.dashboard-next-action::before { position: absolute; inset: 0; content: ""; pointer-events: none; background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--accent) 10%, transparent) 50%, transparent 62%); transform: translateX(-135%); animation: dashboard-scanner-sweep 7s 1.1s ease-in-out infinite; }
 .dashboard-next-action__icon,
 .dashboard-row-icon {
   display: grid;
@@ -342,17 +347,19 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   background: var(--accent-soft);
   color: var(--accent);
 }
-.dashboard-next-action__icon { width: 58px; height: 58px; }
+.dashboard-next-action__icon { position: relative; width: 58px; height: 58px; animation: dashboard-icon-settle 620ms 120ms var(--motion-spring) both; }
+.dashboard-next-action__icon::after { position: absolute; inset: -7px; border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent); border-radius: 16px; content: ""; animation: dashboard-icon-radiate 2.8s 900ms ease-out infinite; }
 .dashboard-next-action h2,
 .dashboard-worklist h2 { margin: 0; color: var(--foreground); font-size: 22px; font-weight: 700; letter-spacing: -0.035em; }
 .dashboard-next-action p,
 .dashboard-worklist__heading p { max-width: 640px; margin: 7px 0 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
 .dashboard-next-action__meta { min-width: 132px; border-left: 1px solid var(--border); padding-left: 20px; }
-.dashboard-next-action__meta span { display: block; color: var(--accent); font-size: 30px; font-weight: 750; letter-spacing: -0.06em; line-height: 1; }
+.dashboard-next-action__meta span { display: block; color: var(--accent); font-size: 30px; font-weight: 750; letter-spacing: -0.06em; line-height: 1; animation: dashboard-number-arrive 480ms 180ms var(--motion-spring) both; }
 .dashboard-next-action__meta small { display: block; margin-top: 7px; color: var(--muted-foreground); font-size: 12px; font-weight: 600; line-height: 1.35; }
 .dashboard-next-action__button { min-width: 174px; }
 .dashboard-worklist,
-.dashboard-activity { padding: 0; overflow: hidden; }
+.dashboard-activity { padding: 0; overflow: hidden; animation: dashboard-panel-arrive 560ms var(--motion-spring) both; }
+.dashboard-activity { animation-delay: 72ms; }
 .dashboard-worklist__heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 24px 24px 18px; }
 .dashboard-text-link,
 .dashboard-row-action { display: inline-flex; flex: none; align-items: center; gap: 6px; margin: -6px -8px; border: 1px solid transparent; border-radius: 8px; color: var(--accent-strong); padding: 6px 8px; font-size: 13px; font-weight: 700; transition: border-color var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), color var(--motion-normal) var(--motion-settle); }
@@ -364,10 +371,14 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .dashboard-worklist__rows,
 .dashboard-activity__rows { border-top: 1px solid var(--border); }
 .dashboard-worklist__row,
-.dashboard-activity__row { display: flex; align-items: center; gap: 14px; padding: 16px 24px; }
+.dashboard-activity__row { display: flex; align-items: center; gap: 14px; padding: 16px 24px; transition: background-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle); animation: dashboard-row-arrive 440ms var(--motion-spring) both; }
+.dashboard-worklist__row:nth-child(2), .dashboard-activity__row:nth-child(2) { animation-delay: 54ms; }
+.dashboard-worklist__row:nth-child(3), .dashboard-activity__row:nth-child(3) { animation-delay: 108ms; }
+.dashboard-worklist__row:nth-child(4), .dashboard-activity__row:nth-child(4) { animation-delay: 162ms; }
+.dashboard-worklist__row:hover, .dashboard-activity__row:hover { background: color-mix(in srgb, var(--accent) 4%, var(--surface)); box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 54%, transparent); }
 .dashboard-worklist__row + .dashboard-worklist__row,
 .dashboard-activity__row + .dashboard-activity__row { border-top: 1px solid var(--border); }
-.dashboard-row-icon { width: 40px; height: 40px; }
+.dashboard-row-icon { width: 40px; height: 40px; animation: dashboard-icon-settle 460ms var(--motion-spring) both; }
 .dashboard-row-title,
 .dashboard-activity__row p,
 .dashboard-empty-state p { margin: 0; color: var(--foreground); font-size: 14px; font-weight: 700; line-height: 1.35; }
@@ -375,7 +386,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .dashboard-activity__row span,
 .dashboard-empty-state span { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
 .dashboard-activity__row strong { margin-left: auto; color: var(--foreground); font-size: 14px; }
-.dashboard-empty-state { display: flex; align-items: center; gap: 14px; padding: 26px 24px; border-top: 1px solid var(--border); }
+.dashboard-empty-state { display: flex; align-items: center; gap: 14px; padding: 26px 24px; border-top: 1px solid var(--border); animation: dashboard-row-arrive 500ms 110ms var(--motion-spring) both; }
 .dashboard-empty-state > div:nth-child(2) { min-width: 0; flex: 1; }
 
 @media (min-width: 640px) {
@@ -735,6 +746,48 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 @keyframes navigation-feedback-panel-in {
   from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.97); }
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes dashboard-header-arrive {
+  from { opacity: 0; transform: translate3d(0, -10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes dashboard-action-arrive {
+  from { opacity: 0; transform: translate3d(0, 18px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes dashboard-panel-arrive {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes dashboard-row-arrive {
+  from { opacity: 0; transform: translate3d(-8px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes dashboard-icon-settle {
+  from { opacity: 0; transform: scale(.76); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes dashboard-icon-radiate {
+  0%, 64% { opacity: 0; transform: scale(.86); }
+  72% { opacity: .8; }
+  100% { opacity: 0; transform: scale(1.22); }
+}
+
+@keyframes dashboard-number-arrive {
+  from { opacity: 0; transform: translate3d(0, 9px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes dashboard-scanner-sweep {
+  0%, 36% { transform: translateX(-135%); opacity: 0; }
+  43% { opacity: 1; }
+  57%, 100% { transform: translateX(135%); opacity: 0; }
 }
 
 @keyframes landing-media-float {
