@@ -264,7 +264,7 @@ export function DashboardShell({
                 ref={menuTriggerRef}
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className="inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] md:hidden"
+                className="dashboard-menu-trigger inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] md:hidden"
                 aria-label="Abrir menu"
                 aria-expanded={mobileMenuOpen}
               >
