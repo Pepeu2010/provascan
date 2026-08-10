@@ -168,7 +168,7 @@ body {
 .dashboard-menu-trigger:active { animation: menu-trigger-press 280ms var(--motion-spring) both; }
 .dashboard-menu-trigger--open { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); animation: menu-trigger-open 420ms var(--motion-spring) both; }
 
-.command-palette { width: min(calc(100vw - 32px), 580px); border: 1px solid var(--border-strong); border-radius: 18px; background: var(--card-solid); box-shadow: var(--shadow-floating); color: var(--foreground); padding: 8px; }
+.command-palette { position: fixed; inset: 0; width: min(calc(100vw - 32px), 580px); max-height: min(calc(100dvh - 64px), 520px); margin: auto; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 18px; background: var(--card-solid); box-shadow: var(--shadow-floating); color: var(--foreground); padding: 8px; }
 .command-palette[open] { animation: dialog-arrive 360ms var(--motion-spring) both; }
 .command-palette::backdrop { background: var(--overlay-scrim); backdrop-filter: blur(4px); }
 .command-palette__input { width: 100%; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--foreground); outline: 0; padding: 13px 14px 15px; font-size: 15px; }
