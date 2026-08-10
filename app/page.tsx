@@ -92,9 +92,7 @@ export default function HomePage() {
         <div className="landing-container landing-hero__grid">
           <motion.div
             className="landing-hero__copy"
-            initial={reduceMotion ? false : { opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={heroTransition}
+            initial={false}
           >
             <p className="landing-kicker"><Sparkles className="size-3.5" /> Para quem corrige prova objetiva</p>
             <h1>A correção que cabe no ritmo da <span>escola.</span></h1>
@@ -113,9 +111,7 @@ export default function HomePage() {
 
           <motion.div
             className="landing-hero__media"
-            initial={reduceMotion ? false : { opacity: 0, y: 26, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ ...heroTransition, delay: 0.1 }}
+            initial={false}
           >
             <div className="landing-hero__image-frame">
               <Image

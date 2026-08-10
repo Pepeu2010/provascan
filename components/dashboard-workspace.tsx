@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { ArrowRight, Camera, CheckCircle2, ClipboardList, FileText, UsersRound } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { Button } from "@/components/ui/button";
@@ -19,12 +18,7 @@ export function DashboardWorkspace() {
 
   return (
     <div className="dashboard-command-center mx-auto grid max-w-[1380px] gap-5">
-      <motion.section
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, ease: "easeOut" }}
-        className="dashboard-next-action"
-      >
+      <section className="dashboard-next-action">
         <div className="dashboard-next-action__icon" aria-hidden="true">
           <Camera className="size-7" strokeWidth={1.8} />
         </div>
@@ -42,7 +36,7 @@ export function DashboardWorkspace() {
             <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </Button>
-      </motion.section>
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(330px,0.75fr)]">
         <Card className="dashboard-worklist">

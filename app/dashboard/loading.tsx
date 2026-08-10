@@ -29,6 +29,7 @@ export default function DashboardLoading() {
           <span className="dashboard-loading__step dashboard-loading__step--active"><LoaderCircle className="size-3.5 animate-spin" />Organizando dados</span>
           <span className="dashboard-loading__step">Abrindo painel</span>
         </div>
+        <div className="dashboard-loading__progress" aria-hidden="true"><span /></div>
       </section>
     </main>
   );

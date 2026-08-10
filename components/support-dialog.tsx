@@ -92,7 +92,7 @@ export function SupportDialog() {
     >
       <div className="relative overflow-hidden px-6 pb-6 pt-7 sm:px-9 sm:pb-9 sm:pt-10">
         <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--accent),#d7d0ff,transparent)]" />
-        <button type="button" className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]" onClick={() => close()} aria-label="Fechar apoio ao ProvaScan"><X className="size-4" /></button>
+        <motion.button type="button" whileHover={reduceMotion ? undefined : { scale: 1.06, rotate: 4 }} whileTap={reduceMotion ? undefined : { scale: 0.9 }} transition={{ type: "spring", stiffness: 420, damping: 22 }} className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]" onClick={() => close()} aria-label="Fechar apoio ao ProvaScan"><X className="size-4" /></motion.button>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={step} initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, y: -8 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 340, damping: 27, mass: 0.8 }}>
             {step === "intro" ? <>
