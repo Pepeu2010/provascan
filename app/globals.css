@@ -159,13 +159,17 @@ body {
 .app-page-header__meta { margin: 6px 0 0; color: var(--muted-foreground); font-size: 12px; }
 .app-page-header__command { display: inline-flex; align-items: center; gap: 8px; min-width: min(260px, 31vw); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--muted-foreground); padding: 9px 11px; font-size: 12px; text-align: left; transition: border-color var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), color var(--motion-normal) var(--motion-settle); }
 .app-page-header__command:hover, .app-page-header__command:focus-visible { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); background: var(--surface); box-shadow: 0 0 0 3px var(--focus-ring), inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); color: var(--foreground); outline: 0; }
+.app-page-header__command:active { transform: scale(.98); }
 .app-page-header__command svg { transition: color var(--motion-normal) var(--motion-settle); }
 .app-page-header__command:hover svg, .app-page-header__command:focus-visible svg { color: var(--accent); }
 .app-page-header__command kbd { margin-left: auto; border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px; color: var(--muted-foreground); font-family: var(--font-plex-mono), monospace; font-size: 10px; }
 .dashboard-menu-trigger { transition: border-color var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), color var(--motion-normal) var(--motion-settle); }
 .dashboard-menu-trigger:hover, .dashboard-menu-trigger:focus-visible { border-color: color-mix(in srgb, var(--accent) 62%, var(--border)); background: var(--surface); box-shadow: 0 0 0 3px var(--focus-ring); color: var(--accent); outline: 0; }
+.dashboard-menu-trigger:active { animation: menu-trigger-press 280ms var(--motion-spring) both; }
+.dashboard-menu-trigger--open { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); animation: menu-trigger-open 420ms var(--motion-spring) both; }
 
 .command-palette { width: min(calc(100vw - 32px), 580px); border: 1px solid var(--border-strong); border-radius: 18px; background: var(--card-solid); box-shadow: var(--shadow-floating); color: var(--foreground); padding: 8px; }
+.command-palette[open] { animation: dialog-arrive 360ms var(--motion-spring) both; }
 .command-palette::backdrop { background: var(--overlay-scrim); backdrop-filter: blur(4px); }
 .command-palette__input { width: 100%; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--foreground); outline: 0; padding: 13px 14px 15px; font-size: 15px; }
 .command-palette__list { display: grid; gap: 3px; max-height: min(55dvh, 420px); overflow: auto; padding: 8px 0 0; }
@@ -356,6 +360,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .dashboard-text-link:focus-visible,
 .dashboard-row-action:hover,
 .dashboard-row-action:focus-visible { border-color: color-mix(in srgb, var(--accent) 58%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); outline: 0; }
+.dashboard-text-link:active, .dashboard-row-action:active { transform: scale(.97); }
 .dashboard-worklist__rows,
 .dashboard-activity__rows { border-top: 1px solid var(--border); }
 .dashboard-worklist__row,
@@ -528,6 +533,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 }
 
 .dashboard-sidebar__item:hover, .dashboard-sidebar__item:focus-visible { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--surface); color: var(--foreground); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); outline: 0; }
+.dashboard-sidebar__item:active { transform: scale(.98); }
 .dashboard-sidebar__item--active { border-color: transparent; background: color-mix(in srgb, var(--accent-soft) 70%, transparent); color: var(--foreground); }
 
 .dashboard-sidebar__item-icon {
@@ -577,7 +583,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   background: transparent;
   opacity: 0;
   transform: translateX(-14px);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition: opacity var(--motion-emphasis) var(--motion-spring), transform var(--motion-emphasis) var(--motion-spring);
 }
 
 .dashboard-mobile-dialog[data-ready="true"] { opacity: 1; transform: translateX(0); }
@@ -649,6 +655,8 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .nav-link:hover { color: var(--foreground); }
 
 .dashboard-page-transition { animation: page-reveal 360ms cubic-bezier(.22, 1, .36, 1) both; }
+.dashboard-navigation-feedback { animation: navigation-feedback-in 180ms ease-out both; }
+.dashboard-navigation-feedback__panel { animation: navigation-feedback-panel-in 360ms var(--motion-spring) both; }
 .dashboard-page-transition > * { animation: content-stagger-in 460ms var(--motion-spring) both; }
 .dashboard-command-center > * { animation: content-stagger-in 460ms var(--motion-spring) both; }
 .dashboard-command-center > *:nth-child(2) { animation-delay: var(--motion-stagger); }
@@ -700,6 +708,33 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 @keyframes active-indicator-in {
   0% { transform: scale(.3); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes menu-trigger-press {
+  0% { transform: scale(1); }
+  45% { transform: scale(.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes menu-trigger-open {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 38%, transparent); }
+  55% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+  100% { box-shadow: 0 0 0 3px var(--focus-ring); }
+}
+
+@keyframes dialog-arrive {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.98); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes navigation-feedback-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes navigation-feedback-panel-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.97); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 @keyframes landing-media-float {

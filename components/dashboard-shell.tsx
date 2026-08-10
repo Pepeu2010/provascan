@@ -220,12 +220,12 @@ export function DashboardShell({
     <div className="dashboard-shell">
       {pendingNavigation && pendingNavigation.path !== pathname ? (
         <div
-          className="fixed inset-0 z-[80] grid place-items-center bg-[rgb(4_3_7_/_66%)] p-5 backdrop-blur-[2px]"
+          className="dashboard-navigation-feedback fixed inset-0 z-[80] grid place-items-center bg-[rgb(4_3_7_/_66%)] p-5 backdrop-blur-[2px]"
           role="status"
           aria-live="polite"
           aria-atomic="true"
         >
-          <div className="flex min-w-[230px] items-center gap-3 rounded-[20px] border border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] bg-[var(--card-solid)] px-5 py-4 shadow-[var(--shadow-floating)]">
+          <div className="dashboard-navigation-feedback__panel flex min-w-[230px] items-center gap-3 rounded-[20px] border border-[color-mix(in_srgb,var(--accent)_40%,var(--border))] bg-[var(--card-solid)] px-5 py-4 shadow-[var(--shadow-floating)]">
             <span className="grid size-10 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
               <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
             </span>
@@ -264,7 +264,7 @@ export function DashboardShell({
                 ref={menuTriggerRef}
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className="dashboard-menu-trigger inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] md:hidden"
+                className={`dashboard-menu-trigger ${mobileMenuOpen ? "dashboard-menu-trigger--open" : ""} inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] md:hidden`}
                 aria-label="Abrir menu"
                 aria-expanded={mobileMenuOpen}
               >
