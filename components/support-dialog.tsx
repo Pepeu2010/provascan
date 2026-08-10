@@ -12,8 +12,6 @@ import { isPixConfigured } from "@/lib/support-config";
 type SupportStep = "intro" | "pix";
 
 const DISMISSED_KEY = "provascan-support-dismissed";
-const COOLDOWN_KEY = "provascan-support-next-prompt-at";
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const OPEN_EVENT = "provascan:open-support";
 
 async function copyText(value: string) {
@@ -44,7 +42,6 @@ export function SupportDialog() {
 
   const close = useCallback((permanently = false) => {
     if (permanently) localStorage.setItem(DISMISSED_KEY, "true");
-    else localStorage.setItem(COOLDOWN_KEY, String(Date.now() + COOLDOWN_MS));
     setOpen(false);
   }, []);
 
@@ -61,9 +58,8 @@ export function SupportDialog() {
   }, [show]);
 
   useEffect(() => {
-    const shouldPrompt = pathname === "/" || (pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/correcao"));
+    const shouldPrompt = pathname.startsWith("/dashboard") && !pathname.startsWith("/dashboard/correcao");
     if (!shouldPrompt || localStorage.getItem(DISMISSED_KEY) === "true") return;
-    if (Date.now() < Number(localStorage.getItem(COOLDOWN_KEY) ?? 0)) return;
     const timer = window.setTimeout(show, 360);
     return () => window.clearTimeout(timer);
   }, [pathname, show]);
