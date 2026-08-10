@@ -677,27 +677,6 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 1ms !important; }
 }
 
-.support-dialog { width: min(100% - 32px, 500px); max-height: min(760px, calc(100dvh - 32px)); overflow: auto; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border)); border-radius: 24px; background: var(--card-solid); color: var(--foreground); padding: 0; box-shadow: var(--shadow-floating); }
-.support-dialog::backdrop { background: var(--overlay-scrim); backdrop-filter: blur(2px); }
-.support-dialog__panel { position: relative; overflow: hidden; padding: clamp(26px, 6vw, 38px); }
-.support-dialog__panel::after { position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 30%, transparent)); content: ""; }
-.support-dialog__close { position: absolute; top: 16px; right: 16px; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted-foreground); transition: color var(--motion-fast) ease, background var(--motion-fast) ease; }
-.support-dialog__close:hover { background: var(--accent-soft); color: var(--accent); }
-.support-dialog__mark { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
-.support-dialog__mark--success { background: var(--success-soft); color: var(--success); }
-.support-dialog__eyebrow { margin: 22px 0 0; color: var(--accent); font-family: var(--font-plex-mono), monospace; font-size: 10px; font-weight: 700; letter-spacing: .16em; }
-.support-dialog__title { max-width: 390px; margin: 10px 0 0; font-size: clamp(1.65rem, 6vw, 2rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.05; }
-.support-dialog__copy { margin: 17px 0 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.7; }
-.support-dialog__assurance, .support-dialog__setup { margin: 16px 0 0; border-left: 2px solid var(--accent); padding-left: 12px; color: var(--foreground); font-size: 13px; font-weight: 650; line-height: 1.55; }
-.support-dialog__setup { border-color: var(--warning); color: var(--muted-foreground); }
-.support-dialog__actions { display: grid; gap: 8px; margin-top: 26px; }
-.support-dialog__never, .support-dialog__back { display: block; width: fit-content; margin: 13px auto 0; border: 0; background: transparent; color: var(--muted-foreground); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
-.support-dialog__pix { display: grid; justify-items: center; gap: 13px; margin-top: 22px; text-align: center; }
-.support-dialog__pix > p { margin: 0; color: var(--muted-foreground); font-size: 13px; }
-.support-dialog__pix .button { margin-top: 6px; }
-.support-dialog__copied { margin: 18px 0 0; color: var(--success); font-size: 13px; font-weight: 700; text-align: center; }
-@media (max-width: 767px) { .support-dialog__panel { padding: 28px 24px 24px; } }
-
 /* Landing page: Signal Room - dark editorial system for ProvaScan. */
 .landing-page {
   --landing-ink: #0a0910;
