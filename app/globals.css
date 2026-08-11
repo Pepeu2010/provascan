@@ -464,7 +464,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .correction-workspace__control .border-dashed::after { position: absolute; top: 0; right: 12%; left: 12%; height: 1px; background: var(--accent); content: ""; opacity: .7; animation: scanner-sweep 3.8s ease-in-out infinite; }
 .correction-workspace__review { background: linear-gradient(180deg, var(--card-solid), var(--surface)); }
 
-.collaborative-exams__intro { overflow: hidden; background: linear-gradient(135deg, var(--card-solid), color-mix(in srgb, var(--accent-soft) 38%, var(--card-solid))); }
+.collaborative-exams__intro { z-index: 20; overflow: visible; background: linear-gradient(135deg, var(--card-solid), color-mix(in srgb, var(--accent-soft) 38%, var(--card-solid))); }
 .collaborative-exams__intro > div:first-child { position: relative; }
 .collaborative-exams__intro > div:first-child::after { position: absolute; right: -15px; bottom: -46px; width: 150px; height: 150px; border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent); border-radius: 50%; box-shadow: 0 0 0 22px color-mix(in srgb, var(--accent) 7%, transparent), 0 0 0 46px color-mix(in srgb, var(--accent) 4%, transparent); content: ""; pointer-events: none; }
 .collaborative-exams__intro ~ .app-panel { overflow: hidden; }
