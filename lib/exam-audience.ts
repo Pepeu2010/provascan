@@ -13,13 +13,13 @@ type DerivedAudience = ExamAudienceOption & {
 };
 
 const FIXED_EXAM_AUDIENCES: ExamAudienceOption[] = [
-  { id: "ANO-1-GERAL", label: "1ª série", groupType: "GERAL", yearSegment: "1" },
-  { id: "ANO-2-EXATAS", label: "2ª série - Exatas", groupType: "EXATAS", yearSegment: "2" },
-  { id: "ANO-2-HUMANAS", label: "2ª série - Humanas", groupType: "HUMANAS", yearSegment: "2" },
-  { id: "ANO-2-TECNICO", label: "2ª série - Técnico", groupType: "TECNICO", yearSegment: "2" },
-  { id: "ANO-3-EXATAS", label: "3ª série - Exatas", groupType: "EXATAS", yearSegment: "3" },
-  { id: "ANO-3-HUMANAS", label: "3ª série - Humanas", groupType: "HUMANAS", yearSegment: "3" },
-  { id: "ANO-3-TECNICO", label: "3ª série - Técnico", groupType: "TECNICO", yearSegment: "3" },
+  { id: "ANO-1-GERAL", label: "1º série", groupType: "GERAL", yearSegment: "1" },
+  { id: "ANO-2-EXATAS", label: "2º série - Exatas", groupType: "EXATAS", yearSegment: "2" },
+  { id: "ANO-2-HUMANAS", label: "2º série - Humanas", groupType: "HUMANAS", yearSegment: "2" },
+  { id: "ANO-2-TECNICO", label: "2º série - Técnico", groupType: "TECNICO", yearSegment: "2" },
+  { id: "ANO-3-EXATAS", label: "3º série - Exatas", groupType: "EXATAS", yearSegment: "3" },
+  { id: "ANO-3-HUMANAS", label: "3º série - Humanas", groupType: "HUMANAS", yearSegment: "3" },
+  { id: "ANO-3-TECNICO", label: "3º série - Técnico", groupType: "TECNICO", yearSegment: "3" },
 ] as const;
 
 function normalizeText(value: string) {
@@ -76,7 +76,7 @@ export function deriveClassAudience(classroom: Pick<ClassRoom, "id" | "nome">): 
   if (yearSegment === "2" || yearSegment === "3") {
     return {
       id: createAudienceId(yearSegment, "INDEFINIDO", slugify(classroom.id || classroom.nome)),
-      label: `${yearSegment}ª série - Revisar agrupamento`,
+      label: `${yearSegment}º série - Revisar agrupamento`,
       groupType: "INDEFINIDO",
       requiresManualGrouping: true,
       yearSegment,

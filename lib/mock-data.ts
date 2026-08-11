@@ -16,9 +16,9 @@ export const teacherProfile: TeacherProfile = {
 };
 
 export const classes: ClassRoom[] = [
-  { id: "T-101", nome: "3ª Série A", ano: "2026" },
-  { id: "T-102", nome: "2ª Série B", ano: "2026" },
-  { id: "T-103", nome: "9ª Série A", ano: "2026" },
+  { id: "T-101", nome: "3º Série A", ano: "2026" },
+  { id: "T-102", nome: "2º Série B", ano: "2026" },
+  { id: "T-103", nome: "9º Série A", ano: "2026" },
 ];
 
 export const students: Student[] = [
@@ -34,7 +34,7 @@ export const exams: Exam[] = [
     id: "P-301",
     titulo: "Simulado ENEM I",
     audienceId: "ANO-3-INDEFINIDO-t-101",
-    audienceLabel: "3ª série - Revisar agrupamento",
+    audienceLabel: "3º série - Revisar agrupamento",
     groupType: "INDEFINIDO",
     yearSegment: "3",
     quantidadeQuestoes: 20,
@@ -47,7 +47,7 @@ export const exams: Exam[] = [
     id: "P-302",
     titulo: "Revisão de Química",
     audienceId: "ANO-2-HUMANAS",
-    audienceLabel: "2ª série - Humanas",
+    audienceLabel: "2º série - Humanas",
     groupType: "HUMANAS",
     yearSegment: "2",
     quantidadeQuestoes: 15,
@@ -60,7 +60,7 @@ export const exams: Exam[] = [
     id: "P-303",
     titulo: "Avaliação de Ciências",
     audienceId: "ANO-OUTROS-TURMA-t-103",
-    audienceLabel: "9ª Série A",
+    audienceLabel: "9º Série A",
     groupType: "TURMA",
     yearSegment: "OUTROS",
     quantidadeQuestoes: 10,

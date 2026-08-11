@@ -578,7 +578,7 @@ export function ExamsManager() {
         </div>
         {hasYearTwoAmbiguity || hasYearThreeAmbiguity ? (
           <p className="mt-4 text-sm text-[var(--muted-foreground)]">
-            Existem turmas de 2ª/3ª série sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
+            Existem turmas de 2º/3º série sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">

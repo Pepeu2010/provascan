@@ -3,9 +3,9 @@ import type { ClassRoom } from "@/types/domain";
 /** Presentation-only terminology. Stored identifiers and legacy values remain compatible. */
 export function formatEducationalLabel(value: string) {
   return value
-    .replace(/(\d+)\s*[º°oªa]?\s*anos?\b/gi, "$1ª série")
-    .replace(/(\d+)\s*[º°oªa]?\s*series?\b/gi, "$1ª série")
-    .replace(/^(\d+)\s*([A-Z]+)\s+Ensino Médio$/i, "$1ª Série $2");
+    .replace(/(\d+)\s*[º°oªa]?\s*anos?\b/gi, "$1º série")
+    .replace(/(\d+)\s*[º°oªa]?\s*series?\b/gi, "$1º série")
+    .replace(/^(\d+)\s*([A-Z]+)\s+Ensino Médio$/i, "$1º Série $2");
 }
 
 export function compareClassrooms(left: Pick<ClassRoom, "nome">, right: Pick<ClassRoom, "nome">) {
