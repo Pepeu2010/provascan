@@ -195,6 +195,52 @@ input, select, textarea { color: var(--input-foreground); }
 input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: .78; }
 select option, select optgroup { background: var(--card-solid); color: var(--foreground); }
 
+/* Date selection is a compact scheduling instrument, not the browser's generic calendar. */
+.date-picker__trigger { display: flex; width: 100%; height: 44px; align-items: center; gap: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--input-bg); padding: 0 11px 0 13px; color: var(--foreground); text-align: left; transition: border-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle); }
+.date-picker__trigger:hover, .date-picker__trigger:focus-visible { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); box-shadow: 0 0 0 3px var(--focus-ring), inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent); outline: 0; }
+.date-picker__trigger:disabled { cursor: not-allowed; opacity: .48; }
+.date-picker__trigger > svg { color: var(--accent); }
+.date-picker__trigger > span:not(.date-picker__marker) { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+.date-picker__marker { margin-left: auto; color: var(--muted-foreground); font-family: var(--font-plex-mono), monospace; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.date-picker__panel { position: absolute; z-index: 60; top: calc(100% + 9px); left: 0; width: min(332px, calc(100vw - 40px)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius: 16px; background: linear-gradient(145deg, var(--card-elevated), var(--card-solid)); box-shadow: var(--shadow-floating); padding: 14px; animation: date-picker-enter 220ms var(--motion-spring) both; }
+.date-picker__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); padding: 2px 1px 13px; }
+.date-picker__header p { margin: 0 0 3px; color: var(--muted-foreground); font-family: var(--font-plex-mono), monospace; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.date-picker__header strong { display: block; color: var(--foreground); font-size: 14px; font-weight: 700; letter-spacing: -.025em; text-transform: capitalize; }
+.date-picker__navigation { display: flex; gap: 4px; }
+.date-picker__navigation button, .date-picker__footer button { display: grid; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--foreground); transition: border-color var(--motion-fast), background-color var(--motion-fast), color var(--motion-fast); }
+.date-picker__navigation button { width: 31px; height: 31px; }
+.date-picker__navigation button:hover, .date-picker__navigation button:focus-visible, .date-picker__footer button:hover, .date-picker__footer button:focus-visible { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); outline: 0; }
+.date-picker__weekdays, .date-picker__days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; }
+.date-picker__weekdays { margin-top: 13px; color: var(--muted-foreground); font-family: var(--font-plex-mono), monospace; font-size: 9px; font-weight: 700; letter-spacing: .04em; }
+.date-picker__days { margin-top: 7px; }
+.date-picker__day { position: relative; display: grid; min-height: 34px; place-items: center; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--foreground); font-size: 12px; font-weight: 650; transition: border-color var(--motion-fast), background-color var(--motion-fast), color var(--motion-fast); }
+.date-picker__day:hover:not(:disabled), .date-picker__day:focus-visible { border-color: color-mix(in srgb, var(--accent) 70%, var(--border)); background: var(--accent-soft); outline: 0; }
+.date-picker__day--outside { color: color-mix(in srgb, var(--muted-foreground) 55%, transparent); }
+.date-picker__day--today::after { position: absolute; bottom: 4px; width: 3px; height: 3px; border-radius: 999px; background: var(--accent); content: ""; }
+.date-picker__day--selected { border-color: var(--accent) !important; background: var(--accent) !important; box-shadow: 0 5px 13px color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent-contrast) !important; }
+.date-picker__day--selected::after { background: var(--accent-contrast); }
+.date-picker__day:disabled { cursor: not-allowed; opacity: .25; }
+.date-picker__footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border); margin-top: 11px; padding-top: 11px; color: var(--muted-foreground); font-family: var(--font-plex-mono), monospace; font-size: 9px; font-weight: 700; letter-spacing: .06em; }
+.date-picker__footer button { height: 28px; padding: 0 9px; color: var(--accent-strong); font-family: inherit; font-size: inherit; letter-spacing: .08em; text-transform: uppercase; }
+@keyframes date-picker-enter { from { opacity: 0; transform: translateY(-5px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.teacher-select { position: relative; }
+.teacher-select__trigger { display: flex; width: 100%; height: 44px; align-items: center; gap: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--input-bg); padding: 0 12px; color: var(--foreground); text-align: left; transition: border-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle); }
+.teacher-select__trigger:hover, .teacher-select__trigger:focus-visible { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); box-shadow: 0 0 0 3px var(--focus-ring), inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent); outline: 0; }
+.teacher-select__trigger:disabled { cursor: not-allowed; opacity: .48; }
+.teacher-select__trigger > svg:first-child { color: var(--accent); }
+.teacher-select__trigger > span { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-select__trigger > svg:last-child { margin-left: auto; color: var(--muted-foreground); }
+.teacher-select__panel { position: absolute; z-index: 60; top: calc(100% + 9px); left: 0; width: min(338px, calc(100vw - 40px)); overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius: 16px; background: linear-gradient(145deg, var(--card-elevated), var(--card-solid)); box-shadow: var(--shadow-floating); padding: 10px; animation: date-picker-enter 220ms var(--motion-spring) both; }
+.teacher-select__search { display: flex; height: 38px; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 0 10px; color: var(--muted-foreground); }
+.teacher-select__search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+.teacher-select__search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--foreground); font-size: 12px; }
+.teacher-select__options { max-height: 260px; overflow: auto; margin-top: 8px; padding-right: 2px; }
+.teacher-select__option { display: flex; width: 100%; min-height: 38px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; padding: 0 10px; color: var(--foreground); text-align: left; font-size: 13px; font-weight: 600; transition: border-color var(--motion-fast), background-color var(--motion-fast), color var(--motion-fast); }
+.teacher-select__option:hover, .teacher-select__option:focus-visible { border-color: color-mix(in srgb, var(--accent) 54%, var(--border)); background: var(--accent-soft); outline: 0; }
+.teacher-select__option--selected { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-strong); }
+.teacher-select__empty { margin: 0; padding: 18px 10px; color: var(--muted-foreground); font-size: 12px; text-align: center; }
+
 ::selection { background: var(--accent-soft); color: var(--foreground); }
 
 :where(button, a, input, select, textarea):focus-visible {

@@ -1,7 +1,23 @@
-import type { InputHTMLAttributes } from "react";
+import type { ChangeEvent, InputHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  if (props.type === "date") {
+    const value = typeof props.value === "string" ? props.value : "";
+    return (
+      <DatePicker
+        value={value}
+        min={typeof props.min === "string" ? props.min : undefined}
+        max={typeof props.max === "string" ? props.max : undefined}
+        disabled={props.disabled}
+        className={className}
+        aria-label={props["aria-label"]}
+        onChange={(nextValue) => props.onChange?.({ target: { value: nextValue } } as ChangeEvent<HTMLInputElement>)}
+      />
+    );
+  }
+
   return (
     <input
       className={cn(
