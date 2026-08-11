@@ -9,6 +9,7 @@ import type {
   TeacherProfile,
 } from "@/types/domain";
 import { teacherProfile } from "@/lib/mock-data";
+import { formatEducationalLabel } from "@/lib/education-labels";
 
 export const APP_DATA_STORAGE_KEY = "provascan-app-data";
 export const APP_SESSION_STORAGE_KEY = "provascan-session";
@@ -116,7 +117,7 @@ export function calculateAnalytics(data: AppDataState): AnalyticsSnapshot {
       );
 
       return {
-        turma: item.nome.replace(" Ensino Médio", "").replace("º Ano", "").replace(" Ano", ""),
+        turma: formatEducationalLabel(item.nome),
         media,
       };
     })

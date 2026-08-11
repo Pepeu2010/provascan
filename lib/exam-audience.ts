@@ -1,4 +1,5 @@
 import type { AudienceGroupType, ClassRoom, Exam, Student, YearSegment } from "@/types/domain";
+import { formatEducationalLabel } from "@/lib/education-labels";
 
 export type ExamAudienceOption = {
   id: string;
@@ -12,13 +13,13 @@ type DerivedAudience = ExamAudienceOption & {
 };
 
 const FIXED_EXAM_AUDIENCES: ExamAudienceOption[] = [
-  { id: "ANO-1-GERAL", label: "1º ano", groupType: "GERAL", yearSegment: "1" },
-  { id: "ANO-2-EXATAS", label: "2º ano - Exatas", groupType: "EXATAS", yearSegment: "2" },
-  { id: "ANO-2-HUMANAS", label: "2º ano - Humanas", groupType: "HUMANAS", yearSegment: "2" },
-  { id: "ANO-2-TECNICO", label: "2º ano - Técnico", groupType: "TECNICO", yearSegment: "2" },
-  { id: "ANO-3-EXATAS", label: "3º ano - Exatas", groupType: "EXATAS", yearSegment: "3" },
-  { id: "ANO-3-HUMANAS", label: "3º ano - Humanas", groupType: "HUMANAS", yearSegment: "3" },
-  { id: "ANO-3-TECNICO", label: "3º ano - Técnico", groupType: "TECNICO", yearSegment: "3" },
+  { id: "ANO-1-GERAL", label: "1ª série", groupType: "GERAL", yearSegment: "1" },
+  { id: "ANO-2-EXATAS", label: "2ª série - Exatas", groupType: "EXATAS", yearSegment: "2" },
+  { id: "ANO-2-HUMANAS", label: "2ª série - Humanas", groupType: "HUMANAS", yearSegment: "2" },
+  { id: "ANO-2-TECNICO", label: "2ª série - Técnico", groupType: "TECNICO", yearSegment: "2" },
+  { id: "ANO-3-EXATAS", label: "3ª série - Exatas", groupType: "EXATAS", yearSegment: "3" },
+  { id: "ANO-3-HUMANAS", label: "3ª série - Humanas", groupType: "HUMANAS", yearSegment: "3" },
+  { id: "ANO-3-TECNICO", label: "3ª série - Técnico", groupType: "TECNICO", yearSegment: "3" },
 ] as const;
 
 function normalizeText(value: string) {
@@ -75,7 +76,7 @@ export function deriveClassAudience(classroom: Pick<ClassRoom, "id" | "nome">): 
   if (yearSegment === "2" || yearSegment === "3") {
     return {
       id: createAudienceId(yearSegment, "INDEFINIDO", slugify(classroom.id || classroom.nome)),
-      label: `${yearSegment}º ano - Revisar agrupamento`,
+      label: `${yearSegment}ª série - Revisar agrupamento`,
       groupType: "INDEFINIDO",
       requiresManualGrouping: true,
       yearSegment,
@@ -133,7 +134,7 @@ export function normalizeExam(
   if ("audienceId" in exam && typeof exam.audienceId === "string" && exam.audienceId.trim()) {
     return {
       ...exam,
-      audienceLabel: exam.audienceLabel || exam.audienceId,
+      audienceLabel: formatEducationalLabel(exam.audienceLabel || exam.audienceId),
     };
   }
 
@@ -144,7 +145,7 @@ export function normalizeExam(
   return {
     alternativas: exam.alternativas,
     audienceId: audience.audienceId,
-    audienceLabel: audience.audienceLabel,
+    audienceLabel: formatEducationalLabel(audience.audienceLabel),
     codigo: exam.codigo,
     data: exam.data,
     groupType: audience.groupType,

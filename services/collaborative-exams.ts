@@ -54,6 +54,8 @@ export async function listCollaborativeExams(teacherId?: string): Promise<Collab
 }
 
 export async function createCollaborativeExam(input: { title: string; audienceId: string; audienceLabel: string; groupType: string; yearSegment: string; alternatives: string[]; examDate: string; sections: Array<{ subject: string; teacherId: string; questionCount: number }> }) {
+  const assignedTeacherIds = input.sections.map((item) => item.teacherId);
+  if (new Set(assignedTeacherIds).size !== assignedTeacherIds.length) throw new Error("Um professor pode receber apenas uma matéria por prova.");
   const teachers = new Map((await listTeachers()).map((item) => [item.id, item.name]));
   let offset = 1;
   const normalized = input.sections.map((item) => {

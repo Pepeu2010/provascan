@@ -239,6 +239,8 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .teacher-select__option { display: flex; width: 100%; min-height: 38px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; padding: 0 10px; color: var(--foreground); text-align: left; font-size: 13px; font-weight: 600; transition: border-color var(--motion-fast), background-color var(--motion-fast), color var(--motion-fast); }
 .teacher-select__option:hover, .teacher-select__option:focus-visible { border-color: color-mix(in srgb, var(--accent) 54%, var(--border)); background: var(--accent-soft); outline: 0; }
 .teacher-select__option--selected { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-strong); }
+.teacher-select__option--disabled { cursor: not-allowed; color: var(--muted-foreground); opacity: 0.58; }
+.teacher-select__option--disabled:hover, .teacher-select__option--disabled:focus-visible { border-color: transparent; background: transparent; }
 .teacher-select__empty { margin: 0; padding: 18px 10px; color: var(--muted-foreground); font-size: 12px; text-align: center; }
 
 ::selection { background: var(--accent-soft); color: var(--foreground); }

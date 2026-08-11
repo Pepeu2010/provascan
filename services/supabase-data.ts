@@ -152,6 +152,47 @@ export async function listUsersForAdmin() {
   return (data ?? []).map((row) => ({ id: row.legacy_id, nome: row.full_name, email: row.access_key, perfil: row.role, ativo: row.active ? "SIM" : "NAO", trocar_senha: row.force_password_change ? "SIM" : "NAO" }));
 }
 
+export type ManagedUserInput = { nome: string; acesso: string; perfil: "admin" | "vice_diretor" | "coordenador" | "professor" };
+
+async function assertAdminContinuity(userId: string, nextRole: string, nextActive: boolean) {
+  const database = client();
+  const { data: current, error: currentError } = await database.from("app_users").select("role,active").eq("legacy_id", userId).maybeSingle();
+  dbError(currentError);
+  if (!current) throw new SupabaseSchemaError("Usuário não encontrado.");
+  if (current.role !== "admin" || !current.active || (nextRole === "admin" && nextActive)) return;
+  const { count, error: countError } = await database.from("app_users").select("legacy_id", { count: "exact", head: true }).eq("role", "admin").eq("active", true);
+  dbError(countError);
+  if ((count ?? 0) <= 1) throw new SupabaseSchemaError("Mantenha ao menos uma conta admin ativa.");
+}
+
+export async function createManagedUser(input: ManagedUserInput & { passwordHash: string }) {
+  const { error } = await client().from("app_users").insert({
+    legacy_id: crypto.randomUUID(), access_key: input.acesso.trim().toLowerCase(), full_name: input.nome.trim(), role: input.perfil,
+    password_hash: input.passwordHash, active: true, force_password_change: true,
+  });
+  dbError(error);
+}
+
+export async function updateManagedUser(userId: string, input: ManagedUserInput) {
+  await assertAdminContinuity(userId, input.perfil, true);
+  const { error } = await client().from("app_users").update({ full_name: input.nome.trim(), access_key: input.acesso.trim().toLowerCase(), role: input.perfil }).eq("legacy_id", userId);
+  dbError(error);
+}
+
+export async function setManagedUserActive(userId: string, active: boolean) {
+  const { data: current, error: currentError } = await client().from("app_users").select("role").eq("legacy_id", userId).maybeSingle();
+  dbError(currentError);
+  if (!current) throw new SupabaseSchemaError("Usuário não encontrado.");
+  await assertAdminContinuity(userId, String(current.role), active);
+  const { error } = await client().from("app_users").update(active ? { active: true, force_password_change: true, sessions_revoked_at: new Date().toISOString() } : { active: false, force_password_change: true, mfa_active: false, mfa_method: "", mfa_secret_encrypted: "", recovery_codes_hashes: [], sessions_revoked_at: new Date().toISOString() }).eq("legacy_id", userId);
+  dbError(error);
+}
+
+export async function resetManagedUserMfa(userId: string) {
+  const { error } = await client().from("app_users").update({ mfa_active: false, mfa_method: "", mfa_secret_encrypted: "", recovery_codes_hashes: [], sessions_revoked_at: new Date().toISOString() }).eq("legacy_id", userId);
+  dbError(error);
+}
+
 export async function appendAuditEvent(input: { actorId: string; event: string; targetId?: string; ipHash?: string; metadata?: Record<string, string | number | boolean> }) {
   const { error } = await client().from("audit_log_internal").insert({ id: crypto.randomUUID(), occurred_at: new Date().toISOString(), actor_id: input.actorId, event: input.event, target_id: input.targetId ?? "", ip_hash: input.ipHash ?? "", metadata: input.metadata ?? {} });
   dbError(error);

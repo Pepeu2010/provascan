@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { canManageUsers } from "@/lib/access-control";
+import { UserManagementPanel } from "@/components/user-management-panel";
+import { compareClassrooms, formatEducationalLabel } from "@/lib/education-labels";
 import {
   buildExamAudienceOptions,
   getRepresentativeClassForExam,
@@ -210,11 +212,11 @@ export function ClassesManager() {
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
       {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {data.classes.map((item) => (
+        {data.classes.slice().sort(compareClassrooms).map((item) => (
           <Card key={item.id} className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">{item.nome}</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{formatEducationalLabel(item.nome)}</p>
               </div>
             </div>
             <div className="mt-5 flex items-center justify-between text-sm">
@@ -272,9 +274,9 @@ export function StudentsManager() {
         <div className="mt-6 grid gap-3 lg:grid-cols-3">
           <Input placeholder="Nome do aluno" value={student.nome} onChange={(event) => setStudent((prev) => ({ ...prev, nome: event.target.value }))} />
           <FieldSelect value={student.turma} onChange={(turma) => setStudent((prev) => ({ ...prev, turma }))}>
-            {data.classes.map((item) => (
+            {data.classes.slice().sort(compareClassrooms).map((item) => (
               <option key={item.id} value={item.id}>
-                {item.nome}
+                {formatEducationalLabel(item.nome)}
               </option>
             ))}
           </FieldSelect>
@@ -576,7 +578,7 @@ export function ExamsManager() {
         </div>
         {hasYearTwoAmbiguity || hasYearThreeAmbiguity ? (
           <p className="mt-4 text-sm text-[var(--muted-foreground)]">
-            Existem turmas de 2º/3º ano sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
+            Existem turmas de 2ª/3ª série sem itinerário claro no nome. A prova agora é criada por público-alvo; revise o agrupamento escolhido antes de salvar.
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
@@ -1170,6 +1172,7 @@ export function SettingsWorkspace() {
 
   return (
     <div className="grid gap-5">
+      {session?.role === "admin" ? <UserManagementPanel currentUserId={session.id} /> : null}
       {canManagePasswordPolicy ? (
         <Card className="p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">

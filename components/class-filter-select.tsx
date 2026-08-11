@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, School } from "lucide-react";
 import type { ClassRoom } from "@/types/domain";
+import { compareClassrooms, formatEducationalLabel } from "@/lib/education-labels";
 
 type ClassFilterSelectProps = {
   classes: ClassRoom[];
@@ -17,7 +18,7 @@ export function ClassFilterSelect({ classes, value, onChange }: ClassFilterSelec
   const rootRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const listboxId = useId();
-  const options = [allClassesOption, ...classes];
+  const options = [allClassesOption, ...classes.slice().sort(compareClassrooms)];
   const selectedOption = options.find((item) => item.id === value) ?? allClassesOption;
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export function ClassFilterSelect({ classes, value, onChange }: ClassFilterSelec
         }}
       >
         <School className="size-4 shrink-0 text-[var(--accent)]" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate">{selectedOption.nome}</span>
+        <span className="min-w-0 flex-1 truncate">{formatEducationalLabel(selectedOption.nome)}</span>
         <ChevronDown className={`size-4 shrink-0 text-[var(--muted-foreground)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
 
@@ -122,7 +123,7 @@ export function ClassFilterSelect({ classes, value, onChange }: ClassFilterSelec
                 <span className={`grid size-5 place-items-center rounded-full border ${isSelected ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]" : "border-[var(--border-strong)] text-transparent"}`} aria-hidden="true">
                   <Check className="size-3" />
                 </span>
-                <span className="min-w-0 flex-1 truncate">{option.nome}</span>
+                <span className="min-w-0 flex-1 truncate">{formatEducationalLabel(option.nome)}</span>
               </button>
             );
           })}

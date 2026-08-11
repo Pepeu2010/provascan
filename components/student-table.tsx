@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ClassFilterSelect } from "@/components/class-filter-select";
+import { compareClassrooms, formatEducationalLabel } from "@/lib/education-labels";
 
 export function StudentTable({
   classes,
@@ -20,10 +21,16 @@ export function StudentTable({
 }) {
   const hasActions = Boolean(onDelete || onEdit);
   const [classFilter, setClassFilter] = useState("all");
-  const visibleStudents = useMemo(
-    () => (classFilter === "all" ? students : students.filter((student) => student.turma === classFilter)),
-    [classFilter, students],
-  );
+  const visibleStudents = useMemo(() => {
+    const classesById = new Map(classes.map((item) => [item.id, item]));
+    return students
+      .filter((student) => classFilter === "all" || student.turma === classFilter)
+      .slice()
+      .sort((left, right) => {
+        const classOrder = compareClassrooms(classesById.get(left.turma) ?? { nome: "" }, classesById.get(right.turma) ?? { nome: "" });
+        return classOrder || left.nome.localeCompare(right.nome, "pt-BR", { sensitivity: "base" });
+      });
+  }, [classFilter, classes, students]);
   const selectedClass = classes.find((item) => item.id === classFilter);
 
   return (
@@ -61,7 +68,7 @@ export function StudentTable({
               return (
                 <tr key={student.id} className="border-t border-[var(--border)] text-sm">
                   <td className="px-6 py-4 font-medium text-[var(--foreground)]">{student.nome}</td>
-                  <td className="px-6 py-4 text-[var(--muted-foreground)]">{turma?.nome}</td>
+                  <td className="px-6 py-4 text-[var(--muted-foreground)]">{turma ? formatEducationalLabel(turma.nome) : "Turma não encontrada"}</td>
                   <td className="px-6 py-4">
                     <Badge
                       tone={
