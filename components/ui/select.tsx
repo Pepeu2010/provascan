@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, isValidElement, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 import { Check, ChevronDown, Search, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,15 +12,17 @@ type Option = { value: string; label: string };
 
 function TeacherSelect({ children, className, value, onChange, disabled, ...props }: SelectProps) {
   const root = useRef<HTMLDivElement>(null);
+  const nativeSelect = useRef<HTMLSelectElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const options = useMemo<Option[]>(() => Children.toArray(children).flatMap((child) => {
-    if (!isValidElement<{ value?: string; children?: ReactNode }>(child) || child.type !== "option") return [];
-    return [{ value: child.props.value ?? "", label: String(child.props.children ?? "") }];
-  }), [children]);
+  const [options, setOptions] = useState<Option[]>([]);
   const selectedValue = typeof value === "string" ? value : "";
   const selected = options.find((option) => option.value === selectedValue);
   const filtered = options.filter((option) => option.label.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR")));
+
+  useEffect(() => {
+    setOptions(Array.from(nativeSelect.current?.options ?? []).map((option) => ({ value: option.value, label: option.text })));
+  }, [children]);
 
   useEffect(() => {
     if (!open) return;
@@ -38,6 +40,7 @@ function TeacherSelect({ children, className, value, onChange, disabled, ...prop
   };
 
   return <div ref={root} className={cn("teacher-select", className)}>
+    <select ref={nativeSelect} aria-hidden="true" tabIndex={-1} value={selectedValue} onChange={() => undefined} className="sr-only">{children}</select>
     <button type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} aria-label={props["aria-label"]} onClick={() => setOpen((current) => !current)} className="teacher-select__trigger"><UserRound aria-hidden="true" className="size-4" /><span>{selected?.label || options[0]?.label || "Selecionar professor"}</span><ChevronDown aria-hidden="true" className="size-4" /></button>
     {open ? <div className="teacher-select__panel"><div className="teacher-select__search"><Search aria-hidden="true" className="size-4" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar professor" aria-label="Buscar professor" /></div><div role="listbox" aria-label="Professores disponíveis" className="teacher-select__options">{filtered.map((option) => <button key={option.value || "empty"} type="button" role="option" aria-selected={option.value === selectedValue} onClick={() => choose(option.value)} className={cn("teacher-select__option", option.value === selectedValue && "teacher-select__option--selected")}><span>{option.label}</span>{option.value === selectedValue ? <Check aria-hidden="true" className="size-4" /> : null}</button>)}{!filtered.length ? <p className="teacher-select__empty">Nenhum professor encontrado.</p> : null}</div></div> : null}
   </div>;
