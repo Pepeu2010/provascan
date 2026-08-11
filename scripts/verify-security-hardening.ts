@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createId } from "../lib/app-data";
 import { decryptTotpSecret, encryptTotpSecret } from "../lib/mfa-crypto";
 import { validateNewPassword } from "../lib/passwords";
+import { readFileSync } from "node:fs";
 
 process.env.MFA_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
 
@@ -26,4 +27,7 @@ assert.equal(firstId.startsWith("exam-"), true);
 assert.equal(firstId === secondId, false);
 assert.equal(firstId.length > 20, true);
 
-console.log("Security hardening regression passed: authenticated MFA encryption, password checks, and IDs are secure.");
+const totpRoute = readFileSync(new URL("../app/api/auth/mfa/totp/route.ts", import.meta.url), "utf8");
+assert.match(totpRoute, /await invalidateChallenge\(challenge\.id\)/);
+
+console.log("Security hardening regression passed: MFA encryption, challenge invalidation, password checks, and IDs are secure.");

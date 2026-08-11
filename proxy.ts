@@ -28,11 +28,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!canAccessPath(session.role, pathname)) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Acesso negado para este perfil." }, { status: 403 });
-    }
-
+  // Route handlers own their API-level authorization. Applying the page
+  // navigation matrix here would reject valid authenticated API callers (for
+  // example, the photo-correction endpoint) before their specific checks run.
+  if (!pathname.startsWith("/api/") && !canAccessPath(session.role, pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

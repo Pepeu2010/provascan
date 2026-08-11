@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { canManageAcademicExams } from "@/lib/collaborative-access";
 import { hasSameOriginRequest } from "@/lib/request-security";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
 import { appendAuditEvent } from "@/services/supabase-data";
 import { reviewSection } from "@/services/collaborative-exams";
@@ -13,6 +14,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ exa
   const validation = await validateSessionToken((await cookies()).get(AUTH_COOKIE_NAME)?.value);
   if (!validation.ok || !canManageAcademicExams(validation.session.role)) return NextResponse.json({ error: "Acesso restrito à gestão acadêmica." }, { status: 403 });
   const parsed = schema.safeParse(await request.json()); if (!parsed.success) return NextResponse.json({ error: "Revisão inválida." }, { status: 400 });
+  const rateLimit = await consumeRateLimit({ bucket: "collaborative-section-review", key: buildRateLimitKey(getClientIp(request.headers), validation.session.id), limit: 30, windowMs: 5 * 60 * 1000 });
+  if (!rateLimit.ok) return NextResponse.json({ error: "Muitas revisões seguidas. Aguarde antes de tentar novamente." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rateLimit.retryAfterSeconds) } });
   const { examId, sectionId } = await params;
   try { await reviewSection({ examId, sectionId, reviewerId: validation.session.id, ...parsed.data }); await appendAuditEvent({ actorId: validation.session.id, event: parsed.data.approved ? "exam_section_approved" : "exam_section_returned", targetId: sectionId }); return NextResponse.json({ message: parsed.data.approved ? "Bloco aprovado." : "Bloco devolvido ao professor." }); }
   catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível revisar." }, { status: 400 }); }

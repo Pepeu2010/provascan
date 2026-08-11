@@ -14,7 +14,8 @@ import {
   saveOperationalAppData,
 } from "@/services/supabase-data";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
-import { isTeacherRole } from "@/lib/collaborative-access";
+import { canAccessOperationalData } from "@/lib/access-control";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -22,7 +23,7 @@ const text = z.string().trim().min(1).max(500);
 const id = z.string().trim().min(1).max(120);
 const studentSchema = z.object({ id, nome: text, turma: id, status: z.enum(["Ativo", "Transferido", "Inativo"]) }).strict();
 const classSchema = z.object({ id, nome: text, ano: z.string().max(80), audienceId: z.string().max(120).optional(), audienceLabel: z.string().max(200).optional(), groupType: z.string().max(40).optional(), requiresManualGrouping: z.boolean().optional(), yearSegment: z.string().max(20).optional() }).strict();
-const examSchema = z.object({ id, titulo: text, audienceId: z.string().max(120), audienceLabel: z.string().max(200), groupType: z.string().max(40), yearSegment: z.string().max(20), quantidadeQuestoes: z.number().int().min(1).max(200), alternativas: z.array(z.string().trim().min(1).max(30)).min(2).max(10), data: z.string().max(80), codigo: text, templateVersion: z.string().max(80) }).strict();
+const examSchema = z.object({ id, titulo: text, audienceId: z.string().max(120), audienceLabel: z.string().max(200), groupType: z.string().max(40), yearSegment: z.string().max(20), quantidadeQuestoes: z.number().int().min(1).max(200), alternativas: z.array(z.string().trim().min(1).max(30)).min(2).max(10), data: z.string().max(80), codigo: text, templateVersion: z.string().max(80), releasedAt: z.string().datetime().nullable().optional() }).strict();
 const appDataSchema = z.object({
   answerKeys: z.array(z.object({ provaId: id, questao: z.number().int().min(1).max(200), respostaCorreta: text }).strict()).max(20000),
   classes: z.array(classSchema).max(1000),
@@ -56,7 +57,7 @@ export async function GET() {
     return response;
   }
 
-  if (isTeacherRole(validation.session.role)) {
+  if (!canAccessOperationalData(validation.session.role)) {
     return NextResponse.json({ data: cloneDefaultAppData(), revision: "0" }, { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -102,8 +103,21 @@ export async function PUT(request: Request) {
     return response;
   }
 
-  if (isTeacherRole(validation.session.role)) {
-    return NextResponse.json({ error: "Professores não podem alterar os dados operacionais completos." }, { status: 403 });
+  if (!canAccessOperationalData(validation.session.role)) {
+    return NextResponse.json({ error: "Apenas a gestão acadêmica pode alterar os dados operacionais completos." }, { status: 403 });
+  }
+
+  const rateLimit = await consumeRateLimit({
+    bucket: "operational-data-write",
+    key: buildRateLimitKey(getClientIp(request.headers), validation.session.id),
+    limit: 12,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      { error: "Muitas tentativas de salvamento. Aguarde antes de tentar novamente." },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   try {

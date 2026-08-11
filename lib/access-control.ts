@@ -16,6 +16,11 @@ export function isAcademicManagementRole(role: UserRole) {
   return ACADEMIC_MANAGEMENT_ROLES.has(role);
 }
 
+/** Operational records include school-wide student and correction data. */
+export function canAccessOperationalData(role: UserRole) {
+  return isAcademicManagementRole(role);
+}
+
 export function canAccessPath(role: UserRole, pathname: string) {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return isAdminRole(role);

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { applyPreAuthCookie } from "@/lib/auth";
 import { createFinalSession, requirePreAuth } from "@/lib/auth-flow-server";
-import { createChallenge, getChallenge } from "@/lib/mfa-challenge-store";
+import { createChallenge, getChallenge, invalidateChallenge } from "@/lib/mfa-challenge-store";
 import { encryptTotpSecret } from "@/lib/mfa-crypto";
 import { decryptTotpSecret } from "@/lib/mfa-crypto";
 import { createPreAuthToken } from "@/lib/pre-auth";
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       }
       const challenge = await getChallenge(flow.preAuth.challengeId, flow.user.id, "TOTP_SETUP");
       if (!challenge?.secret || !verifyTotp(challenge.secret, payload.code)) return NextResponse.json({ error: "Código inválido ou expirado." }, { status: 400 });
+      await invalidateChallenge(challenge.id);
       const recoveryCodes = createRecoveryCodes(); const recoveryCodeHashes = JSON.stringify(await Promise.all(recoveryCodes.map((item) => hash(item, 12))));
       await completeTotpSetup(flow.user.id, { encryptedSecret: encryptTotpSecret(challenge.secret), recoveryCodeHashes });
       await appendAuditEvent({ actorId: flow.user.id, event: "MFA_TOTP_ENABLED", targetId: flow.user.id });

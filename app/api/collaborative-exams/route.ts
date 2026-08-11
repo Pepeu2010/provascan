@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { canManageAcademicExams } from "@/lib/collaborative-access";
 import { hasSameOriginRequest } from "@/lib/request-security";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
 import { appendAuditEvent } from "@/services/supabase-data";
 import { createCollaborativeExam, listCollaborativeExams, listTeachers } from "@/services/collaborative-exams";
@@ -29,6 +30,8 @@ export async function POST(request: Request) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const validation = await manager();
   if (!validation) return NextResponse.json({ error: "Acesso restrito à gestão acadêmica." }, { status: 403 });
+  const rateLimit = await consumeRateLimit({ bucket: "collaborative-exam-create", key: buildRateLimitKey(getClientIp(request.headers), validation.session.id), limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!rateLimit.ok) return NextResponse.json({ error: "Muitas criações de prova. Aguarde antes de tentar novamente." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rateLimit.retryAfterSeconds) } });
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Dados da prova inválidos." }, { status: 400 });
   try {

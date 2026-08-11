@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { isTeacherRole } from "@/lib/collaborative-access";
 import { hasSameOriginRequest } from "@/lib/request-security";
+import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
 import { appendAuditEvent } from "@/services/supabase-data";
 import { saveSectionAnswers } from "@/services/collaborative-exams";
@@ -14,6 +15,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ exam
   const store = await cookies(); const validation = await validateSessionToken(store.get(AUTH_COOKIE_NAME)?.value);
   if (!validation.ok || !isTeacherRole(validation.session.role)) return NextResponse.json({ error: "Acesso restrito a professores." }, { status: 403 });
   const parsed = schema.safeParse(await request.json()); if (!parsed.success) return NextResponse.json({ error: "Gabarito inválido." }, { status: 400 });
+  const rateLimit = await consumeRateLimit({ bucket: "collaborative-section-write", key: buildRateLimitKey(getClientIp(request.headers), validation.session.id), limit: 30, windowMs: 5 * 60 * 1000 });
+  if (!rateLimit.ok) return NextResponse.json({ error: "Muitos salvamentos seguidos. Aguarde antes de tentar novamente." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rateLimit.retryAfterSeconds) } });
   const { examId, sectionId } = await params;
   try {
     await saveSectionAnswers({ examId, sectionId, teacherId: validation.session.id, ...parsed.data });

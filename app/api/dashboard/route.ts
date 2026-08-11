@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
+import { canAccessOperationalData } from "@/lib/access-control";
 import { calculateAnalytics } from "@/lib/app-data";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import { getOperationalAppData, getSystemSnapshot } from "@/services/supabase-data";
@@ -18,6 +19,13 @@ export async function GET() {
     );
     clearInvalidSessionCookie(response);
     return response;
+  }
+
+  if (!canAccessOperationalData(validation.session.role)) {
+    return NextResponse.json(
+      { error: "O resumo operacional é restrito à gestão acadêmica." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   try {

@@ -1,12 +1,12 @@
 "use client";
 
 import { DashboardShell } from "@/components/dashboard-shell";
-import { AnswerKeyEditor } from "@/components/management-workspace";
+import { CollaborativeExamsWorkspace } from "@/components/collaborative-exams-workspace";
 
 export default function GabaritosPage() {
   return (
     <DashboardShell active="/dashboard/gabaritos">
-      <AnswerKeyEditor />
+      <CollaborativeExamsWorkspace />
     </DashboardShell>
   );
 }
