@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, ClipboardCheck, Plus, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Check, ClipboardCheck, Plus, RotateCcw, Send, ShieldCheck, Trash2 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ export function CollaborativeExamsWorkspace() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [alternatives, setAlternatives] = useState("A,B,C,D,E");
   const [sections, setSections] = useState<DraftSection[]>([{ subject: "", teacherId: "", questionCount: "10" }]);
+  const [examToDelete, setExamToDelete] = useState<CollaborativeExam | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -66,6 +68,20 @@ export function CollaborativeExamsWorkspace() {
       setMessage("Prova-base criada e distribuída aos professores."); setTitle(""); setSections([{ subject: "", teacherId: "", questionCount: "10" }]); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível criar a prova."); }
   };
+  const removeExam = async () => {
+    if (!examToDelete) return;
+    setDeleting(true);
+    try {
+      const result = await api<{ message: string }>(`/api/collaborative-exams/${examToDelete.id}`, { method: "DELETE" });
+      setMessage(result.message);
+      setExamToDelete(null);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível excluir a prova.");
+    } finally {
+      setDeleting(false);
+    }
+  };
   if (!session || loading) return <CollaborativeExamsLoading />;
 
   return <div className="grid gap-5">
@@ -74,7 +90,8 @@ export function CollaborativeExamsWorkspace() {
       {management ? <div className="mt-6 grid gap-4"><div className="grid gap-3 md:grid-cols-2"><Input placeholder="Título da prova" value={title} onChange={(event) => setTitle(event.target.value)} /><Select value={audienceId} onChange={(event) => setAudienceId(event.target.value)}><option value="">Aplicação geral</option>{data.classes.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</Select><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><Input placeholder="Alternativas: A,B,C,D,E" value={alternatives} onChange={(event) => setAlternatives(event.target.value)} /></div><p className="text-sm text-[var(--muted-foreground)]">Cada matéria é entregue somente ao professor escolhido abaixo. O acesso é conferido no servidor pela conta autenticada.</p><div className="grid gap-3">{sections.map((item, index) => <div key={index} className="grid gap-3 rounded-2xl border border-[var(--border)] p-4 md:grid-cols-[1fr_1fr_140px_auto]"><Input placeholder="Matéria" value={item.subject} onChange={(event) => setSections((current) => current.map((value, i) => i === index ? { ...value, subject: event.target.value } : value))} /><Select value={item.teacherId} aria-label={`Professor que receberá somente a matéria ${item.subject || index + 1}`} onChange={(event) => setSections((current) => current.map((value, i) => i === index ? { ...value, teacherId: event.target.value } : value))}><option value="">Entregar somente a...</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</Select><Input type="number" min="1" placeholder="Questões" value={item.questionCount} onChange={(event) => setSections((current) => current.map((value, i) => i === index ? { ...value, questionCount: event.target.value } : value))} /><Button variant="secondary" onClick={() => setSections((current) => current.length === 1 ? current : current.filter((_, i) => i !== index))}>Remover</Button></div>)}</div><div className="flex flex-wrap items-center gap-3"><Button variant="secondary" onClick={() => setSections((current) => [...current, { subject: "", teacherId: "", questionCount: "10" }])}><Plus className="size-4" />Adicionar matéria</Button><Button onClick={() => void create()} disabled={!title.trim() || !sections.every((item) => item.subject.trim() && item.teacherId && Number(item.questionCount) > 0)}><ClipboardCheck className="size-4" />Criar prova-base</Button><Badge tone="accent">{total} questões globais</Badge></div></div> : null}
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
     </Card>
-    {exams.length ? exams.map((exam) => <ExamCard key={exam.id} exam={exam} management={management} onChange={load} />) : <Card className="p-6"><p className="text-sm text-[var(--muted-foreground)]">{management ? "Nenhuma prova-base criada." : "Nenhum bloco de prova foi atribuído a você."}</p></Card>}
+    {exams.length ? exams.map((exam) => <ExamCard key={exam.id} exam={exam} management={management} onChange={load} onDelete={() => setExamToDelete(exam)} />) : <Card className="p-6"><p className="text-sm text-[var(--muted-foreground)]">{management ? "Nenhuma prova-base criada." : "Nenhum bloco de prova foi atribuído a você."}</p></Card>}
+    <DeleteExamDialog exam={examToDelete} deleting={deleting} onCancel={() => !deleting && setExamToDelete(null)} onConfirm={() => void removeExam()} />
   </div>;
 }
 
@@ -102,11 +119,23 @@ function CollaborativeExamsLoading() {
   );
 }
 
-function ExamCard({ exam, management, onChange }: { exam: CollaborativeExam; management: boolean; onChange: () => Promise<void> }) {
+function ExamCard({ exam, management, onChange, onDelete }: { exam: CollaborativeExam; management: boolean; onChange: () => Promise<void>; onDelete: () => void }) {
   const [message, setMessage] = useState("");
   const release = async () => { try { await api(`/api/collaborative-exams/${exam.id}/release`, { method: "POST", body: "{}" }); setMessage("Prova liberada para impressão e correção."); await onChange(); } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível liberar."); } };
   const complete = exam.sections.every((item) => item.status === "aprovado");
-  return <Card className="p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">{exam.title}</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{exam.audienceLabel} · {exam.questionCount} questões · {exam.examDate}</p></div>{exam.releasedAt ? <Badge tone="success">Liberada</Badge> : management ? <Button disabled={!complete} onClick={() => void release()}><ShieldCheck className="size-4" />Liberar prova</Button> : null}</div><div className="mt-5 grid gap-3">{exam.sections.map((section) => management ? <ManagementSection key={section.id} exam={exam} section={section} onChange={onChange} /> : <TeacherSection key={section.id} exam={exam} section={section} onChange={onChange} />)}</div>{message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}</Card>;
+  return <Card className="p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">{exam.title}</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{exam.audienceLabel} · {exam.questionCount} questões · {exam.examDate}</p></div>{management ? <div className="flex flex-wrap items-center gap-2">{exam.releasedAt ? <Badge tone="success">Liberada</Badge> : <Button disabled={!complete} onClick={() => void release()}><ShieldCheck className="size-4" />Liberar prova</Button>}<Button variant="danger" onClick={onDelete}><Trash2 className="size-4" />Excluir prova</Button></div> : exam.releasedAt ? <Badge tone="success">Liberada</Badge> : null}</div><div className="mt-5 grid gap-3">{exam.sections.map((section) => management ? <ManagementSection key={section.id} exam={exam} section={section} onChange={onChange} /> : <TeacherSection key={section.id} exam={exam} section={section} onChange={onChange} />)}</div>{message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}</Card>;
+}
+
+function DeleteExamDialog({ exam, deleting, onCancel, onConfirm }: { exam: CollaborativeExam | null; deleting: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (exam && !dialog.open) dialog.showModal();
+    if (!exam && dialog.open) dialog.close();
+  }, [exam]);
+
+  return <dialog ref={dialogRef} className="m-auto w-[min(calc(100vw-32px),520px)] rounded-[24px] border border-[color-mix(in_srgb,var(--error)_42%,var(--border))] bg-[var(--card-solid)] p-0 text-[var(--foreground)] shadow-[0_32px_100px_rgb(0_0_0_/_48%)] backdrop:bg-[var(--overlay-scrim)] backdrop:backdrop-blur-[3px]" aria-labelledby="delete-exam-title" aria-describedby="delete-exam-description" onCancel={(event) => { event.preventDefault(); onCancel(); }} onClick={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); if (!deleting && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) onCancel(); }} onClose={() => { if (exam && !deleting) onCancel(); }}><div className="relative overflow-hidden p-6 sm:p-8"><div className="absolute inset-x-0 top-0 h-1 bg-[var(--error)]" /><div className="grid size-12 place-items-center rounded-2xl border border-[color-mix(in_srgb,var(--error)_35%,var(--border))] bg-[color-mix(in_srgb,var(--error)_12%,var(--surface))] text-[var(--error)]"><AlertTriangle className="size-5" /></div><p className="mt-6 font-mono text-[10px] font-bold tracking-[0.18em] text-[var(--error)]">EXCLUSÃO DEFINITIVA</p><h2 id="delete-exam-title" className="mt-2 text-2xl font-bold tracking-[-0.04em]">Excluir prova para todos?</h2><p id="delete-exam-description" className="mt-4 text-sm leading-6 text-[var(--muted-foreground)]">A prova <strong className="text-[var(--foreground)]">{exam?.title}</strong>, seus blocos, gabaritos, regras e correções vinculadas serão removidos para toda a equipe. Esta ação não pode ser desfeita.</p><div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button variant="secondary" disabled={deleting} onClick={onCancel}>Cancelar</Button><Button variant="danger" loading={deleting} onClick={onConfirm}><Trash2 className="size-4" />Excluir definitivamente</Button></div></div></dialog>;
 }
 
 function ManagementSection({ exam, section, onChange }: { exam: CollaborativeExam; section: CollaborativeExam["sections"][number]; onChange: () => Promise<void> }) {

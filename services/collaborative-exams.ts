@@ -118,3 +118,9 @@ export async function releaseExam(examId: string) {
   const { error: updateError } = await client.from("exams").update({ released_at: new Date().toISOString() }).eq("id", examId);
   ensure(updateError);
 }
+
+export async function deleteCollaborativeExam(examId: string) {
+  const { data, error } = await db().rpc("delete_collaborative_exam", { p_exam_id: examId });
+  ensure(error);
+  if (!data) throw new Error("Prova colaborativa não encontrada.");
+}
