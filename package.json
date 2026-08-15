@@ -11,6 +11,7 @@
     "test:mobile-photo-fixture": "npx --no-install tsx scripts/verify-mobile-photo-fixture.ts",
     "test:auth-flow": "npx --no-install tsx scripts/verify-auth-flow.ts",
     "test:collaborative-access": "npx --no-install tsx scripts/verify-collaborative-access.ts",
+    "test:collaborative-printing": "npx --no-install tsx scripts/verify-collaborative-printing.ts",
     "test:api-authorization": "npx --no-install tsx scripts/verify-api-authorization.ts",
     "test:security-hardening": "npx --no-install tsx scripts/verify-security-hardening.ts"
   },

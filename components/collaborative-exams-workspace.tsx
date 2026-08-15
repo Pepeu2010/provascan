@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, ClipboardCheck, Plus, RotateCcw, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, Check, ClipboardCheck, Plus, Printer, RotateCcw, Send, ShieldCheck, Trash2 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { canManageAcademicExams } from "@/lib/collaborative-access";
+import { buildOrderedAnswerKey, sortStudentsForPrinting } from "@/services/collaborative-printing";
 import type { CollaborativeExam, ExamSectionStatus } from "@/types/collaborative-exams";
+import type { Student } from "@/types/domain";
 
 type Teacher = { id: string; name: string };
 type DraftSection = { subject: string; teacherId: string; questionCount: string };
@@ -22,6 +24,42 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const body = await response.json() as T & { error?: string };
   if (!response.ok) throw new Error(body.error || "A operação não pôde ser concluída.");
   return body;
+}
+
+function escapeForHtml(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+}
+
+function printAnswerKey(exam: CollaborativeExam) {
+  const sections = [...exam.sections].sort((left, right) => left.questionStart - right.questionStart);
+  const answers = buildOrderedAnswerKey(sections);
+  const answerRows = answers.map((item) => `<div class="answer"><span>${item.question}</span><strong>${escapeForHtml(item.answer || "—")}</strong></div>`).join("");
+  const sectionRows = sections.map((section) => `<li><strong>${escapeForHtml(section.subject)}</strong><span>Questões ${section.questionStart}–${section.questionEnd}</span></li>`).join("");
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" /><title>Gabarito — ${escapeForHtml(exam.title)}</title><style>
+    @page { size: A4 portrait; margin: 16mm; }
+    * { box-sizing: border-box; } body { margin: 0; color: #172033; font-family: Arial, Helvetica, sans-serif; }
+    header { border-bottom: 3px solid #5538c8; padding-bottom: 15px; } .eyebrow { color: #5538c8; font-size: 10px; font-weight: 800; letter-spacing: .14em; } h1 { margin: 6px 0; font-size: 25px; } .meta { color: #526075; font-size: 12px; }
+    .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; } .summary div { border: 1px solid #d5dbea; border-radius: 10px; padding: 11px; } .summary b { display: block; color: #526075; font-size: 9px; letter-spacing: .1em; } .summary span { display: block; margin-top: 4px; font-size: 13px; font-weight: 700; }
+    h2 { margin: 24px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; } .answers { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; } .answer { display: flex; align-items: center; justify-content: space-between; border: 1px solid #d5dbea; border-radius: 8px; padding: 9px 10px; break-inside: avoid; } .answer span { color: #667085; font-size: 11px; font-weight: 700; } .answer strong { color: #5538c8; font-size: 16px; }
+    ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0; list-style: none; } li { border-left: 3px solid #a78bfa; background: #f7f5ff; padding: 9px 11px; } li strong, li span { display: block; } li span { margin-top: 3px; color: #526075; font-size: 11px; }
+    footer { margin-top: 24px; border-top: 1px solid #d5dbea; padding-top: 10px; color: #667085; font-size: 10px; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style></head><body><header><div class="eyebrow">PROVASCAN · GABARITO FINAL</div><h1>${escapeForHtml(exam.title)}</h1><div class="meta">${escapeForHtml(exam.audienceLabel)} · ${escapeForHtml(exam.examDate)} · ${exam.questionCount} questões</div></header><div class="summary"><div><b>ORDEM DE IMPRESSÃO</b><span>Questões 1 a ${exam.questionCount}</span></div><div><b>SITUAÇÃO</b><span>Gabarito liberado</span></div></div><h2>Respostas em ordem numérica</h2><main class="answers">${answerRows}</main><h2>Blocos da prova</h2><ul>${sectionRows}</ul><footer>Gerado pelo ProvaScan. Confira este documento antes de distribuir aos aplicadores.</footer></body></html>`;
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=720");
+  if (!printWindow) return false;
+  printWindow.addEventListener("load", () => { printWindow.focus(); printWindow.print(); }, { once: true });
+  printWindow.document.write(html);
+  printWindow.document.close();
+  return true;
+}
+
+function printStudentCards(exam: CollaborativeExam, students: Student[], classNames: Map<string, string>) {
+  const cards = students.map((student) => `<section class="card"><header><div><b>PROVASCAN · CARTÃO-RESPOSTA</b><h1>${escapeForHtml(exam.title)}</h1><p>${escapeForHtml(classNames.get(student.turma) ?? exam.audienceLabel)} · ${escapeForHtml(exam.examDate)}</p></div><div class="student"><small>ALUNO(A)</small><strong>${escapeForHtml(student.nome)}</strong></div></header><p class="instruction">Preencha somente uma alternativa por questão.</p><main>${Array.from({ length: exam.questionCount }, (_, index) => `<div class="question"><b>${index + 1}</b>${exam.alternatives.map((alternative) => `<span>${escapeForHtml(alternative)}</span><i></i>`).join("")}</div>`).join("")}</main><footer>Não dobre este cartão. Use caneta azul ou preta.</footer></section>`).join("");
+  const printWindow = window.open("", "_blank", "noopener,noreferrer,width=900,height=720");
+  if (!printWindow) return false;
+  printWindow.addEventListener("load", () => { printWindow.focus(); printWindow.print(); }, { once: true });
+  printWindow.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Cartões — ${escapeForHtml(exam.title)}</title><style>@page{size:A4 portrait;margin:0}*{box-sizing:border-box}body{margin:0;color:#172033;font-family:Arial,Helvetica,sans-serif}.card{width:210mm;min-height:297mm;padding:18mm;page-break-after:always}.card:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid #5538c8;padding-bottom:12px}header b{color:#5538c8;font-size:10px;letter-spacing:.1em}h1{margin:6px 0;font-size:22px}p{margin:0;color:#526075;font-size:12px}.student{min-width:180px;border-left:1px solid #d5dbea;padding-left:14px}.student small{display:block;color:#667085;font-size:9px;letter-spacing:.1em}.student strong{display:block;margin-top:5px;font-size:14px}.instruction{margin:17px 0 10px}.question{display:grid;grid-template-columns:32px repeat(${exam.alternatives.length},20px 22px);align-items:center;gap:5px;min-height:26px;border-bottom:1px solid #e5e9f2;font-size:10px}.question b{font-size:12px}.question span{text-align:center;font-weight:700}.question i{width:17px;height:17px;border:1.5px solid #172033;border-radius:50%}footer{margin-top:14px;color:#667085;font-size:10px}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>${cards}</body></html>`);
+  printWindow.document.close();
+  return true;
 }
 
 export function CollaborativeExamsWorkspace() {
@@ -124,7 +162,27 @@ function ExamCard({ exam, management, onChange, onDelete }: { exam: Collaborativ
   const [message, setMessage] = useState("");
   const release = async () => { try { await api(`/api/collaborative-exams/${exam.id}/release`, { method: "POST", body: "{}" }); setMessage("Prova liberada para impressão e correção."); await onChange(); } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível liberar."); } };
   const complete = exam.sections.every((item) => item.status === "aprovado");
-  return <Card className="p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">{exam.title}</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{exam.audienceLabel} · {exam.questionCount} questões · {exam.examDate}</p></div>{management ? <div className="flex flex-wrap items-center gap-2">{exam.releasedAt ? <Badge tone="success">Liberada</Badge> : <Button disabled={!complete} onClick={() => void release()}><ShieldCheck className="size-4" />Liberar prova</Button>}<Button variant="danger" onClick={onDelete}><Trash2 className="size-4" />Excluir prova</Button></div> : exam.releasedAt ? <Badge tone="success">Liberada</Badge> : null}</div><div className="mt-5 grid gap-3">{exam.sections.map((section) => management ? <ManagementSection key={section.id} exam={exam} section={section} onChange={onChange} /> : <TeacherSection key={section.id} exam={exam} section={section} onChange={onChange} />)}</div>{message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}</Card>;
+  return <Card className="p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-mono text-[10px] font-bold tracking-[0.16em] text-[var(--accent)]">AVALIAÇÃO · {exam.releasedAt ? "LIBERADA" : "EM PREPARO"}</p><h3 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-[var(--foreground)]">{exam.title}</h3><p className="mt-2 text-sm text-[var(--muted-foreground)]">{exam.audienceLabel} · {exam.questionCount} questões · {exam.examDate}</p></div>{management ? <div className="flex flex-wrap items-center gap-2">{exam.releasedAt ? <><Badge tone="success">Liberada</Badge><Button variant="secondary" onClick={() => setMessage(printAnswerKey(exam) ? "Gabarito em ordem aberto para impressão ou PDF." : "Não foi possível abrir a janela de impressão.")}><Printer className="size-4" />Imprimir gabarito em ordem</Button></> : <Button disabled={!complete} onClick={() => void release()}><ShieldCheck className="size-4" />Liberar prova</Button>}<Button variant="danger" onClick={onDelete}><Trash2 className="size-4" />Excluir prova</Button></div> : exam.releasedAt ? <Badge tone="success">Liberada</Badge> : null}</div>{management && exam.releasedAt ? <><ReleaseFlow /><div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"><div><AnswerKeyPreview exam={exam} /><div className="mt-5 grid gap-3">{exam.sections.map((section) => <ManagementSection key={section.id} exam={exam} section={section} onChange={onChange} />)}</div></div><PrintOperations exam={exam} onMessage={setMessage} /></div></> : <div className="mt-5 grid gap-3">{exam.sections.map((section) => management ? <ManagementSection key={section.id} exam={exam} section={section} onChange={onChange} /> : <TeacherSection key={section.id} exam={exam} section={section} onChange={onChange} />)}</div>}{message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}</Card>;
+}
+
+function ReleaseFlow() {
+  return <div className="mt-6 grid gap-3 rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-4">{[["1", "Revisar", "Respostas conferidas"], ["2", "Liberar", "Prova disponível"], ["3", "Imprimir", "Gabarito e cartões"], ["4", "Corrigir", "Leitura e resultado"]].map(([step, title, detail], index) => <div key={step} className="flex items-center gap-3"><span className={`grid size-8 shrink-0 place-items-center rounded-full border text-xs font-bold ${index < 3 ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]" : "border-[var(--border-strong)] text-[var(--muted-foreground)]"}`}>{step}</span><div><p className="text-sm font-semibold">{title}</p><p className="text-xs text-[var(--muted-foreground)]">{detail}</p></div></div>)}</div>;
+}
+
+function AnswerKeyPreview({ exam }: { exam: CollaborativeExam }) {
+  const answers = buildOrderedAnswerKey(exam.sections);
+  return <section className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h4 className="text-lg font-semibold">Gabarito em ordem</h4><p className="mt-1 text-sm text-[var(--muted-foreground)]">Q1 → Q{exam.questionCount}, bloqueado após a liberação.</p></div><Button variant="secondary" onClick={() => void printAnswerKey(exam)}><Printer className="size-4" />Imprimir</Button></div><div className="mt-5 grid grid-cols-5 gap-2 sm:grid-cols-6 lg:grid-cols-10">{answers.map((item) => <div key={item.question} className="rounded-xl border border-[var(--border)] bg-[var(--card-solid)] px-2 py-3 text-center"><span className="block font-mono text-[10px] text-[var(--muted-foreground)]">Q{item.question}</span><strong className="mt-1 block text-lg text-[var(--foreground)]">{item.answer || "—"}</strong></div>)}</div></section>;
+}
+
+function PrintOperations({ exam, onMessage }: { exam: CollaborativeExam; onMessage: (message: string) => void }) {
+  const { data } = useAppData();
+  const students = useMemo(() => sortStudentsForPrinting(data.students, data.classes), [data.classes, data.students]);
+  const [classId, setClassId] = useState("");
+  const visibleStudents = students.filter((student) => !classId || student.turma === classId);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => students.map((student) => student.id));
+  const selected = visibleStudents.filter((student) => selectedIds.includes(student.id));
+  const classNames = new Map(data.classes.map((item) => [item.id, item.nome]));
+  return <aside className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5"><p className="font-mono text-[10px] font-bold tracking-[0.15em] text-[var(--accent)]">OPERAÇÃO DE IMPRESSÃO</p><h4 className="mt-2 text-lg font-semibold">Gerar cartões de resposta</h4><p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">Selecione os alunos. A ordem segue turma e nome.</p><div className="mt-5 grid gap-3"><Select value={classId} onChange={(event) => { const nextClassId = event.target.value; setClassId(nextClassId); setSelectedIds(students.filter((student) => !nextClassId || student.turma === nextClassId).map((student) => student.id)); }}><option value="">Todas as turmas</option>{data.classes.map((classRoom) => <option key={classRoom.id} value={classRoom.id}>{classRoom.nome}</option>)}</Select><label className="flex items-center justify-between text-sm font-semibold"><span>Selecionar todos</span><input type="checkbox" checked={visibleStudents.length > 0 && selected.length === visibleStudents.length} onChange={(event) => setSelectedIds(event.target.checked ? visibleStudents.map((student) => student.id) : [])} /></label><div className="max-h-56 divide-y divide-[var(--border)] overflow-y-auto rounded-xl border border-[var(--border)]">{visibleStudents.map((student) => <label key={student.id} className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-sm"><input type="checkbox" checked={selectedIds.includes(student.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, student.id] : current.filter((id) => id !== student.id))} /><span className="min-w-0 flex-1 truncate">{student.nome}</span><span className="text-xs text-[var(--muted-foreground)]">{classNames.get(student.turma)}</span></label>)}</div><Button disabled={!selected.length} onClick={() => onMessage(printStudentCards(exam, selected, classNames) ? `${selected.length} cartões abertos em ordem para impressão.` : "Não foi possível abrir a janela de impressão.")}><Printer className="size-4" />Gerar cartões ({selected.length})</Button></div><div className="mt-5 border-t border-[var(--border)] pt-4"><p className="text-sm font-semibold">Atividade de impressão</p><p className="mt-2 text-sm text-[var(--muted-foreground)]">O histórico permanente será registrado na próxima etapa de persistência. Nesta tela, as ações abrem a impressão imediatamente.</p></div></aside>;
 }
 
 function DeleteExamDialog({ exam, deleting, onCancel, onConfirm }: { exam: CollaborativeExam | null; deleting: boolean; onCancel: () => void; onConfirm: () => void }) {

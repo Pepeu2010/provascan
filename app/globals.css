@@ -12,26 +12,26 @@
   --green-400: #5ed39a;
   --amber-400: #e4b45b;
   --red-400: #ff8797;
-  --dashboard-sidebar-width: 248px;
+  --dashboard-sidebar-width: 230px;
   --dashboard-sidebar-compact-width: 76px;
   --dashboard-sidebar-notebook-width: 232px;
   /* Semantic tokens. Components should consume these, never primitive colors. */
-  --background: var(--ink-950);
-  --background-end: #10131a;
-  --foreground: #edf0f5;
-  --muted-foreground: #98a1b0;
-  --surface: var(--ink-900);
-  --surface-strong: var(--ink-850);
-  --surface-contrast: #202733;
-  --card: #0f1319;
-  --card-solid: #0f1319;
-  --card-elevated: #181e27;
-  --border: #252d39;
-  --border-strong: #465163;
-  --accent: var(--violet-400);
-  --accent-strong: var(--violet-300);
-  --accent-soft: #252143;
-  --accent-contrast: #151329;
+  --background: #080c12;
+  --background-end: #0b1018;
+  --foreground: #f4f6fa;
+  --muted-foreground: #99a3b3;
+  --surface: #0d131c;
+  --surface-strong: #121924;
+  --surface-contrast: #1a2330;
+  --card: #0c121a;
+  --card-solid: #0c121a;
+  --card-elevated: #121a26;
+  --border: #242e3d;
+  --border-strong: #3c495b;
+  --accent: #9b5cff;
+  --accent-strong: #b58aff;
+  --accent-soft: #25183d;
+  --accent-contrast: #ffffff;
   --success: var(--green-400);
   --success-soft: #102b25;
   --success-border: #255f51;
@@ -59,9 +59,9 @@
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 30%), 0 14px 34px -24px rgb(0 0 0 / 88%);
   --shadow-floating: 0 22px 58px -30px rgb(0 0 0 / 95%);
   /* Component tokens */
-  --radius-sm: 9px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
   --motion-fast: 140ms;
   --motion-normal: 200ms;
   --motion-emphasis: 280ms;
@@ -722,6 +722,36 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .dashboard-page-transition .app-panel { transition: border-color var(--motion-normal) ease, box-shadow var(--motion-normal) ease, background-color var(--motion-normal) ease; }
 @media (hover: hover) {
   .dashboard-page-transition .app-panel:hover { border-color: color-mix(in srgb, var(--accent) 26%, var(--border)); box-shadow: var(--shadow-floating); }
+}
+
+/* Operational dark workspace: shared chrome for every protected surface. */
+.dashboard-shell { background: radial-gradient(circle at 42% -20%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 33%), var(--background); }
+.dashboard-shell__main { max-width: 1840px; margin: 0 auto; padding: 24px 28px 44px; }
+.dashboard-shell-panel { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0 0 26px; }
+.app-page-header { min-height: 58px; }
+.app-page-header__eyebrow { color: color-mix(in srgb, var(--accent) 82%, var(--muted-foreground)); letter-spacing: .16em; }
+.app-page-header__title { font-size: clamp(1.7rem, 2.6vw, 2.4rem); font-weight: 740; letter-spacing: -.055em; }
+.app-page-header__command { min-width: 220px; background: color-mix(in srgb, var(--card-solid) 86%, transparent); }
+.dashboard-sidebar { background: linear-gradient(180deg, #080c12, #0a0f17); border-right-color: color-mix(in srgb, var(--border) 74%, transparent); }
+.dashboard-sidebar__header { min-height: 88px; border-bottom: 0; padding: 20px 18px 14px; }
+.dashboard-sidebar__workspace { margin: 0 18px; padding: 0 0 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.dashboard-sidebar__workspace-name { font-family: var(--font-plex-mono), monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.dashboard-sidebar__navigation { gap: 6px; margin: 18px 8px; }
+.dashboard-sidebar__item { min-height: 44px; border-radius: 8px; font-size: 13px; font-weight: 650; }
+.dashboard-sidebar__item--active { background: linear-gradient(100deg, color-mix(in srgb, var(--accent) 38%, #18102b), color-mix(in srgb, var(--accent) 17%, transparent)); box-shadow: inset 2px 0 0 var(--accent); }
+.dashboard-sidebar__item--active .dashboard-sidebar__item-icon { color: var(--accent-strong); }
+.dashboard-sidebar__support { padding: 4px 14px 18px; }
+.app-panel { box-shadow: none; }
+.dashboard-page-transition .app-panel:hover { box-shadow: 0 16px 40px -34px #000; }
+
+@media (min-width: 1024px) {
+  .dashboard-shell { grid-template-columns: var(--dashboard-sidebar-width) minmax(0, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .dashboard-shell__main { padding: 18px 16px 32px; }
+  .dashboard-shell-panel { padding-bottom: 20px; }
+  .app-page-header__title { font-size: 1.55rem; }
 }
 
 @keyframes sidebar-reveal {
