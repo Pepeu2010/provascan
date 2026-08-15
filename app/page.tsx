@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -10,13 +11,18 @@ import {
   Check,
   ClipboardCheck,
   FileCheck2,
+  Menu,
   ScanLine,
   ShieldCheck,
   Sparkles,
+  X,
 } from "lucide-react";
 import { CreatorCredit } from "@/components/creator-credit";
+import { LandingBenefitStrip } from "@/components/landing-benefit-strip";
 import { ProvaScanLogo } from "@/components/provascan-logo";
 import { Button } from "@/components/ui/button";
+import Aurora from "@/components/Aurora";
+import { TextAnimate } from "@/components/ui/text-animate";
 
 const workflow = [
   {
@@ -64,6 +70,18 @@ const heroTransition = {
 
 export default function HomePage() {
   const reduceMotion = useReducedMotion();
+  const mobileMenuRef = useRef<HTMLDialogElement>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  function openMobileMenu() {
+    mobileMenuRef.current?.showModal();
+    setIsMobileMenuOpen(true);
+  }
+
+  function closeMobileMenu() {
+    mobileMenuRef.current?.close();
+    setIsMobileMenuOpen(false);
+  }
 
   return (
     <main className="landing-page">
@@ -81,21 +99,70 @@ export default function HomePage() {
             <Button asChild variant="ghost" className="landing-login">
               <Link href="/login">Entrar</Link>
             </Button>
-            <Button asChild className="landing-primary-button">
-              <Link href="/login">Começar agora <ArrowRight className="size-4" /></Link>
+            <Button asChild className="landing-primary-button landing-header__cta">
+              <Link href="/login">Começar agora <ArrowRight className="landing-header__cta-arrow size-4" /></Link>
             </Button>
           </div>
+          <button
+            type="button"
+            className="landing-menu-trigger"
+            aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="landing-mobile-menu"
+            onClick={isMobileMenuOpen ? closeMobileMenu : openMobileMenu}
+          >
+            {isMobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
       </header>
 
+      <dialog
+        ref={mobileMenuRef}
+        id="landing-mobile-menu"
+        className="landing-mobile-menu"
+        aria-labelledby="landing-mobile-menu-title"
+        onClose={() => setIsMobileMenuOpen(false)}
+        onCancel={() => setIsMobileMenuOpen(false)}
+      >
+        <div className="landing-mobile-menu__panel">
+          <div className="landing-mobile-menu__topline">
+            <span id="landing-mobile-menu-title">Navegação</span>
+            <button type="button" className="landing-mobile-menu__close" aria-label="Fechar menu" onClick={closeMobileMenu}>
+              <X className="size-5" />
+            </button>
+          </div>
+          <nav className="landing-mobile-menu__links" aria-label="Navegação mobile">
+            <a href="#como-funciona" onClick={closeMobileMenu}>Como funciona</a>
+            <a href="#recursos" onClick={closeMobileMenu}>Recursos</a>
+            <a href="#seguranca" onClick={closeMobileMenu}>Segurança</a>
+          </nav>
+          <div className="landing-mobile-menu__actions">
+            <Button asChild variant="ghost" className="landing-login">
+              <Link href="/login" onClick={closeMobileMenu}>Entrar</Link>
+            </Button>
+            <Button asChild className="landing-primary-button landing-header__cta">
+              <Link href="/login" onClick={closeMobileMenu}>Começar agora <ArrowRight className="landing-header__cta-arrow size-4" /></Link>
+            </Button>
+          </div>
+        </div>
+      </dialog>
+
       <section className="landing-hero">
+        <Aurora className="landing-hero__aurora" colorStops={["#5421b5", "#b28aff", "#1a236e"]} blend={0.4} amplitude={0.9} speed={0.45} />
         <div className="landing-container landing-hero__grid">
           <motion.div
             className="landing-hero__copy"
             initial={false}
           >
             <p className="landing-kicker"><Sparkles className="size-3.5" /> Para quem corrige prova objetiva</p>
-            <h1>A correção que cabe no ritmo da <span>escola.</span></h1>
+            <h1>
+              <TextAnimate as="span" by="word" animation="blurInUp" duration={0.52} startOnView={false} className="landing-hero__title-copy">
+                A correção que cabe no ritmo da
+              </TextAnimate>
+              <TextAnimate as="span" by="word" animation="blurInUp" delay={0.48} duration={0.2} startOnView={false} className="landing-hero__accent">
+                escola.
+              </TextAnimate>
+            </h1>
             <p className="landing-hero__description">
               Fotografe o cartão-resposta. O ProvaScan destaca apenas o que precisa da sua confirmação.
             </p>
@@ -138,13 +205,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="landing-assurance" aria-label="Pontos principais do ProvaScan">
-        <div className="landing-container landing-assurance__items">
-          <p><Camera className="size-4" /> Leitura por foto no celular</p>
-          <p><ClipboardCheck className="size-4" /> Revisão do professor preservada</p>
-          <p><ChartNoAxesCombined className="size-4" /> Resultados por turma</p>
-        </div>
-      </section>
+      <LandingBenefitStrip />
 
       <section id="como-funciona" className="landing-section landing-workflow">
         <div className="landing-container">

@@ -21,11 +21,6 @@ export const metadata: Metadata = {
   authors: [{ name: CREATOR_NAME }],
   description:
     "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Supabase.",
-  icons: {
-    icon: [{ url: "/icon", type: "image/png", sizes: "512x512" }],
-    shortcut: "/icon",
-    apple: "/icon",
-  },
 };
 
 export default function RootLayout({
