@@ -28,14 +28,19 @@ export function LoginForm() {
   }, [authResolved, session]);
 
   const handleLogin = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    const result = await loginTeacher({ email, password, remember });
-    setIsSubmitting(false);
-    setMessage(result.message);
-    if (!result.ok) return;
-    if (result.step) { setSecurityFlow(true); setMessage(""); return; }
-    const redirect = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("redirect") : null;
-    navigateAfterAuth(getSafePostAuthRedirect(redirect, result.redirectTo || "/dashboard"));
+    setMessage("");
+    try {
+      const result = await loginTeacher({ email, password, remember });
+      setMessage(result.message);
+      if (!result.ok) return;
+      if (result.step) { setSecurityFlow(true); setMessage(""); return; }
+      const redirect = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("redirect") : null;
+      navigateAfterAuth(getSafePostAuthRedirect(redirect, result.redirectTo || "/dashboard"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -69,7 +74,7 @@ export function LoginForm() {
                 <AuthField icon={<Mail className="size-4" />} label="Nome de acesso" type="text" autoComplete="username" placeholder="Digite seu acesso" value={email} onChange={setEmail} />
                 <AuthField icon={<KeyRound className="size-4" />} label="Senha" type="password" autoComplete="current-password" placeholder="Digite sua senha" value={password} onChange={setPassword} />
                 <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between"><Checkbox checked={remember} onChange={(event) => setRemember(event.target.checked)} label="Lembrar este dispositivo por 30 dias" /><button type="button" onClick={() => setShowRecovery((previous) => !previous)} className="text-left font-medium text-[var(--accent)] hover:text-[var(--accent-strong)]">Ajuda com a senha</button></div>
-                <Button size="lg" className="mt-1 w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? "Entrando..." : "Entrar"}</Button>
+                <Button size="lg" className="mt-1 w-full" type="submit" loading={isSubmitting}>{isSubmitting ? "Entrando…" : "Entrar"}</Button>
               </form>
             )}
 

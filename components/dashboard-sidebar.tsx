@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type CSSProperties } from "react";
 import {
   BarChart3,
   BookCheck,
@@ -10,6 +11,7 @@ import {
   GraduationCap,
   Heart,
   LayoutDashboard,
+  LogOut,
   ScanLine,
   Settings,
   Users,
@@ -17,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { ProvaScanLogo } from "@/components/provascan-logo";
+import { Button } from "@/components/ui/button";
 import { canAccessSensitiveSettings } from "@/lib/access-control";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +55,21 @@ export function DashboardSidebar({
   onToggleCompact,
   onRequestClose,
 }: DashboardSidebarProps) {
-  const { data, session } = useAppData();
+  const router = useRouter();
+  const { data, logoutTeacher, session } = useAppData();
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    try {
+      await logoutTeacher();
+      onNavigate();
+      router.replace("/login");
+    } finally {
+      setIsLeaving(false);
+    }
+  };
 
   return (
     <aside
@@ -68,22 +85,11 @@ export function DashboardSidebar({
       <header className="dashboard-sidebar__header">
         <ProvaScanLogo variant="sidebar" compact={compact} className="dashboard-sidebar__logo" />
         {modal ? (
-          <button
-            type="button"
-            onClick={onRequestClose}
-            className="dashboard-sidebar__icon-button dashboard-sidebar__close"
-            aria-label="Fechar menu"
-          >
+          <button type="button" onClick={onRequestClose} className="dashboard-sidebar__icon-button dashboard-sidebar__close" aria-label="Fechar menu">
             <X className="size-5" aria-hidden="true" />
           </button>
         ) : onToggleCompact ? (
-          <button
-            type="button"
-            onClick={onToggleCompact}
-            className="dashboard-sidebar__icon-button dashboard-sidebar__expand"
-            aria-label={expanded ? "Recolher navegação" : "Expandir navegação"}
-            aria-expanded={expanded}
-          >
+          <button type="button" onClick={onToggleCompact} className="dashboard-sidebar__icon-button dashboard-sidebar__expand" aria-label={expanded ? "Recolher navegação" : "Expandir navegação"} aria-expanded={expanded}>
             <ChevronRight className={cn("size-4 transition-transform duration-200", expanded && "rotate-180")} aria-hidden="true" />
           </button>
         ) : null}
@@ -100,43 +106,26 @@ export function DashboardSidebar({
           .map((item, index) => {
             const Icon = item.icon;
             const isActive = active === item.href;
-
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                aria-current={isActive ? "page" : undefined}
-                aria-label={compact ? item.label : undefined}
-                title={compact ? item.label : undefined}
-                className={cn("dashboard-sidebar__item", isActive && "dashboard-sidebar__item--active")}
-                style={{ "--sidebar-item-index": index } as CSSProperties}
-              >
-                <span className="dashboard-sidebar__item-icon">
-                  <Icon className="size-[18px]" aria-hidden="true" />
-                </span>
+              <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={isActive ? "page" : undefined} aria-label={compact ? item.label : undefined} title={compact ? item.label : undefined} className={cn("dashboard-sidebar__item", isActive && "dashboard-sidebar__item--active")} style={{ "--sidebar-item-index": index } as CSSProperties}>
+                <span className="dashboard-sidebar__item-icon"><Icon className="size-[18px]" aria-hidden="true" /></span>
                 <span className="dashboard-sidebar__item-label">{item.label}</span>
                 {isActive ? <span className="dashboard-sidebar__active-indicator" aria-hidden="true" /> : null}
               </Link>
             );
           })}
       </nav>
+
       <div className="dashboard-sidebar__support">
-        <button
-          type="button"
-          onClick={() => {
-            onNavigate();
-            window.dispatchEvent(new Event("provascan:open-support"));
-          }}
-          aria-label={compact ? "Apoiar o ProvaScan" : undefined}
-          title={compact ? "Apoiar o ProvaScan" : undefined}
-          className="dashboard-sidebar__item dashboard-sidebar__support-button"
-        >
+        <button type="button" onClick={() => { onNavigate(); window.dispatchEvent(new Event("provascan:open-support")); }} aria-label={compact ? "Apoiar o ProvaScan" : undefined} title={compact ? "Apoiar o ProvaScan" : undefined} className="dashboard-sidebar__item dashboard-sidebar__support-button">
           <span className="dashboard-sidebar__item-icon"><Heart className="size-[18px]" aria-hidden="true" /></span>
           <span className="dashboard-sidebar__item-label">Apoiar o ProvaScan</span>
         </button>
+        <Button variant="ghost" loading={isLeaving} onClick={() => void handleLogout()} className="dashboard-sidebar__logout" aria-label="Sair da conta">
+          <LogOut className="size-[18px]" aria-hidden="true" />
+          <span className="dashboard-sidebar__item-label">Sair</span>
+        </Button>
       </div>
-
     </aside>
   );
 }

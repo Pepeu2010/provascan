@@ -2,7 +2,13 @@
 alter table public.app_users drop column if exists subject;
 alter table public.exams drop column if exists subject;
 alter table public.exams drop column if exists sections;
-alter table public.grades drop column if exists subject;
+do $$
+begin
+  if to_regclass('public.grades') is not null then
+    alter table public.grades drop column if exists subject;
+  end if;
+end;
+$$;
 drop index if exists public.exams_subject_idx;
 
 -- Historical correction snapshots can carry the previous shape even though the

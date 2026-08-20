@@ -13,7 +13,9 @@
     "test:collaborative-access": "npx --no-install tsx scripts/verify-collaborative-access.ts",
     "test:collaborative-printing": "npx --no-install tsx scripts/verify-collaborative-printing.ts",
     "test:api-authorization": "npx --no-install tsx scripts/verify-api-authorization.ts",
-    "test:security-hardening": "npx --no-install tsx scripts/verify-security-hardening.ts"
+    "test:security-hardening": "npx --no-install tsx scripts/verify-security-hardening.ts",
+    "test:collaborative-exam-draft": "npx --no-install tsx scripts/verify-collaborative-exam-draft.ts",
+    "test:fresh-schema-migrations": "npx --no-install tsx scripts/verify-fresh-schema-migrations.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

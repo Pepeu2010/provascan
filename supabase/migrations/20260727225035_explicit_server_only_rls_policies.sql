@@ -25,6 +25,10 @@ begin
     'teacher_student_links',
     'tutoring_sessions'
   ] loop
+    if to_regclass(format('public.%I', target_table)) is null then
+      continue;
+    end if;
+
     execute format('alter table public.%I enable row level security', target_table);
     execute format('revoke all privileges on table public.%I from anon, authenticated', target_table);
     execute format('drop policy if exists server_only_no_direct_access on public.%I', target_table);

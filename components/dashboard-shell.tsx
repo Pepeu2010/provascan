@@ -30,6 +30,7 @@ export function DashboardShell({
   const [pendingNavigation, setPendingNavigation] = useState<{ label: string; path: string } | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const commandDialogRef = useRef<HTMLDialogElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -37,6 +38,17 @@ export function DashboardShell({
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
   const tabletCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeLabel = dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logoutTeacher();
+      router.replace("/login");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const summary = useMemo(
     () =>
@@ -289,7 +301,7 @@ export function DashboardShell({
                   Salvando alterações
                 </div>
               ) : null}
-              <Button variant="ghost" className="hidden sm:inline-flex" onClick={async () => { await logoutTeacher(); router.push("/login"); }}>
+              <Button variant="ghost" className="hidden sm:inline-flex" loading={isLoggingOut} onClick={() => void handleLogout()}>
                 <LogOut className="size-4" />
                 Sair
               </Button>
