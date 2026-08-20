@@ -169,6 +169,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
     return { acertos, erros, percentual, revisao };
   }, [review]);
+  const activeStep = syncStatus === "saving" ? 5 : review ? 4 : phase === "processing" ? 3 : selectedFile ? 3 : 1;
 
   if (!exam || !studentsForExam.length) {
     return (
@@ -482,13 +483,14 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     >
       <Card className="correction-workspace__control border-[var(--border-strong)] p-5 sm:p-6">
         <div className={cn("grid gap-5", compact ? "" : "")}>
-          <div>
+          <CorrectionProgress activeStep={activeStep} />
+          <div className="correction-workspace__intro">
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
               <ScanSearch className="size-4 text-[var(--accent)]" />
-              1. Envie o cartão
+              1. Escolha a prova
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              Escolha a prova e envie a foto. A leitura começa sozinha e você só confere o que estiver sinalizado.
+              Escolha a prova e a turma. Depois, envie uma única foto do cartão para iniciar a leitura.
             </p>
           </div>
 
@@ -559,8 +561,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-4 sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="font-semibold text-[var(--foreground)]">Gabarito da prova</p>
-                <p className="mt-1 text-xs text-[var(--muted-foreground)]">{answerKey.length} questões para leitura</p>
+                <p className="font-semibold text-[var(--foreground)]">2. Envie o cartão-resposta</p>
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">{answerKey.length} questões serão lidas automaticamente</p>
               </div>
               <Badge tone="accent">Automático</Badge>
             </div>
@@ -582,6 +584,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
               Fotografe a folha inteira, com os quatro cantos visíveis e sem sombra forte. A perspectiva, rotação e contraste são ajustados automaticamente.
             </p>
+            {selectedFile ? <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--card-solid)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]" aria-live="polite">Arquivo selecionado: {selectedFile.name}</p> : null}
           </div>
 
           <input
@@ -622,7 +625,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             </details>
           ) : null}
 
-          <div className="grid gap-3">
+          <div className="grid gap-3" aria-label="Ações de leitura">
             <Button
               size="lg"
               className="min-h-12 w-full"
@@ -642,7 +645,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 onClick={startManualReview}
               >
                 <UserRoundSearch className="size-4" />
-                Corrigir sem leitura
+                Preencher manualmente
               </Button>
               <Button
                 size="lg"
@@ -691,8 +694,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="grid gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">2. Revise antes de salvar</p>
-                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Corrija somente as exceções</h3>
+                <p className="text-sm text-[var(--muted-foreground)]">4. Revise antes de salvar</p>
+                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Revise somente o que precisa de atenção</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
                   A leitura já preencheu o cartão. Confirme o aluno e toque apenas nas respostas que precisam de ajuste.
                 </p>
@@ -756,7 +759,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </Card>
 
               <details className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Detalhes técnicos da leitura</summary>
+                <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver detalhes técnicos da leitura</summary>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <InfoPanel label="Orientacao" value={review.qualitySummary.orientation} />
                   <InfoPanel label="Brilho" value={review.qualitySummary.brightness} />
@@ -797,6 +800,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                       key={item.key}
                       type="button"
                       onClick={() => setResultFilter(item.key as ResultFilter)}
+                      aria-pressed={resultFilter === item.key}
                       className={cn(
                         "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
                         resultFilter === item.key
@@ -984,7 +988,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <div className="sticky bottom-3 z-10 grid gap-3 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)] sm:grid-cols-2">
               <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
-                3. Salvar correção
+                5. Salvar correção
               </Button>
               <Button
                 size="lg"
@@ -1009,6 +1013,18 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   );
 }
 
+function CorrectionProgress({ activeStep }: { activeStep: number }) {
+  const steps = ["Escolher prova", "Enviar cartão", "Ler cartão", "Revisar", "Salvar"];
+
+  return (
+    <ol className="correction-progress" aria-label={`Etapa ${activeStep} de ${steps.length}: ${steps[activeStep - 1]}`}>
+      {steps.map((step, index) => {
+        const position = index + 1;
+        return <li key={step} className={cn(position === activeStep && "correction-progress__step--current", position < activeStep && "correction-progress__step--complete")}><span aria-hidden="true">{position < activeStep ? "✓" : position}</span><strong>{step}</strong></li>;
+      })}
+    </ol>
+  );
+}
 export function EmptyReviewState() {
   return (
     <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] px-6 py-10 text-center">
@@ -1226,7 +1242,7 @@ function ProcessingCard({
   onCancel: () => void;
 }) {
   return (
-    <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
+    <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4" role="status" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[var(--foreground)]">{label}</p>
@@ -1236,7 +1252,7 @@ function ProcessingCard({
           Cancelar processamento
         </Button>
       </div>
-      <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--card-solid)]">
+      <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--card-solid)]" role="progressbar" aria-label="Progresso da leitura" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
         <div
           className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-strong))] transition-all"
           style={{ width: `${progress}%` }}
@@ -1265,6 +1281,8 @@ function StatusCard({
 }) {
   return (
     <div
+      role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
       className={cn(
         "rounded-[24px] border p-4",
         tone === "error"

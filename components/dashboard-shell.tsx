@@ -33,6 +33,7 @@ export function DashboardShell({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const commandDialogRef = useRef<HTMLDialogElement | null>(null);
+  const commandTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
@@ -67,6 +68,19 @@ export function DashboardShell({
     [session?.role],
   );
   const visibleCommandItems = commandItems.filter((item) => item.label.toLocaleLowerCase("pt-BR").includes(commandQuery.trim().toLocaleLowerCase("pt-BR")));
+  const focusCommandItem = useCallback((index: number) => {
+    document.getElementById(`dashboard-command-${index}`)?.focus();
+  }, []);
+  const handleCommandKeyDown = (event: React.KeyboardEvent<HTMLElement>, currentIndex: number) => {
+    if (!visibleCommandItems.length) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      focusCommandItem((currentIndex + direction + visibleCommandItems.length) % visibleCommandItems.length);
+    }
+    if (event.key === "Home") { event.preventDefault(); focusCommandItem(0); }
+    if (event.key === "End") { event.preventDefault(); focusCommandItem(visibleCommandItems.length - 1); }
+  };
 
   const clearDialogCloseTransition = useCallback(() => {
     const dialog = dialogRef.current;
@@ -290,7 +304,7 @@ export function DashboardShell({
             </div>
 
             <div className="flex flex-none items-center justify-end gap-2">
-              <button type="button" className="app-page-header__command" onClick={() => setCommandOpen(true)} aria-label="Abrir busca rápida">
+              <button ref={commandTriggerRef} type="button" className="app-page-header__command" onClick={() => setCommandOpen(true)} aria-label="Abrir busca rápida">
                 <Search className="size-4" aria-hidden="true" />
                 <span>Ir para uma área</span>
                 <kbd>Ctrl K</kbd>
@@ -353,7 +367,7 @@ export function DashboardShell({
         ref={commandDialogRef}
         className="command-palette"
         aria-label="Busca rápida"
-        onClose={() => { setCommandOpen(false); setCommandQuery(""); }}
+        onClose={() => { setCommandOpen(false); setCommandQuery(""); requestAnimationFrame(() => commandTriggerRef.current?.focus()); }}
       >
         <form method="dialog">
           <input
@@ -361,16 +375,18 @@ export function DashboardShell({
             className="command-palette__input"
             value={commandQuery}
             onChange={(event) => setCommandQuery(event.target.value)}
+            onKeyDown={(event) => handleCommandKeyDown(event, -1)}
             placeholder="Ir para…"
             aria-label="Filtrar áreas"
           />
         </form>
-        <div className="command-palette__list" role="list">
-          {visibleCommandItems.map((item) => {
+        <div className="command-palette__list" role="group" aria-label="Áreas do workspace">
+          {visibleCommandItems.length ? <p className="command-palette__heading">Áreas do workspace</p> : null}
+          {visibleCommandItems.map((item, index) => {
             const Icon = item.icon;
-            return <button key={item.href} type="button" className="command-palette__item" onClick={() => { setCommandOpen(false); router.push(item.href); }}><span><Icon className="size-4" aria-hidden="true" /></span>{item.label}</button>;
+            return <button id={`dashboard-command-${index}`} key={item.href} type="button" className="command-palette__item" onKeyDown={(event) => handleCommandKeyDown(event, index)} onClick={() => { setCommandOpen(false); router.push(item.href); }}><span><Icon className="size-4" aria-hidden="true" /></span>{item.label}</button>;
           })}
-          {!visibleCommandItems.length ? <p className="command-palette__empty">Nenhuma área encontrada.</p> : null}
+          {!visibleCommandItems.length ? <p className="command-palette__empty" role="status">Nenhuma área encontrada.</p> : null}
         </div>
       </dialog>
     </div>

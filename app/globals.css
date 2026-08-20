@@ -173,6 +173,7 @@ body {
 .command-palette::backdrop { background: var(--overlay-scrim); backdrop-filter: blur(4px); }
 .command-palette__input { width: 100%; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--foreground); outline: 0; padding: 13px 14px 15px; font-size: 15px; }
 .command-palette__list { display: grid; gap: 3px; max-height: min(55dvh, 420px); overflow: auto; padding: 8px 0 0; }
+.command-palette__heading { margin: 4px 12px 5px; color: var(--muted-foreground); font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
 .command-palette__item { display: flex; align-items: center; gap: 11px; width: 100%; border: 0; border-radius: 11px; background: transparent; color: var(--foreground); padding: 11px 12px; text-align: left; font-size: 13px; font-weight: 650; }
 .command-palette__item:hover, .command-palette__item:focus-visible { background: var(--accent-soft); outline: 0; }
 .command-palette__item span { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--border); border-radius: 8px; color: var(--accent); }
@@ -469,10 +470,21 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .correction-workspace__review { min-width: 0; }
 .correction-workspace__review > div { min-width: 0; }
 .correction-workspace__control { background: linear-gradient(145deg, var(--card-solid), color-mix(in srgb, var(--accent-soft) 22%, var(--card-solid))); }
-.correction-workspace__control > div > div:first-child { position: relative; padding-left: 17px; }
-.correction-workspace__control > div > div:first-child::before { position: absolute; top: 3px; bottom: 3px; left: 0; width: 3px; border-radius: 999px; background: var(--accent); content: ""; }
+.correction-workspace__intro { position: relative; padding-left: 17px; }
+.correction-workspace__intro::before { position: absolute; top: 3px; bottom: 3px; left: 0; width: 3px; border-radius: 999px; background: var(--accent); content: ""; }
 .correction-workspace__control .border-dashed { position: relative; overflow: hidden; border-color: color-mix(in srgb, var(--accent) 58%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
-.correction-workspace__control .border-dashed::after { position: absolute; top: 0; right: 12%; left: 12%; height: 1px; background: var(--accent); content: ""; opacity: .7; animation: scanner-sweep 3.8s ease-in-out infinite; }
+.correction-workspace__control .border-dashed::after { display: none; }
+.correction-progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.correction-progress li { display: grid; min-width: 0; gap: 5px; color: var(--muted-foreground); font-size: 11px; line-height: 1.25; }
+.correction-progress span { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--card-solid); color: inherit; font-size: 12px; font-weight: 800; }
+.correction-progress strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.correction-progress__step--current { color: var(--foreground) !important; }
+.correction-progress__step--current span { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); box-shadow: 0 0 0 3px var(--focus-ring); }
+.correction-progress__step--complete { color: var(--success) !important; }
+.correction-progress__step--complete span { border-color: var(--success-border); background: var(--success-soft); }
+.correction-workspace__control details > summary, .correction-workspace__review details > summary { min-height: 44px; display: flex; align-items: center; }
+.correction-workspace__review [aria-pressed="true"] { box-shadow: 0 0 0 3px var(--focus-ring); }
+@media (max-width: 480px) { .correction-progress strong { font-size: 9px; } .correction-progress span { width: 26px; height: 26px; } }
 .correction-workspace__review { background: linear-gradient(180deg, var(--card-solid), var(--surface)); }
 
 .collaborative-exams__intro { z-index: 20; overflow: visible; background: linear-gradient(135deg, var(--card-solid), color-mix(in srgb, var(--accent-soft) 38%, var(--card-solid))); }
