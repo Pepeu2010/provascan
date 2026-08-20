@@ -749,7 +749,12 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .dashboard-sidebar__item { min-height: 44px; border-radius: 8px; font-size: 13px; font-weight: 650; }
 .dashboard-sidebar__item--active { background: linear-gradient(100deg, color-mix(in srgb, var(--accent) 38%, #18102b), color-mix(in srgb, var(--accent) 17%, transparent)); box-shadow: inset 2px 0 0 var(--accent); }
 .dashboard-sidebar__item--active .dashboard-sidebar__item-icon { color: var(--accent-strong); }
-.dashboard-sidebar__support { padding: 4px 14px 18px; }
+.dashboard-sidebar__support {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 4px 14px 18px;
+}
 .app-panel { box-shadow: none; }
 .dashboard-page-transition .app-panel:hover { box-shadow: 0 16px 40px -34px #000; }
 
