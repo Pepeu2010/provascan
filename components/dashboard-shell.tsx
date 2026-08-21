@@ -1,12 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Command, LoaderCircle, LogOut, Menu, Search } from "lucide-react";
+import { Command, LoaderCircle, Menu, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardLoading from "@/app/dashboard/loading";
 import { useAppData } from "@/components/app-data-provider";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { canAccessSensitiveSettings } from "@/lib/access-control";
 
@@ -22,7 +21,7 @@ export function DashboardShell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { authResolved, data, isHydrated, logoutTeacher, operationalDataReady, session, syncError, syncStatus } = useAppData();
+  const { authResolved, data, isHydrated, operationalDataReady, session, syncError, syncStatus } = useAppData();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dialogReady, setDialogReady] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
@@ -30,7 +29,6 @@ export function DashboardShell({
   const [pendingNavigation, setPendingNavigation] = useState<{ label: string; path: string } | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const commandDialogRef = useRef<HTMLDialogElement | null>(null);
   const commandTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -39,17 +37,6 @@ export function DashboardShell({
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
   const tabletCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeLabel = dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
-
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-    try {
-      await logoutTeacher();
-      router.replace("/login");
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
 
   const summary = useMemo(
     () =>
@@ -315,10 +302,6 @@ export function DashboardShell({
                   Salvando alterações
                 </div>
               ) : null}
-              <Button variant="ghost" className="hidden sm:inline-flex" loading={isLoggingOut} onClick={() => void handleLogout()}>
-                <LogOut className="size-4" />
-                Sair
-              </Button>
             </div>
           </div>
         </header>
