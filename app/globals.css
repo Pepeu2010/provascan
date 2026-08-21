@@ -808,7 +808,19 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 @media (max-width: 767px) {
   .dashboard-shell__main { padding: 18px 16px max(32px, env(safe-area-inset-bottom)); }
   .dashboard-shell-panel { margin-bottom: 0; padding-bottom: 20px; }
+  .app-page-header { gap: 12px; }
+  .app-page-header > :first-child { flex: 1 1 auto; }
   .app-page-header__title { font-size: 1.55rem; }
+  .app-page-header__command {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+  .app-page-header__command > span,
+  .app-page-header__command kbd { display: none; }
 }
 
 @keyframes sidebar-reveal {
