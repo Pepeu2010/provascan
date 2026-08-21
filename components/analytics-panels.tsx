@@ -35,17 +35,17 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
         </div>
 
         <div className="rounded-[24px] border border-[var(--border)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--card-solid)_94%,transparent),transparent)] p-6">
-          {hasClassAverages ? <div className="flex h-56 items-end gap-4 sm:gap-6">
+          {hasClassAverages ? <div className="flex h-56 items-end gap-2 sm:gap-6">
             {classAverages.map((item) => (
-              <div key={item.turma} className="flex flex-1 flex-col items-center gap-4">
-                <div className="flex h-full w-full items-end justify-center rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface),transparent)] px-3 pb-3 sm:px-4 sm:pb-4">
+              <div key={item.turma} className="flex min-w-0 flex-1 flex-col items-center gap-3 sm:gap-4">
+                <div className="flex h-full w-full items-end justify-center rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,var(--surface),transparent)] px-1.5 pb-2 sm:px-4 sm:pb-4">
                   <div
                     className="w-full rounded-[18px] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent-strong)_88%,white),var(--accent))] shadow-[var(--shadow-soft)]"
                     style={{ height: `${(item.media / barMax) * 100}%` }}
                   />
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-[var(--foreground)]">{item.turma}</p>
+                <div className="min-w-0 text-center">
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">{item.turma}</p>
                   <p className="text-xs text-[var(--muted-foreground)]">{item.media}% média</p>
                 </div>
               </div>
@@ -141,7 +141,7 @@ export function AnalyticsPanels({ analytics }: { analytics: AnalyticsSnapshot })
                   );
                 })}
               </svg>
-              <div className="mt-4 grid grid-cols-4 gap-4 text-center text-sm text-[var(--muted-foreground)]">
+              <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-left text-sm text-[var(--muted-foreground)] sm:grid-cols-4 sm:gap-4 sm:text-center">
                 {gradeEvolution.map((item, index) => (
                   <div key={`${item.periodo}-${index}`}>{item.periodo}</div>
                 ))}

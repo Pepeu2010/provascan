@@ -452,14 +452,45 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 }
 
 @media (max-width: 639px) {
-  .dashboard-next-action__meta { border-left: 0; padding-left: 0; }
-  .dashboard-next-action__button { width: 100%; }
-  .dashboard-worklist__heading { align-items: start; padding: 20px 18px 16px; }
+  .dashboard-command-center { gap: 16px; }
+  .dashboard-next-action {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 16px;
+    padding: 20px 18px;
+  }
+  .dashboard-next-action__meta {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    min-width: 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+    padding-top: 14px;
+    padding-left: 0;
+  }
+  .dashboard-next-action__meta small { margin-top: 0; }
+  .dashboard-next-action__button { grid-column: 1 / -1; width: 100%; }
+  .dashboard-worklist__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 18px 16px;
+  }
+  .dashboard-worklist__heading .dashboard-text-link { align-self: flex-start; }
   .dashboard-worklist__heading h2 { font-size: 19px; }
   .dashboard-worklist__row,
   .dashboard-activity__row,
   .dashboard-empty-state { padding: 15px 18px; }
-  .dashboard-row-action { font-size: 0; }
+  .dashboard-worklist__row { align-items: flex-start; }
+  .dashboard-row-action {
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    margin: -4px -6px;
+    padding: 8px;
+    font-size: 0;
+  }
   .dashboard-row-action svg { width: 18px; height: 18px; }
   .dashboard-empty-state { align-items: flex-start; flex-wrap: wrap; }
   .dashboard-empty-state .dashboard-text-link { width: 100%; margin-left: 54px; }
@@ -775,8 +806,8 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 }
 
 @media (max-width: 767px) {
-  .dashboard-shell__main { padding: 18px 16px 32px; }
-  .dashboard-shell-panel { padding-bottom: 20px; }
+  .dashboard-shell__main { padding: 18px 16px max(32px, env(safe-area-inset-bottom)); }
+  .dashboard-shell-panel { margin-bottom: 0; padding-bottom: 20px; }
   .app-page-header__title { font-size: 1.55rem; }
 }
 

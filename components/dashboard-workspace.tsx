@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Camera, CheckCircle2, ClipboardList, FileText, UsersRound } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardList, UsersRound } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
+import { ExamSheetIcon, ScanCaptureIcon } from "@/components/provascan-action-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -20,7 +21,7 @@ export function DashboardWorkspace() {
     <div className="dashboard-command-center mx-auto grid max-w-[1380px] gap-5">
       <section className="dashboard-next-action">
         <div className="dashboard-next-action__icon" aria-hidden="true">
-          <Camera className="size-7" strokeWidth={1.8} />
+          <ScanCaptureIcon className="size-8" />
         </div>
         <div className="min-w-0 flex-1">
           <h2>Corrigir provas por foto</h2>
@@ -56,7 +57,7 @@ export function DashboardWorkspace() {
                 const audienceSize = data.students.filter((student) => student.status === "Ativo" && student.turma === exam.audienceId).length;
                 return (
                   <div key={exam.id} className="dashboard-worklist__row">
-                    <div className="dashboard-row-icon" aria-hidden="true"><FileText className="size-5" strokeWidth={1.8} /></div>
+                    <div className="dashboard-row-icon" aria-hidden="true"><ExamSheetIcon className="size-[22px]" /></div>
                     <div className="min-w-0 flex-1">
                       <p className="dashboard-row-title">{exam.titulo}</p>
                       <p className="dashboard-row-detail">{exam.audienceLabel} · {exam.quantidadeQuestoes} questões{audienceSize ? ` · ${audienceSize} alunos` : ""}</p>
