@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { Color, Mesh, Program, Renderer, Triangle } from "ogl";
+import { canUseWebGL2 } from "@/lib/webgl-support";
 
 const PAD = 16;
 
@@ -55,6 +56,7 @@ export function SpecularFrame({
     const mount = mountRef.current;
     const host = hostRef.current?.parentElement;
     if (!mount || !host) return;
+    if (!canUseWebGL2(document)) return;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const renderer = new Renderer({ alpha: true, premultipliedAlpha: true, antialias: true, dpr });
