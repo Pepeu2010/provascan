@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +123,52 @@ function RecoveryCodesStep({ loading, error, run, codes }: Props & { codes: stri
   return <section className="mt-6 grid gap-4"><StepHeader icon={<KeyRound />} title="Salve seus códigos de recuperação" text="Eles permitem acessar sua conta caso você perca o celular. Cada código funciona uma única vez." />{codes.length ? <div className="grid grid-cols-2 gap-2 rounded-[20px] border border-[var(--border)] p-4 font-mono text-sm">{codes.map((code) => <code key={code}>{code}</code>)}</div> : <p className="rounded-xl border border-amber-400/40 p-3 text-sm">Os códigos foram exibidos uma única vez. Refaça a configuração caso não os tenha salvo.</p>}<div className="flex gap-2"><Button type="button" variant="secondary" className="flex-1" onClick={() => void copy()} disabled={!codes.length}>{copyState === "success" ? <><Check className="mr-2 size-4" />Copiado</> : <><Copy className="mr-2 size-4" />Copiar</>}</Button><Button type="button" variant="secondary" className="flex-1" onClick={() => { const blob = new Blob([codes.join("\n")], { type: "text/plain" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "provascan-codigos-recuperacao.txt"; link.click(); URL.revokeObjectURL(url); }} disabled={!codes.length}>Baixar .txt</Button></div>{copyState === "success" ? <p className="text-sm font-medium text-[var(--accent)]" role="status" aria-live="polite">Códigos copiados. Guarde-os em um local seguro.</p> : null}{copyState === "error" ? <p className="text-sm text-red-700 dark:text-red-300" role="alert">Não foi possível copiar os códigos. Use o download ou copie manualmente.</p> : null}<label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} className="mt-1 size-4" />Salvei meus códigos em um local seguro.</label><ActionError error={error} /><Button size="lg" className="h-[52px] w-full rounded-[18px]" disabled={loading || !saved} onClick={() => run(() => post("/api/auth/mfa/totp", { action: "confirm-recovery" }))}>{loading ? "Finalizando..." : <><Check className="mr-2 size-4" />Concluir proteção</>}</Button></section>;
 }
 
-function OtpInput({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) { const ref = useRef<HTMLInputElement>(null); const digits = value.padEnd(6, " ").slice(0, 6).split(""); return <div className="grid gap-2"><label className="text-sm font-medium">Código de seis dígitos</label><div className="relative grid grid-cols-6 gap-2" onClick={() => ref.current?.focus()}>{digits.map((digit, index) => <span key={index} className="flex h-12 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-lg font-semibold">{digit.trim()}</span>)}<input ref={ref} aria-label="Código de seis dígitos" className="absolute inset-0 cursor-text opacity-0" value={value} disabled={disabled} inputMode="numeric" pattern="[0-9]*" autoComplete="off" enterKeyHint="done" onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 6))} /></div></div>; }
+function OtpInput({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const hintId = useId();
+  const [focused, setFocused] = useState(false);
+  const digits = value.padEnd(6, " ").slice(0, 6).split("");
+  const activeIndex = Math.min(value.length, 5);
+
+  return (
+    <div className="grid gap-2">
+      <label htmlFor={inputId} className="text-sm font-medium">Código de seis dígitos</label>
+      <div className="relative grid grid-cols-6 gap-2" onClick={() => ref.current?.focus()}>
+        {digits.map((digit, index) => {
+          const isFilled = Boolean(digit.trim());
+          const isActive = focused && index === activeIndex;
+          return (
+            <span
+              key={index}
+              aria-hidden="true"
+              className={`flex h-12 items-center justify-center border-b-2 bg-[var(--input-bg)] text-lg font-semibold transition-[border-color,color,background-color] duration-200 ${isActive ? "border-[var(--accent)] text-[var(--foreground)]" : isFilled ? "border-[color-mix(in_srgb,var(--accent)_58%,var(--border))] text-[var(--foreground)]" : "border-[var(--border-strong)] text-[var(--muted-foreground)]"}`}
+            >
+              {digit.trim()}
+            </span>
+          );
+        })}
+        <input
+          ref={ref}
+          id={inputId}
+          aria-describedby={hintId}
+          aria-label="Código de seis dígitos"
+          className="absolute inset-0 cursor-text opacity-0"
+          value={value}
+          disabled={disabled}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete="one-time-code"
+          enterKeyHint="done"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onChange={(event) => onChange(event.target.value.replace(/\D/g, "").slice(0, 6))}
+        />
+      </div>
+      <p id={hintId} className="text-xs text-[var(--muted-foreground)]">Digite ou cole o código. A linha violeta mostra a próxima posição.</p>
+    </div>
+  );
+}
 function PasswordField({ label, value, onChange, autoComplete }: { label: string; value: string; onChange: (value: string) => void; autoComplete: string }) { return <label className="grid gap-2 text-sm font-medium">{label}<Input type="password" autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} /></label>; }
 function StepHeader({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) { return <div><div className="flex items-center gap-2 text-[var(--accent)]">{icon}<span className="text-xs font-bold tracking-[.14em]">SEGURANÇA DA CONTA</span></div><h2 className="mt-3 text-2xl font-semibold tracking-[-.04em]">{title}</h2><p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">{text}</p></div>; }
 function ActionError({ error }: { error: string }) { return error ? <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">{error}</p> : null; }
