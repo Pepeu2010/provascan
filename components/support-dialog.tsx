@@ -8,6 +8,7 @@ import { PixQrCode } from "@/components/pix-qr-code";
 import { Button } from "@/components/ui/button";
 import { createPixPayload } from "@/lib/pix-payload";
 import { isPixConfigured } from "@/lib/support-config";
+import { dialogTransition, motionTokens } from "@/lib/motion";
 
 type SupportStep = "intro" | "pix";
 
@@ -92,9 +93,9 @@ export function SupportDialog() {
     >
       <div className="relative overflow-hidden px-6 pb-6 pt-7 sm:px-9 sm:pb-9 sm:pt-10">
         <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--accent),#d7d0ff,transparent)]" />
-        <motion.button type="button" whileTap={reduceMotion ? undefined : { scale: 0.9 }} transition={{ type: "spring", stiffness: 420, damping: 22 }} className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]" onClick={() => close()} aria-label="Fechar apoio ao ProvaScan"><X className="size-4" /></motion.button>
+        <motion.button type="button" whileTap={reduceMotion ? undefined : { scale: 0.9 }} transition={{ ...motionTokens.spring, stiffness: 420, damping: 22 }} className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]" onClick={() => close()} aria-label="Fechar apoio ao ProvaScan"><X className="size-4" /></motion.button>
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={step} initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, y: -8 }} transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 340, damping: 27, mass: 0.8 }}>
+          <motion.div key={step} initial={reduceMotion ? false : { opacity: 0, scale: 0.97, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.98, y: -8 }} transition={reduceMotion ? { duration: 0 } : dialogTransition}>
             {step === "intro" ? <>
               <motion.div className="grid size-12 place-items-center rounded-2xl border border-[color-mix(in_srgb,var(--accent)_28%,var(--border))] bg-[var(--accent-soft)] text-[var(--accent)] shadow-[0_10px_30px_rgb(108_89_212_/_16%)]" animate={reduceMotion ? undefined : { y: [0, -3, 0] }} transition={{ duration: 3.2, ease: "easeInOut", repeat: Infinity }}><Heart className="size-5" fill="currentColor" /></motion.div>
               <p className="mt-6 font-mono text-[10px] font-bold tracking-[0.18em] text-[var(--accent)]">APOIO VOLUNTÁRIO</p>

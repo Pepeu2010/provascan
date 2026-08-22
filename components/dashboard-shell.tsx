@@ -5,6 +5,7 @@ import { Command, LoaderCircle, Menu, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardLoading from "@/app/dashboard/loading";
 import { useAppData } from "@/components/app-data-provider";
+import { MotionPageTransition } from "@/components/motion-page-transition";
 import { DashboardSidebar, dashboardNavigationItems } from "@/components/dashboard-sidebar";
 import { Card } from "@/components/ui/card";
 import { canAccessSensitiveSettings } from "@/lib/access-control";
@@ -315,9 +316,9 @@ export function DashboardShell({
           </Card>
         ) : null}
 
-        <div key={pathname} className="dashboard-page-transition">
+        <MotionPageTransition key={pathname}>
           {children}
-        </div>
+        </MotionPageTransition>
       </main>
 
       {mobileMenuOpen ? (
