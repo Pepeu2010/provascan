@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import QRCode from "qrcode";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, Copy, KeyRound, LockKeyhole, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { motionTokens } from "@/lib/motion";
 import type { AuthStep } from "@/types/auth";
 
 type FlowState = { step: AuthStep; mfaConfigured: boolean; user: { nome: string; acesso: string }; policy: { required: boolean } };
@@ -128,6 +130,7 @@ function OtpInput({ value, onChange, disabled }: { value: string; onChange: (val
   const inputId = useId();
   const hintId = useId();
   const [focused, setFocused] = useState(false);
+  const reduceMotion = useReducedMotion();
   const digits = value.padEnd(6, " ").slice(0, 6).split("");
   const activeIndex = Math.min(value.length, 5);
 
@@ -139,13 +142,16 @@ function OtpInput({ value, onChange, disabled }: { value: string; onChange: (val
           const isFilled = Boolean(digit.trim());
           const isActive = focused && index === activeIndex;
           return (
-            <span
+            <motion.span
               key={index}
               aria-hidden="true"
+              initial={false}
+              animate={reduceMotion ? undefined : isFilled ? { opacity: [0.45, 1], scale: [0.82, 1.06, 1], y: [4, -1, 0] } : { opacity: 1, scale: 1, y: 0 }}
+              transition={{ ...motionTokens.spring, stiffness: 520, damping: 24, mass: 0.45 }}
               className={`flex h-12 items-center justify-center border-b-2 bg-[var(--input-bg)] text-lg font-semibold transition-[border-color,color,background-color] duration-200 ${isActive ? "border-[var(--accent)] text-[var(--foreground)]" : isFilled ? "border-[color-mix(in_srgb,var(--accent)_58%,var(--border))] text-[var(--foreground)]" : "border-[var(--border-strong)] text-[var(--muted-foreground)]"}`}
             >
               {digit.trim()}
-            </span>
+            </motion.span>
           );
         })}
         <input
