@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a reproducible problem in ProvaScan
+title: "[Bug]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include credentials, real student data or security exploit details here. Use SECURITY.md for vulnerabilities.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+      placeholder: Describe the problem clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable sequence that reproduces the issue.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. Upload/select ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Authentication / MFA
+        - Dashboard
+        - Classes / students
+        - Exams / answer keys
+        - OCR / OMR / correction
+        - Collaborative exams
+        - Printing / PDF
+        - Results
+        - API / permissions
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, operating system and device when relevant.
+      placeholder: Firefox 154, Windows 11, desktop
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove tokens, credentials and personal data before attaching evidence.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues before opening this report.
+          required: true
+        - label: I removed credentials and personal data from the report.
+          required: true
+        - label: This is not a security vulnerability that requires private disclosure.
+          required: true
