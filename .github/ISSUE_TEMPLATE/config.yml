@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Pepeu2010/provascan/security/policy
+    about: Read the security policy before reporting sensitive issues.
