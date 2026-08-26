@@ -1,5 +1,7 @@
 import type { UserRole } from "@/types/auth";
 
+export type ManagedRole = "admin" | "vice_diretor" | "coordenador" | "professor";
+
 const ADMIN_ROLES = new Set<UserRole>(["admin"]);
 const PRIVILEGED_ROLES = new Set<UserRole>(["admin", "vice_diretor"]);
 const ACADEMIC_MANAGEMENT_ROLES = new Set<UserRole>(["admin", "vice_diretor", "coordenador"]);
@@ -48,4 +50,20 @@ export function canAccessSensitiveSettings(role: UserRole) {
 
 export function canManageUsers(role: UserRole) {
   return isPrivilegedRole(role);
+}
+
+/** Defines who can be assigned or managed without allowing privilege escalation. */
+export function canAssignManagedRole(actorRole: UserRole, targetRole: ManagedRole) {
+  if (isAdminRole(actorRole)) return true;
+  return actorRole === "vice_diretor" && (targetRole === "coordenador" || targetRole === "professor");
+}
+
+export function canManageTargetUser(actorRole: UserRole, targetRole: string) {
+  return canAssignManagedRole(actorRole, targetRole as ManagedRole);
+}
+
+export function managedRolesFor(actorRole: UserRole): ManagedRole[] {
+  if (isAdminRole(actorRole)) return ["professor", "coordenador", "vice_diretor", "admin"];
+  if (actorRole === "vice_diretor") return ["professor", "coordenador"];
+  return [];
 }

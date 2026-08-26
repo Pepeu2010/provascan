@@ -2,11 +2,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
-import { isAdminRole } from "@/lib/access-control";
+import { canAssignManagedRole, canManageTargetUser, canManageUsers, type ManagedRole } from "@/lib/access-control";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent, resetManagedUserMfa, setManagedUserActive, SupabaseConnectionError, SupabaseSchemaError, updateManagedUser } from "@/services/supabase-data";
+import { appendAuditEvent, listUsersForAdmin, resetManagedUserMfa, setManagedUserActive, SupabaseConnectionError, SupabaseSchemaError, updateManagedUser } from "@/services/supabase-data";
 
 const roles = z.enum(["admin", "vice_diretor", "coordenador", "professor"]);
 const schema = z.discriminatedUnion("action", [
@@ -18,13 +18,21 @@ const schema = z.discriminatedUnion("action", [
 export async function PATCH(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const validation = await validateSessionToken((await cookies()).get(AUTH_COOKIE_NAME)?.value);
-  if (!validation.ok || !isAdminRole(validation.session.role)) return NextResponse.json({ error: "Acesso restrito ao admin." }, { status: 403 });
+  if (!validation.ok || !canManageUsers(validation.session.role)) return NextResponse.json({ error: "Acesso restrito a perfis de gestão." }, { status: 403 });
   const { userId } = await params;
   if (!userId.trim() || userId === validation.session.id) return NextResponse.json({ error: "Use sua própria conta para alterar seus dados e segurança." }, { status: 400 });
   const limit = await consumeRateLimit({ bucket: "admin-user-manage", key: buildRateLimitKey(getClientIp(request.headers), validation.session.id), limit: 30, windowMs: 15 * 60 * 1000 });
   if (!limit.ok) return NextResponse.json({ error: "Muitas alterações. Aguarde antes de tentar novamente." }, { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } });
   try {
     const input = schema.parse(await request.json());
+    const target = (await listUsersForAdmin()).find((user) => user.id === userId);
+    if (!target) return NextResponse.json({ error: "Pessoa não encontrada." }, { status: 404 });
+    if (!canManageTargetUser(validation.session.role, target.perfil)) {
+      return NextResponse.json({ error: "Seu perfil não pode alterar esta conta." }, { status: 403 });
+    }
+    if (input.action === "update" && !canAssignManagedRole(validation.session.role, input.perfil as ManagedRole)) {
+      return NextResponse.json({ error: "Seu perfil não pode atribuir esse nível de acesso." }, { status: 403 });
+    }
     if (input.action === "update") await updateManagedUser(userId, input);
     if (input.action === "set-active") await setManagedUserActive(userId, input.active);
     if (input.action === "reset-mfa") await resetManagedUserMfa(userId);

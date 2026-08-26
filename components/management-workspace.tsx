@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, Edit3, FileUp, Heart, KeyRound, Printer, QrCode, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { AdministrationCenter } from "@/components/administration-center";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
 import { StudentTable } from "@/components/student-table";
@@ -11,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { canManageUsers } from "@/lib/access-control";
+import { canManageTargetUser, canManageUsers, isAdminRole } from "@/lib/access-control";
 import { UserManagementPanel } from "@/components/user-management-panel";
 import { compareClassrooms, formatEducationalLabel } from "@/lib/education-labels";
 import {
@@ -1092,6 +1093,7 @@ export function SettingsWorkspace() {
   const [adminMessage, setAdminMessage] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
   const canManagePasswordPolicy = canManageUsers(session?.role ?? "");
+  const isAdmin = isAdminRole(session?.role ?? "");
 
   useEffect(() => {
     if (!canManagePasswordPolicy) {
@@ -1172,9 +1174,10 @@ export function SettingsWorkspace() {
 
   return (
     <div className="grid gap-5">
-      {session?.role === "admin" ? <UserManagementPanel currentUserId={session.id} /> : null}
+      {session ? <AdministrationCenter /> : null}
+      {session && canManagePasswordPolicy ? <section id="equipe" className="scroll-mt-6"><UserManagementPanel currentUserId={session.id} currentRole={session.role} /></section> : null}
       {canManagePasswordPolicy ? (
-        <Card className="p-6">
+        <Card id="seguranca" className="scroll-mt-6 p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-3">
@@ -1192,13 +1195,7 @@ export function SettingsWorkspace() {
                 <ShieldCheck className="size-4" />
                 Atualizar lista
               </Button>
-              <Button onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: true })} disabled={adminLoading}>
-                <KeyRound className="size-4" />
-                Forçar troca para todos
-              </Button>
-              <Button variant="ghost" onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: false })} disabled={adminLoading}>
-                Liberar todos
-              </Button>
+              {isAdmin ? <><Button onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: true })} disabled={adminLoading}><KeyRound className="size-4" />Forçar troca para todos</Button><Button variant="ghost" onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: false })} disabled={adminLoading}>Liberar todos</Button></> : null}
             </div>
           </div>
           <div className="mt-6 grid gap-3">
@@ -1230,7 +1227,7 @@ export function SettingsWorkspace() {
                     {user.email || "Sem identificador de acesso"} • perfil {user.perfil || "sem perfil"}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                {canManageTargetUser(session?.role ?? "", user.perfil) ? <div className="flex flex-wrap gap-3">
                   <Button
                     variant="secondary"
                     onClick={() => void updatePasswordResetMode({ mode: "single", userId: user.id, shouldForce: true })}
@@ -1245,7 +1242,7 @@ export function SettingsWorkspace() {
                   >
                     Liberar
                   </Button>
-                </div>
+                </div> : <p className="text-sm text-[var(--muted-foreground)]">Conta protegida</p>}
               </div>
             ))}
           </div>
@@ -1253,18 +1250,17 @@ export function SettingsWorkspace() {
         </Card>
       ) : null}
 
-      <Card className="border-[color-mix(in_srgb,var(--accent)_32%,var(--border))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--accent)_10%,var(--card-solid)),var(--card-solid))] p-6">
+      <Card className="p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-[var(--accent)]"><Heart className="size-4" fill="currentColor" aria-hidden="true" /><span className="text-xs font-semibold tracking-[0.14em]">APOIE O PROJETO</span></div>
-            <h2 className="mt-3 text-2xl font-semibold text-[var(--foreground)]">O ProvaScan continua gratuito</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)]">O ProvaScan continua gratuito</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">Caso queira contribuir com a manutenção e desenvolvimento da ferramenta, você pode apoiar o projeto via PIX. É totalmente opcional.</p>
           </div>
           <Button variant="secondary" onClick={() => window.dispatchEvent(new Event("provascan:open-support"))}><Heart className="size-4" aria-hidden="true" /> Apoiar o ProvaScan</Button>
         </div>
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      {isAdmin ? <div id="dados" className="grid gap-5 scroll-mt-6 xl:grid-cols-2">
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Persistência operacional</h2>
         <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Os dados do painel são lidos e gravados com segurança no Supabase. O backup JSON continua disponível como contingência manual.</p>
@@ -1345,7 +1341,7 @@ export function SettingsWorkspace() {
           }}
         />
       </Card>
-      </div>
+      </div> : null}
     </div>
   );
 }

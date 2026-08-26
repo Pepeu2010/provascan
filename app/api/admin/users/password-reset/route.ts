@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { hasSameOriginRequest } from "@/lib/request-security";
-import { canManageUsers } from "@/lib/access-control";
+import { canManageTargetUser, canManageUsers, isAdminRole } from "@/lib/access-control";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
@@ -101,6 +101,9 @@ export async function POST(request: Request) {
     const payload = passwordResetSchema.parse(await request.json());
 
     if (payload.mode === "all") {
+      if (!isAdminRole(auth.session.role)) {
+        return NextResponse.json({ error: "Somente Admin pode alterar a política de senha de toda a instituição." }, { status: 403 });
+      }
       const result = await updateAllUsersPasswordChangeFlag(payload.shouldForce);
       return NextResponse.json({
         message: payload.shouldForce
@@ -110,6 +113,11 @@ export async function POST(request: Request) {
       });
     }
 
+    const target = (await listUsersForAdmin()).find((user) => user.id === payload.userId);
+    if (!target) return NextResponse.json({ error: "Pessoa não encontrada." }, { status: 404 });
+    if (!canManageTargetUser(auth.session.role, target.perfil)) {
+      return NextResponse.json({ error: "Seu perfil não pode alterar esta conta." }, { status: 403 });
+    }
     await updateUserPasswordChangeFlag(payload.userId, payload.shouldForce);
     return NextResponse.json({
       message: payload.shouldForce
