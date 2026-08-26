@@ -212,19 +212,17 @@ export function ClassesManager() {
       </div>
       {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
       {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
-      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-6 overflow-hidden rounded-[20px] border border-[var(--border)]" role="list" aria-label="Turmas cadastradas">
         {data.classes.slice().sort(compareClassrooms).map((item) => (
-          <Card key={item.id} className="p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-[var(--foreground)]">{formatEducationalLabel(item.nome)}</p>
+          <div key={item.id} role="listitem" className="flex flex-col gap-4 border-b border-[var(--border)] bg-[var(--card-solid)] px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm font-semibold text-[var(--accent)]" aria-hidden="true">{formatEducationalLabel(item.nome).match(/^\d+/)?.[0] ?? "—"}</span>
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-[var(--foreground)]">{formatEducationalLabel(item.nome)}</p>
+                <p className="mt-1 text-sm text-[var(--muted-foreground)]">Ano letivo {item.ano}</p>
               </div>
             </div>
-            <div className="mt-5 flex items-center justify-between text-sm">
-              <span className="text-[var(--muted-foreground)]">Ano letivo</span>
-              <span className="font-medium text-[var(--foreground)]">{item.ano}</span>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 sm:justify-end">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -245,8 +243,9 @@ export function ClassesManager() {
                 Excluir
               </Button>
             </div>
-          </Card>
+          </div>
         ))}
+        {!data.classes.length ? <p className="px-5 py-8 text-sm text-[var(--muted-foreground)]">Nenhuma turma cadastrada ainda. Use o formulário acima para criar a primeira.</p> : null}
       </div>
     </Card>
   );
