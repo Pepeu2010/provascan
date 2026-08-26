@@ -540,6 +540,20 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .collaborative-exams__intro ~ .app-panel > .mt-5 > div { background: color-mix(in srgb, var(--surface) 76%, transparent); transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease; }
 .collaborative-exams__intro ~ .app-panel > .mt-5 > div:hover { border-color: var(--border-strong); background: var(--surface); }
 .collaborative-exams__intro ~ .app-panel .grid > .rounded-xl { border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); }
+.print-operations { contain: layout paint; }
+.print-operations__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.print-operations__count { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border)); border-radius: 12px; background: var(--accent-soft); color: var(--accent-strong); font-family: var(--font-plex-mono), monospace; font-size: 14px; font-weight: 800; }
+.print-operations__select-all { min-height: 44px; color: var(--foreground); }
+.print-operations__students { background: color-mix(in srgb, var(--card-solid) 74%, transparent); }
+.print-operations__student { min-height: 46px; color: var(--foreground); transition: background-color var(--motion-fast) ease; }
+.print-operations__student:hover { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+@media (max-width: 639px) {
+  .collaborative-exams__intro { padding: 20px !important; }
+  .collaborative-exams__intro > div:first-child::after { display: none; }
+  .collaborative-exams__intro ~ .app-panel { padding: 20px !important; }
+  .print-operations__students { max-height: min(42dvh, 360px); }
+  .print-operations .specular-button { width: 100%; }
+}
 @media (min-width: 1280px) {
   .correction-workspace__control { position: sticky; top: 20px; }
 }
