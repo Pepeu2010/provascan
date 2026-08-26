@@ -1,18 +1,17 @@
+<p align="center">
+  <img src="./docs/provascan-banner.svg" alt="ProvaScan — avaliações escolares, OCR/OMR e correção assistida" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://provascan-app.vercel.app"><img src="https://img.shields.io/badge/Abrir_aplicação-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Abrir aplicação" /></a>
+  <a href="https://github.com/Pepeu2010/provascan/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Pepeu2010/provascan/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI" /></a>
+</p>
+
 # ProvaScan
 
 Plataforma para organizar avaliações escolares, emitir cartões-resposta e conferir marcações por foto com revisão humana. Desenvolvida para uso operacional por equipes pedagógicas, com controle de acesso por função.
 
-[Abrir aplicação](https://provascan-app.vercel.app) · [Repositório](https://github.com/Pepeu2010/provascan)
-
-## Preview
-
-Não há capturas de tela versionadas no repositório. Para documentar uma nova versão visual sem imagens artificiais, capture estas telas na aplicação publicada:
-
-- `/login`: entrada e fluxo de segurança;
-- `/dashboard`: visão geral operacional;
-- `/dashboard/turmas`: lista de turmas;
-- `/dashboard/gabaritos`: gabarito, respostas e impressão;
-- `/dashboard/correcao`: correção assistida por foto.
+[Abrir aplicação](https://provascan-app.vercel.app) · [Repositório](https://github.com/Pepeu2010/provascan) · [Segurança](./SECURITY.md) · [Contribuição](./CONTRIBUTING.md)
 
 ## Visão geral
 
@@ -189,10 +188,7 @@ O repositório não possui itens de roadmap marcados como `TODO` ou `FIXME` no c
 
 ## Contribuição
 
-1. Abra uma issue para alinhar mudanças de comportamento, segurança ou banco de dados.
-2. Crie uma branch, implemente a alteração e mantenha as migrations versionadas quando necessário.
-3. Rode lint, tipagem e os testes relacionados.
-4. Envie um pull request explicando a mudança, o impacto em permissões/dados e como foi validada.
+Consulte [`CONTRIBUTING.md`](./CONTRIBUTING.md) para instalação, padrões de mudança, requisitos de segurança e checklist antes de abrir um pull request.
 
 ## Licença
 
