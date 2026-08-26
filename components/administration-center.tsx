@@ -6,7 +6,7 @@ import { useAppData } from "@/components/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { isAdminRole } from "@/lib/access-control";
+import { canManageUsers } from "@/lib/access-control";
 
 const operations = [
   { href: "/dashboard/alunos", label: "Alunos", description: "Cadastre, mova de turma e acompanhe a situação de cada estudante.", icon: Users },
@@ -19,7 +19,7 @@ const operations = [
 
 export function AdministrationCenter() {
   const { data, session } = useAppData();
-  const isAdmin = isAdminRole(session?.role ?? "");
+  const hasInstitutionalControl = canManageUsers(session?.role ?? "");
   const activeStudents = data.students.filter((student) => student.status === "Ativo").length;
 
   return (
@@ -30,7 +30,7 @@ export function AdministrationCenter() {
             <h1 id="administration-center-title" className="text-3xl font-semibold tracking-[-0.045em] text-[var(--foreground)]">Central de administração</h1>
             <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Organize a instituição, conduza a operação acadêmica e mantenha acessos sob controle em um único lugar.</p>
           </div>
-          <Badge tone={isAdmin ? "accent" : "warning"}>{isAdmin ? "Admin: controle institucional" : "Vice-direção: gestão de equipe"}</Badge>
+          <Badge tone={hasInstitutionalControl ? "accent" : "warning"}>{session?.role === "admin" ? "Admin: controle institucional" : "Vice-direção: controle institucional"}</Badge>
         </div>
         <dl className="mt-7 grid grid-cols-2 divide-x divide-[var(--border)] border-y border-[var(--border)] sm:grid-cols-4">
           {[
@@ -56,11 +56,11 @@ export function AdministrationCenter() {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">Governança e continuidade</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Abaixo, gerencie pessoas, recuperação de acesso e cópias de segurança. Controles que podem afetar toda a instituição ficam restritos a Admin.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Abaixo, gerencie pessoas, recuperação de acesso e cópias de segurança. Admin e Vice-direção têm o mesmo alcance institucional.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary"><a href="#equipe"><ShieldCheck className="size-4" />Equipe e acessos</a></Button>
-            {isAdmin ? <Button asChild variant="secondary"><a href="#dados"><DatabaseBackup className="size-4" />Backup e restauração</a></Button> : null}
+            {hasInstitutionalControl ? <Button asChild variant="secondary"><a href="#dados"><DatabaseBackup className="size-4" />Backup e restauração</a></Button> : null}
             <Button asChild variant="ghost"><a href="#seguranca"><Settings2 className="size-4" />Segurança</a></Button>
           </div>
         </div>

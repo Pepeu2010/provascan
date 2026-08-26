@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { canManageTargetUser, canManageUsers, isAdminRole } from "@/lib/access-control";
+import { canManageTargetUser, canManageUsers } from "@/lib/access-control";
 import { UserManagementPanel } from "@/components/user-management-panel";
 import { compareClassrooms, formatEducationalLabel } from "@/lib/education-labels";
 import {
@@ -1007,7 +1007,7 @@ export function ReportsWorkspace() {
         <div className="grid gap-3 md:grid-cols-4">
           <FieldSelect value={classFilter} onChange={setClassFilter}>
             <option value="all">Todas as turmas</option>
-            {data.classes.map((item) => (
+            {data.classes.slice().sort(compareClassrooms).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.nome}
               </option>
@@ -1093,7 +1093,7 @@ export function SettingsWorkspace() {
   const [adminMessage, setAdminMessage] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
   const canManagePasswordPolicy = canManageUsers(session?.role ?? "");
-  const isAdmin = isAdminRole(session?.role ?? "");
+  const hasInstitutionalControl = canManageUsers(session?.role ?? "");
 
   useEffect(() => {
     if (!canManagePasswordPolicy) {
@@ -1195,7 +1195,7 @@ export function SettingsWorkspace() {
                 <ShieldCheck className="size-4" />
                 Atualizar lista
               </Button>
-              {isAdmin ? <><Button onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: true })} disabled={adminLoading}><KeyRound className="size-4" />Forçar troca para todos</Button><Button variant="ghost" onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: false })} disabled={adminLoading}>Liberar todos</Button></> : null}
+              {hasInstitutionalControl ? <><Button onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: true })} disabled={adminLoading}><KeyRound className="size-4" />Forçar troca para todos</Button><Button variant="ghost" onClick={() => void updatePasswordResetMode({ mode: "all", shouldForce: false })} disabled={adminLoading}>Liberar todos</Button></> : null}
             </div>
           </div>
           <div className="mt-6 grid gap-3">
@@ -1260,7 +1260,7 @@ export function SettingsWorkspace() {
         </div>
       </Card>
 
-      {isAdmin ? <div id="dados" className="grid gap-5 scroll-mt-6 xl:grid-cols-2">
+      {hasInstitutionalControl ? <div id="dados" className="grid gap-5 scroll-mt-6 xl:grid-cols-2">
       <Card className="p-6">
         <h2 className="text-2xl font-semibold text-[var(--foreground)]">Persistência operacional</h2>
         <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Os dados do painel são lidos e gravados com segurança no Supabase. O backup JSON continua disponível como contingência manual.</p>

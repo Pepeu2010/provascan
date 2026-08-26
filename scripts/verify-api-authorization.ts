@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { canAccessOperationalData, canAssignManagedRole, canManageTargetUser, managedRolesFor } from "../lib/access-control";
+import { canAccessOperationalData, canAccessPath, canAssignManagedRole, canManageTargetUser, managedRolesFor } from "../lib/access-control";
+import { compareClassrooms } from "../lib/education-labels";
 
 assert.equal(canAccessOperationalData("admin"), true);
 assert.equal(canAccessOperationalData("vice_diretor"), true);
@@ -10,13 +11,18 @@ assert.equal(canAccessOperationalData("aluno"), false);
 assert.equal(canAccessOperationalData("unknown-role"), false);
 
 assert.deepEqual(managedRolesFor("admin"), ["professor", "coordenador", "vice_diretor", "admin"]);
-assert.deepEqual(managedRolesFor("vice_diretor"), ["professor", "coordenador"]);
+assert.deepEqual(managedRolesFor("vice_diretor"), ["professor", "coordenador", "vice_diretor", "admin"]);
 assert.equal(canAssignManagedRole("admin", "admin"), true);
 assert.equal(canAssignManagedRole("vice_diretor", "professor"), true);
 assert.equal(canAssignManagedRole("vice_diretor", "coordenador"), true);
-assert.equal(canAssignManagedRole("vice_diretor", "vice_diretor"), false);
-assert.equal(canAssignManagedRole("vice_diretor", "admin"), false);
-assert.equal(canManageTargetUser("vice_diretor", "admin"), false);
+assert.equal(canAssignManagedRole("vice_diretor", "vice_diretor"), true);
+assert.equal(canAssignManagedRole("vice_diretor", "admin"), true);
+assert.equal(canManageTargetUser("vice_diretor", "admin"), true);
+assert.equal(canAccessPath("vice_diretor", "/admin"), true);
+assert.equal(canAccessPath("vice_diretor", "/painel"), true);
+
+const orderedClassNames = ["3E", "1C", "2A", "1A", "2C", "1B", "3A"].sort((left, right) => compareClassrooms({ nome: left }, { nome: right }));
+assert.deepEqual(orderedClassNames, ["1A", "1B", "1C", "2A", "2C", "3A", "3E"]);
 
 const dashboardRoute = readFileSync(new URL("../app/api/dashboard/route.ts", import.meta.url), "utf8");
 const operationalRoute = readFileSync(new URL("../app/api/app-data/route.ts", import.meta.url), "utf8");

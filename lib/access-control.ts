@@ -25,11 +25,11 @@ export function canAccessOperationalData(role: UserRole) {
 
 export function canAccessPath(role: UserRole, pathname: string) {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
-    return isAdminRole(role);
+    return isPrivilegedRole(role);
   }
 
   if (pathname === "/painel" || pathname.startsWith("/painel/")) {
-    return isAdminRole(role);
+    return isPrivilegedRole(role);
   }
 
   if (pathname === "/dashboard/configuracoes" || pathname.startsWith("/dashboard/configuracoes/")) {
@@ -52,10 +52,9 @@ export function canManageUsers(role: UserRole) {
   return isPrivilegedRole(role);
 }
 
-/** Defines who can be assigned or managed without allowing privilege escalation. */
+/** Admin and Vice-diretor share the same institutional management scope. */
 export function canAssignManagedRole(actorRole: UserRole, targetRole: ManagedRole) {
-  if (isAdminRole(actorRole)) return true;
-  return actorRole === "vice_diretor" && (targetRole === "coordenador" || targetRole === "professor");
+  return Boolean(targetRole) && isPrivilegedRole(actorRole);
 }
 
 export function canManageTargetUser(actorRole: UserRole, targetRole: string) {
@@ -63,7 +62,6 @@ export function canManageTargetUser(actorRole: UserRole, targetRole: string) {
 }
 
 export function managedRolesFor(actorRole: UserRole): ManagedRole[] {
-  if (isAdminRole(actorRole)) return ["professor", "coordenador", "vice_diretor", "admin"];
-  if (actorRole === "vice_diretor") return ["professor", "coordenador"];
+  if (isPrivilegedRole(actorRole)) return ["professor", "coordenador", "vice_diretor", "admin"];
   return [];
 }

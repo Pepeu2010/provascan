@@ -32,6 +32,7 @@ import {
 import { rectifyMobilePhoto } from "@/services/mobile-photo-rectification";
 import { ANSWER_SHEET_TEMPLATE } from "@/services/answer-sheet-template";
 import { getStudentsForExam } from "@/lib/exam-audience";
+import { compareClassrooms } from "@/lib/education-labels";
 import { cn } from "@/lib/utils";
 
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
@@ -128,7 +129,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   }, [data.classes, data.students, exam]);
 
   const classesForExam = useMemo(
-    () => data.classes.filter((classRoom) => studentsForExam.some((student) => student.turma === classRoom.id)),
+    () => data.classes.filter((classRoom) => studentsForExam.some((student) => student.turma === classRoom.id)).slice().sort(compareClassrooms),
     [data.classes, studentsForExam],
   );
   const activeClassId = classesForExam.some((classRoom) => classRoom.id === classId)
