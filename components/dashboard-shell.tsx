@@ -227,7 +227,7 @@ export function DashboardShell({
   }
 
   if (!isHydrated || !authResolved || (session && !operationalDataReady)) {
-    return <DashboardLoading />;
+    return <DashboardLoading active={active} />;
   }
 
   return (

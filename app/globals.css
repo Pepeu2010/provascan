@@ -374,6 +374,45 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 .dashboard-loading__progress { width: min(100%, 292px); height: 3px; margin: 22px auto 0; overflow: hidden; border-radius: 999px; background: rgb(196 181 253 / .14); }
 .dashboard-loading__progress span { display: block; width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, transparent, var(--accent-strong), #f2eeff, var(--accent-strong), transparent); box-shadow: 0 0 16px rgb(167 139 250 / .7); animation: dashboard-loading-progress 1.85s var(--motion-spring) infinite; }
 
+/* The loading view reserves the ready dashboard's grid, preventing a full-page layout shift. */
+.dashboard-loading--shell { display: grid; min-height: 100dvh; padding: 0; place-items: stretch; background: radial-gradient(circle at 42% -20%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 33%), var(--background); }
+.dashboard-loading__sidebar { display: none; }
+.dashboard-loading__main { min-width: 0; padding: 18px 16px max(32px, env(safe-area-inset-bottom)); }
+.dashboard-loading__header { min-height: 78px; padding-bottom: 20px; }
+.dashboard-loading__overline { display: block; color: color-mix(in srgb, var(--accent) 82%, var(--muted-foreground)); font-family: var(--font-plex-mono), monospace; font-size: 10px; font-weight: 600; letter-spacing: .16em; }
+.dashboard-loading__header h1 { margin: 5px 0 0; color: var(--foreground); font-size: 1.55rem; font-weight: 740; letter-spacing: -.055em; line-height: 1.1; text-transform: capitalize; }
+.dashboard-loading__summary { display: block; width: 188px; height: 12px; margin-top: 9px; border-radius: 999px; background: var(--surface-strong); }
+.dashboard-loading__content-skeleton { display: grid; max-width: 1380px; gap: 14px; }
+.dashboard-loading__intro-skeleton, .dashboard-loading__row-skeleton { display: grid; gap: 14px; border: 1px solid var(--border); background: var(--card-solid); }
+.dashboard-loading__intro-skeleton { min-height: 238px; align-content: center; padding: 24px; }
+.dashboard-loading__intro-skeleton span, .dashboard-loading__row-skeleton span { display: block; height: 14px; border-radius: 999px; background: linear-gradient(90deg, var(--surface-strong), color-mix(in srgb, var(--surface-strong) 68%, var(--card-solid)), var(--surface-strong)); background-size: 220% 100%; animation: dashboard-loading-shimmer 1.6s ease-in-out infinite; }
+.dashboard-loading__intro-skeleton span:nth-child(1) { width: min(240px, 72%); height: 24px; }
+.dashboard-loading__intro-skeleton span:nth-child(2) { width: min(580px, 92%); }
+.dashboard-loading__intro-skeleton span:nth-child(3) { width: min(420px, 78%); }
+.dashboard-loading__row-skeleton { min-height: 84px; grid-template-columns: minmax(120px, .65fr) minmax(90px, .25fr); align-items: center; padding: 20px 24px; }
+.dashboard-loading__row-skeleton span:last-child { justify-self: end; width: 112px; }
+
+@media (min-width: 768px) {
+  .dashboard-loading--shell { grid-template-columns: var(--dashboard-sidebar-compact-width) minmax(0, 1fr); }
+  .dashboard-loading__sidebar { display: grid; align-content: start; gap: 16px; border-right: 1px solid color-mix(in srgb, var(--border) 74%, transparent); background: linear-gradient(180deg, #080c12, #0a0f17); padding: 20px 10px; }
+  .dashboard-loading__logo { width: 40px; height: 40px; justify-self: center; border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--border)); border-radius: 12px; background: var(--accent-soft); }
+  .dashboard-loading__workspace { height: 1px; background: var(--border); }
+  .dashboard-loading__navigation { display: grid; gap: 10px; margin-top: 8px; }
+  .dashboard-loading__navigation span { width: 46px; height: 46px; justify-self: center; border-radius: 8px; background: var(--surface); }
+  .dashboard-loading__main { padding: 24px 28px 44px; }
+  .dashboard-loading__header { min-height: 84px; padding-bottom: 26px; }
+  .dashboard-loading__header h1 { font-size: clamp(1.7rem, 2.6vw, 2.4rem); }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-loading--shell { grid-template-columns: var(--dashboard-sidebar-width) minmax(0, 1fr); }
+  .dashboard-loading__sidebar { padding: 20px 18px; }
+  .dashboard-loading__logo { justify-self: start; width: 48px; height: 48px; }
+  .dashboard-loading__navigation span { width: 100%; height: 44px; }
+}
+
+@keyframes dashboard-loading-shimmer { from { background-position: 100% 0; } to { background-position: -120% 0; } }
+
 @keyframes dashboard-loading-enter { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes dashboard-loading-breathe { 0%, 100% { opacity: .45; transform: scale(.92); } 50% { opacity: 1; transform: scale(1.08); } }
 @keyframes dashboard-loading-spin { to { transform: rotate(360deg); } }
@@ -382,7 +421,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 @keyframes login-panel-arrive { from { opacity: 0; transform: translate3d(0, 16px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 
 @media (max-width: 520px) {
-  .dashboard-loading { padding: 24px; background-size: 28px 28px, 28px 28px, auto; }
+  .dashboard-loading:not(.dashboard-loading--shell) { padding: 24px; background-size: 28px 28px, 28px 28px, auto; }
   .dashboard-loading__brand { gap: 10px; }
   .dashboard-loading__tag { padding-left: 10px; font-size: 8px; letter-spacing: .12em; }
   .dashboard-loading__scanner { width: 130px; height: 130px; margin: 40px auto 30px; }
@@ -390,7 +429,7 @@ select option, select optgroup { background: var(--card-solid); color: var(--for
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-loading__glow, .dashboard-loading__content, .dashboard-loading__scanner-orbit--outer, .dashboard-loading__scanner-beam, .dashboard-loading__progress span { animation: none; }
+  .dashboard-loading__glow, .dashboard-loading__content, .dashboard-loading__scanner-orbit--outer, .dashboard-loading__scanner-beam, .dashboard-loading__progress span, .dashboard-loading__intro-skeleton span, .dashboard-loading__row-skeleton span { animation: none; }
 }
 
 .dashboard-command-center { padding-bottom: 16px; }
