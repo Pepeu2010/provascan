@@ -14,6 +14,7 @@ type Point = { x: number; y: number };
 export function rectifyMobilePhoto(
   source: HTMLCanvasElement,
   expectedAspectRatio: number,
+  { refineBottomEdge = false }: { refineBottomEdge?: boolean } = {},
 ): DocumentRectification {
   const context = source.getContext("2d", { willReadFrequently: true });
   if (!context || source.width < 240 || source.height < 240) {
@@ -21,7 +22,7 @@ export function rectifyMobilePhoto(
   }
 
   const image = context.getImageData(0, 0, source.width, source.height);
-  const corners = detectSheetCorners(image);
+  const corners = detectSheetCorners(image, refineBottomEdge);
   if (!corners || !isPlausibleSheet(corners, source.width, source.height, expectedAspectRatio)) {
     return { applied: false, canvas: source };
   }
@@ -77,7 +78,7 @@ export function rectifyMobilePhoto(
   return { applied: true, canvas: output, corners };
 }
 
-function detectSheetCorners(image: ImageData): Point[] | null {
+function detectSheetCorners(image: ImageData, refineBottomEdge: boolean): Point[] | null {
   const step = Math.max(4, Math.round(Math.min(image.width, image.height) / 180));
   // Leave a generous margin below paper white. Camera exposure, a printed
   // header and mild shadow otherwise make the detected page shrink inward.
@@ -104,7 +105,11 @@ function detectSheetCorners(image: ImageData): Point[] | null {
   const leftLine = fitLine(middleRows.map((point) => ({ x: point.y, y: point.left })));
   const rightLine = fitLine(middleRows.map((point) => ({ x: point.y, y: point.right })));
   const topLine = fitLine(middleColumns.map((point) => ({ x: point.x, y: point.top })));
-  const bottomLine = fitLine(middleColumns.map((point) => ({ x: point.x, y: point.bottom })));
+  const bottomLine = fitLine(
+    refineBottomEdge
+      ? refineBottomSheetEdge(image) ?? middleColumns.map((point) => ({ x: point.x, y: point.bottom }))
+      : middleColumns.map((point) => ({ x: point.x, y: point.bottom })),
+  );
   if (!leftLine || !rightLine || !topLine || !bottomLine) return null;
 
   const topLeft = intersectLines(leftLine, topLine);
@@ -167,6 +172,35 @@ function trimBounds<T>(points: T[]) {
   // only discard the occasional noisy row/column at the very edge.
   const margin = Math.max(1, Math.floor(points.length * 0.025));
   return points.slice(margin, points.length - margin);
+}
+
+function refineBottomSheetEdge(image: ImageData) {
+  const samples: Point[] = [];
+  const horizontalStep = Math.max(14, Math.round(image.width / 46));
+  const verticalStep = Math.max(3, Math.round(image.height / 460));
+  const startY = Math.round(image.height * 0.56);
+  const endY = Math.round(image.height * 0.95);
+
+  for (let x = horizontalStep * 2; x < image.width - horizontalStep * 2; x += horizontalStep) {
+    let bestContrast = 0;
+    let bestY = 0;
+
+    for (let y = startY + 18; y < endY - 18; y += verticalStep) {
+      const contrast = localLuminance(image, x, y - 18, 10) - localLuminance(image, x, y + 18, 10);
+      if (contrast > bestContrast) {
+        bestContrast = contrast;
+        bestY = y;
+      }
+    }
+
+    if (bestContrast >= 38) samples.push({ x, y: bestY });
+  }
+
+  if (samples.length < 8) return null;
+  const initialLine = fitLine(samples);
+  if (!initialLine) return null;
+  const stableSamples = samples.filter((point) => Math.abs(point.y - (initialLine.slope * point.x + initialLine.intercept)) < image.height * 0.045);
+  return stableSamples.length >= 8 ? stableSamples : null;
 }
 
 // Lines are represented by y = slope * x + intercept.

@@ -1422,6 +1422,7 @@ async function preprocessImage(
   const rectification = rectifyMobilePhoto(
     baseCanvas,
     ANSWER_SHEET_TEMPLATE.page.width / ANSWER_SHEET_TEMPLATE.page.height,
+    { refineBottomEdge: preserveCardGeometry },
   );
   const normalizedCanvas = rectification.canvas;
   const normalizedContext = normalizedCanvas.getContext("2d", { willReadFrequently: true });

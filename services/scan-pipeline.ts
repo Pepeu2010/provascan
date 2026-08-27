@@ -316,7 +316,10 @@ function analyzeProvaScanCard(params: {
     imageData.height,
   );
 
-  const answers = Array.from({ length: answerKeyLength }, (_, questionIndex) => {
+  const standardAnswers = readProvaScanCardAnswers({
+    alternatives,
+    answerKeyLength,
+    getBounds: (questionIndex) => {
     const expectedBounds = getBubbleBounds({
       alternatives,
       canvasHeight: imageData.height,
@@ -333,7 +336,54 @@ function analyzeProvaScanCard(params: {
         bound.radius * Math.min(answerRect.width / expectedRect.width, answerRect.height / expectedRect.height),
       ),
     }));
-    const scores = bounds.map((bound) => ({
+    return bounds;
+    },
+    imageData,
+  });
+  const compactPrintAnswers = readProvaScanCardAnswers({
+    alternatives,
+    answerKeyLength,
+    getBounds: (questionIndex) => getCompactPrintBubbleBounds({
+      alternatives,
+      canvasHeight: imageData.height,
+      canvasWidth: imageData.width,
+      questionIndex,
+    }),
+    imageData,
+  });
+  const answers = scoreProvaScanCardAnswers(compactPrintAnswers) > scoreProvaScanCardAnswers(standardAnswers)
+    ? compactPrintAnswers
+    : standardAnswers;
+
+  return {
+    answers,
+    blockAudits: [{
+      averageConfidence: average(answers.map((item) => item.confidence)),
+      questionCount: answerKeyLength,
+      questionStart: 1,
+      rect: answerRect,
+      title: "CARTÃO-RESPOSTA",
+    }],
+    headerConfidence: 100,
+    headerText: ANSWER_SHEET_TEMPLATE.version,
+    modelConfidence: 100,
+    modelDisplayName: "Cartão-resposta padrão ProvaScan",
+    pageType: "EXATAS_E_HUMANAS" as const,
+    templateId: ANSWER_SHEET_TEMPLATE.version,
+    totalQuestions: answerKeyLength,
+    usedExpectedTemplate: true,
+  } satisfies AnswerSheetAnalysis;
+}
+
+function readProvaScanCardAnswers(params: {
+  alternatives: string[];
+  answerKeyLength: number;
+  getBounds: (questionIndex: number) => Array<{ alternative: string; cx: number; cy: number; radius: number }>;
+  imageData: ImageData;
+}) {
+  const { answerKeyLength, getBounds, imageData } = params;
+  return Array.from({ length: answerKeyLength }, (_, questionIndex) => {
+    const scores = getBounds(questionIndex).map((bound) => ({
       alternative: bound.alternative,
       score: getBubbleSignal(imageData, bound.cx, bound.cy, bound.radius),
     }));
@@ -347,25 +397,36 @@ function analyzeProvaScanCard(params: {
       status: decision.status,
     } satisfies BubbleAnswerDetection;
   });
+}
 
-  return {
-    answers,
-    blockAudits: [{
-      averageConfidence: average(answers.map((item) => item.confidence)),
-      questionCount: answerKeyLength,
-      questionStart: 1,
-      rect: { height: imageData.height, width: imageData.width, x: 0, y: 0 },
-      title: "CARTÃO-RESPOSTA",
-    }],
-    headerConfidence: 100,
-    headerText: ANSWER_SHEET_TEMPLATE.version,
-    modelConfidence: 100,
-    modelDisplayName: "Cartão-resposta padrão ProvaScan",
-    pageType: "EXATAS_E_HUMANAS" as const,
-    templateId: ANSWER_SHEET_TEMPLATE.version,
-    totalQuestions: answerKeyLength,
-    usedExpectedTemplate: true,
-  } satisfies AnswerSheetAnalysis;
+function getCompactPrintBubbleBounds(params: {
+  alternatives: string[];
+  canvasHeight: number;
+  canvasWidth: number;
+  questionIndex: number;
+}) {
+  const { alternatives, canvasHeight, canvasWidth, questionIndex } = params;
+  const startX = canvasWidth * 0.352;
+  const endX = canvasWidth * 0.775;
+  const startY = canvasHeight * 0.318;
+  const rowGap = canvasHeight * 0.0418;
+  const radius = Math.max(8, Math.min(canvasWidth, canvasHeight) * 0.021);
+
+  return alternatives.map((alternative, alternativeIndex) => ({
+    alternative,
+    cx: startX + ((endX - startX) * alternativeIndex) / Math.max(alternatives.length - 1, 1),
+    cy: startY + rowGap * questionIndex,
+    radius,
+  }));
+}
+
+function scoreProvaScanCardAnswers(answers: BubbleAnswerDetection[]) {
+  return answers.reduce((total, answer) => {
+    const ordered = [...answer.scores].sort((left, right) => right.score - left.score);
+    const strongest = ordered[0]?.score ?? 0;
+    const median = ordered[Math.floor(ordered.length / 2)]?.score ?? 0;
+    return total + Math.max(0, strongest - median) * 100 + (strongest >= 0.28 ? 4 : 0);
+  }, 0);
 }
 
 function isProvaScanCard(templateId?: string) {
@@ -760,6 +821,7 @@ function getBubbleSignal(imageData: ImageData, cx: number, cy: number, radius: n
   const bottom = Math.min(imageData.height - 1, Math.ceil(cy + radius));
   const innerRadius = radius * 0.54;
   const outerRadius = radius * 0.78;
+  const darkThreshold = getLocalDarkThreshold(imageData, cx, cy, radius);
 
   for (let y = top; y <= bottom; y += 1) {
     for (let x = left; x <= right; x += 1) {
@@ -771,7 +833,7 @@ function getBubbleSignal(imageData: ImageData, cx: number, cy: number, radius: n
       }
 
       const index = (y * imageData.width + x) * 4;
-      const isDark = imageData.data[index] < DARK_PIXEL_THRESHOLD;
+      const isDark = pixelLuminance(imageData.data, index) < darkThreshold;
 
       if (distance <= innerRadius) {
         innerDark += isDark ? 1 : 0;
@@ -786,6 +848,30 @@ function getBubbleSignal(imageData: ImageData, cx: number, cy: number, radius: n
   const innerRatio = innerTotal ? innerDark / innerTotal : 0;
   const ringRatio = ringTotal ? ringDark / ringTotal : 0;
   return innerRatio * 0.78 + ringRatio * 0.22;
+}
+
+function getLocalDarkThreshold(imageData: ImageData, cx: number, cy: number, radius: number) {
+  const samples: number[] = [];
+  const innerRadius = radius * 1.06;
+  const outerRadius = radius * 1.42;
+
+  for (let y = Math.floor(cy - outerRadius); y <= Math.ceil(cy + outerRadius); y += 2) {
+    for (let x = Math.floor(cx - outerRadius); x <= Math.ceil(cx + outerRadius); x += 2) {
+      const distance = Math.hypot(x - cx, y - cy);
+      if (distance < innerRadius || distance > outerRadius || x < 0 || y < 0 || x >= imageData.width || y >= imageData.height) continue;
+      samples.push(pixelLuminance(imageData.data, (y * imageData.width + x) * 4));
+    }
+  }
+
+  samples.sort((left, right) => left - right);
+  const reference = samples[Math.floor(samples.length * 0.7)] ?? DARK_PIXEL_THRESHOLD;
+  return reference < DARK_PIXEL_THRESHOLD + 8
+    ? clamp(reference - 26, 42, DARK_PIXEL_THRESHOLD)
+    : DARK_PIXEL_THRESHOLD;
+}
+
+function pixelLuminance(data: Uint8ClampedArray, index: number) {
+  return data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722;
 }
 
 function average(values: number[]) {
