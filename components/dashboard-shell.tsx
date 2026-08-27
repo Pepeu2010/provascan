@@ -278,14 +278,14 @@ export function DashboardShell({
                 ref={menuTriggerRef}
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className={`dashboard-menu-trigger ${mobileMenuOpen ? "dashboard-menu-trigger--open" : ""} inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)] md:hidden`}
+                className={`dashboard-menu-trigger ${mobileMenuOpen ? "dashboard-menu-trigger--open" : ""} inline-flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] px-4 text-base font-bold text-[var(--foreground)] md:hidden`}
                 aria-label="Abrir menu"
                 aria-expanded={mobileMenuOpen}
               >
                 <Menu className="size-5" aria-hidden="true" />
+                <span>Menu</span>
               </button>
               <div className="min-w-0">
-                <p className="app-page-header__eyebrow">Workspace · {session?.role === "professor" ? "Professor" : "Gestão acadêmica"}</p>
                 <h1 className="app-page-header__title">{activeLabel}</h1>
                 <p className="app-page-header__meta truncate">{summary}</p>
               </div>
