@@ -79,7 +79,7 @@ function printStudentCards(exam: CollaborativeExam, students: Student[], classNa
   return true;
 }
 
-export function CollaborativeExamsWorkspace() {
+export function CollaborativeExamsWorkspace({ showCreation = true }: { showCreation?: boolean }) {
   const { data, session } = useAppData();
   const management = canManageAcademicExams(session?.role ?? "professor");
   const [exams, setExams] = useState<CollaborativeExam[]>([]);
@@ -159,8 +159,8 @@ export function CollaborativeExamsWorkspace() {
 
   return <div className="grid gap-5">
     <Card className="collaborative-exams__intro p-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h2 className="text-2xl font-semibold text-[var(--foreground)]">{management ? "Provas colaborativas" : "Minhas provas"}</h2><p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--muted-foreground)]">{management ? "Monte a prova-base, distribua os blocos e só libere a operação quando todos forem aprovados." : "Preencha apenas as questões atribuídas a você e envie o bloco para conferência."}</p></div><Badge tone={management ? "accent" : "neutral"}>{management ? "Gestão acadêmica" : "Acesso do professor"}</Badge></div>
-      {management ? (
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h2 className="text-2xl font-semibold text-[var(--foreground)]">{!showCreation && management ? "Gabaritos das provas" : management ? "Provas colaborativas" : "Minhas provas"}</h2><p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--muted-foreground)]">{!showCreation && management ? "Consulte, confira e imprima os gabaritos das provas já preparadas." : management ? "Monte a prova-base, distribua os blocos e só libere a operação quando todos forem aprovados." : "Preencha apenas as questões atribuídas a você e envie o bloco para conferência."}</p></div><Badge tone={management ? "accent" : "neutral"}>{management ? "Gestão acadêmica" : "Acesso do professor"}</Badge></div>
+      {management && showCreation ? (
         <div className="mt-6 grid gap-4" aria-busy={isCreating}>
           <div className="grid gap-3 md:grid-cols-2">
             <Input disabled={isCreating} placeholder="Título da prova" value={title} onChange={(event) => setTitle(event.target.value)} />

@@ -6,7 +6,7 @@ import { CollaborativeExamsWorkspace } from "@/components/collaborative-exams-wo
 export default function GabaritosPage() {
   return (
     <DashboardShell active="/dashboard/gabaritos">
-      <CollaborativeExamsWorkspace />
+      <CollaborativeExamsWorkspace showCreation={false} />
     </DashboardShell>
   );
 }
