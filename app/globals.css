@@ -1034,7 +1034,7 @@ button, input, select, textarea { font-size: max(16px, 1rem); }
 .dashboard-next-action h2, .dashboard-worklist__heading h2 { font-size: 1.5rem; line-height: 1.2; }
 .dashboard-next-action p, .dashboard-worklist__heading p, .dashboard-row-detail { font-size: 16px; line-height: 1.55; }
 .dashboard-next-action__button { min-width: 190px; }
-.dashboard-worklist, .dashboard-activity { padding: 26px; }
+.dashboard-worklist, .dashboard-activity { padding: 0; }
 .dashboard-worklist__row, .dashboard-activity__row, .dashboard-empty-state { min-height: 72px; padding-block: 14px; }
 .dashboard-row-title, .dashboard-activity__row p, .dashboard-empty-state p { font-size: 17px; }
 .dashboard-row-action, .dashboard-text-link { min-height: 44px; font-size: 16px; font-weight: 750; }
@@ -1060,12 +1060,14 @@ input::placeholder, textarea::placeholder { opacity: 1; }
   .dashboard-mobile-dialog { width: min(94vw, 380px); }
   .dashboard-sidebar__item { min-height: 60px; font-size: 17px; }
   .dashboard-sidebar__support { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
-  .dashboard-next-action, .dashboard-worklist, .dashboard-activity { padding: 22px 20px; }
+  .dashboard-next-action { padding: 22px 20px; }
   .dashboard-next-action { align-items: stretch; }
   .dashboard-next-action__button { width: 100%; }
   .dashboard-worklist__heading { gap: 14px; }
   .dashboard-worklist__row, .dashboard-empty-state { align-items: flex-start; gap: 14px; }
-  .dashboard-row-action { width: 100%; justify-content: flex-start; }
+  .dashboard-worklist__row { flex-wrap: wrap; }
+  .dashboard-worklist__row > .min-w-0.flex-1 { flex-basis: calc(100% - 54px); }
+  .dashboard-row-action { width: calc(100% - 54px); min-height: 52px; margin: 2px 0 0 54px; padding: 0 16px; justify-content: center; font-size: 16px; }
 }
 
 /* In tablet width, names are safer than an icon-only navigation rail. */
