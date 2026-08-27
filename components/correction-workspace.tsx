@@ -683,7 +683,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
               <p className="text-sm text-[var(--muted-foreground)]">Resultado até agora</p>
-              <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{summary.acertos} respostas corretas de {review.answers.length}</p>
+              <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">
+                {summary.acertos === 1 ? "1 resposta correta" : `${summary.acertos} respostas corretas`} de {review.answers.length}
+              </p>
             </div>
 
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
