@@ -170,8 +170,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
     return { acertos, erros, percentual, revisao };
   }, [review]);
-  const activeStep = syncStatus === "saving" ? 5 : review ? 4 : phase === "processing" ? 3 : selectedFile ? 3 : 1;
-
   if (!exam || !studentsForExam.length) {
     return (
       <Card className="p-6">
@@ -484,14 +482,13 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     >
       <Card className="correction-workspace__control border-[var(--border-strong)] p-5 sm:p-6">
         <div className={cn("grid gap-5", compact ? "" : "")}>
-          <CorrectionProgress activeStep={activeStep} />
           <div className="correction-workspace__intro">
             <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
               <ScanSearch className="size-4 text-[var(--accent)]" />
-              1. Escolha a prova
+              Escolha a prova e a turma
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              Escolha a prova e a turma. Depois, envie uma única foto do cartão para iniciar a leitura.
+              Depois, envie uma foto do cartão-resposta para começar a correção.
             </p>
           </div>
 
@@ -562,7 +559,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-4 sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="font-semibold text-[var(--foreground)]">2. Envie o cartão-resposta</p>
+                <p className="font-semibold text-[var(--foreground)]">Envie o cartão-resposta</p>
                 <p className="mt-1 text-xs text-[var(--muted-foreground)]">{answerKey.length} questões serão lidas automaticamente</p>
               </div>
               <Badge tone="accent">Automático</Badge>
@@ -695,7 +692,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="grid gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">4. Revise antes de salvar</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Confira antes de salvar</p>
                 <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Revise somente o que precisa de atenção</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
                   A leitura já preencheu o cartão. Confirme o aluno e toque apenas nas respostas que precisam de ajuste.
@@ -989,7 +986,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <div className="sticky bottom-3 z-10 grid gap-3 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)] sm:grid-cols-2">
               <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
-                5. Salvar correção
+                Salvar correção
               </Button>
               <Button
                 size="lg"
@@ -1014,18 +1011,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   );
 }
 
-function CorrectionProgress({ activeStep }: { activeStep: number }) {
-  const steps = ["Escolher prova", "Enviar cartão", "Ler cartão", "Revisar", "Salvar"];
-
-  return (
-    <ol className="correction-progress" aria-label={`Etapa ${activeStep} de ${steps.length}: ${steps[activeStep - 1]}`}>
-      {steps.map((step, index) => {
-        const position = index + 1;
-        return <li key={step} className={cn(position === activeStep && "correction-progress__step--current", position < activeStep && "correction-progress__step--complete")}><span aria-hidden="true">{position < activeStep ? "✓" : position}</span><strong>{step}</strong></li>;
-      })}
-    </ol>
-  );
-}
 export function EmptyReviewState() {
   return (
     <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[28px] border border-dashed border-[var(--border)] bg-[linear-gradient(180deg,var(--card-solid),var(--surface))] px-6 py-10 text-center">
