@@ -2,25 +2,20 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   Camera,
-  CheckCircle2,
   FileImage,
   ImagePlus,
   LoaderCircle,
   RefreshCw,
-  RotateCw,
   Save,
   ScanSearch,
   UserRoundSearch,
   WandSparkles,
-  XCircle,
 } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -39,16 +34,14 @@ const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp
 const MAX_FILE_SIZE = 12 * 1024 * 1024;
 const MIN_CONFIDENCE_REVIEW = 75;
 const PROCESSING_STEPS = [
-  { label: "Processando imagem...", progress: 16 },
-  { label: "Lendo QR Code...", progress: 34 },
-  { label: "Tentando OCR...", progress: 54 },
-  { label: "Detectando respostas...", progress: 78 },
-  { label: "Preparando revisão...", progress: 100 },
+  { label: "Preparando a foto...", progress: 16 },
+  { label: "Conferindo o cartão...", progress: 34 },
+  { label: "Lendo as respostas...", progress: 54 },
+  { label: "Organizando as respostas...", progress: 78 },
+  { label: "Quase pronto...", progress: 100 },
 ] as const;
 
 type ScanPhase = "idle" | "processing" | "review" | "error";
-type ResultFilter = "all" | "review" | "wrong";
-
 type ScanAnswer = {
   confidence: number;
   correctAnswer: string;
@@ -104,7 +97,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const [preferredStudentId, setPreferredStudentId] = useState(data.students[0]?.id ?? "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [rawPreviewUrl, setRawPreviewUrl] = useState("");
-  const [processedPreviewUrl, setProcessedPreviewUrl] = useState("");
   const [phase, setPhase] = useState<ScanPhase>("idle");
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("Preparando fluxo...");
@@ -112,7 +104,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const [screenMessage, setScreenMessage] = useState("");
   const [review, setReview] = useState<ScanReview | null>(null);
   const [notes, setNotes] = useState("Revisão manual obrigatória antes da confirmação final.");
-  const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
+  const [editingQuestion, setEditingQuestion] = useState<number | null>(null);
   const [previewZoom, setPreviewZoom] = useState(1);
 
   const exam = data.exams.find((item) => item.id === examId) ?? data.exams[0];
@@ -142,22 +134,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
   const activePreferredStudentId =
     studentsForSelectedClass.find((item) => item.id === preferredStudentId)?.id ?? studentsForSelectedClass[0]?.id ?? "";
-
-  const visibleAnswers = useMemo(() => {
-    if (!review) {
-      return [];
-    }
-
-    if (resultFilter === "review") {
-      return review.answers.filter((item) => item.confidence < MIN_CONFIDENCE_REVIEW);
-    }
-
-    if (resultFilter === "wrong") {
-      return review.answers.filter((item) => getAnswerState(item) !== "acerto");
-    }
-
-    return review.answers;
-  }, [resultFilter, review]);
 
   const summary = useMemo(() => {
     if (!review) {
@@ -215,7 +191,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         throw new Error("Processamento cancelado.");
       }
 
-      setProcessedPreviewUrl(preprocessing.previewUrl);
 
       setProgressLabel(PROCESSING_STEPS[1].label);
       setProgress(PROCESSING_STEPS[1].progress);
@@ -345,12 +320,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       setNotes("Revisão manual obrigatória antes da confirmação final.");
       setPhase("review");
       setPreviewZoom(1);
-      setResultFilter(needsManualReview ? "review" : "wrong");
-      setScreenMessage(
-        identity.method === "qr"
-          ? "QR Code confirmado. Revise os campos abaixo antes de salvar."
-          : "Leitura assistida concluída. Revise os campos abaixo antes de salvar.",
-      );
+      setEditingQuestion(null);
+      setScreenMessage("");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Falha ao processar a imagem.";
       if (message === "Processamento cancelado.") {
@@ -396,6 +367,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       templateId: "MANUAL",
     });
     setPhase("review");
+    setEditingQuestion(null);
     setPreviewZoom(1);
     setScreenMessage("Modo manual habilitado. A imagem continua disponível para consulta.");
   };
@@ -403,7 +375,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const handleFileSelected = async (file: File | null) => {
     setScreenMessage("");
     setReview(null);
-    setProcessedPreviewUrl("");
+    setEditingQuestion(null);
     setErrorMessage("");
     setProgress(0);
     setProgressLabel("Preparando fluxo...");
@@ -429,6 +401,20 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setRawPreviewUrl(URL.createObjectURL(file));
     setScreenMessage("Leitura iniciada automaticamente. Você só revisa o que o sistema sinalizar.");
     void processSelectedImage(file);
+  };
+
+  const updateMarkedAnswer = (question: number, markedAnswers: string[]) => {
+    setReview((previous) =>
+      previous
+        ? {
+            ...previous,
+            answers: previous.answers.map((item) =>
+              item.question === question ? { ...item, markedAnswers } : item,
+            ),
+          }
+        : previous,
+    );
+    setEditingQuestion(null);
   };
 
   const confirmCorrection = async () => {
@@ -556,7 +542,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             </div>
           </details>
 
-          <div className="rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-4 sm:p-5">
+          <div className={cn("rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-4 sm:p-5", phase === "review" && "hidden")}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-[var(--foreground)]">Envie o cartão-resposta</p>
@@ -582,7 +568,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
               Fotografe a folha inteira, com os quatro cantos visíveis e sem sombra forte. A perspectiva, rotação e contraste são ajustados automaticamente.
             </p>
-            {selectedFile ? <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--card-solid)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]" aria-live="polite">Arquivo selecionado: {selectedFile.name}</p> : null}
+            {selectedFile ? <p className="mt-3 rounded-[var(--radius-sm)] bg-[var(--card-solid)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]" aria-live="polite">Foto recebida. Vamos conferir as respostas.</p> : null}
           </div>
 
           <input
@@ -609,12 +595,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
           {selectedFile ? (
             <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4" open={phase === "processing"}>
-              <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver imagem e tratamento</summary>
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver foto enviada</summary>
               <div className="mt-4">
                 <ImagePreviewCard
-                  fileName={selectedFile.name}
-                  phase={phase}
-                  processedPreviewUrl={processedPreviewUrl}
                   rawPreviewUrl={rawPreviewUrl}
                   zoom={previewZoom}
                   onZoomChange={setPreviewZoom}
@@ -623,7 +606,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
             </details>
           ) : null}
 
-          <div className="grid gap-3" aria-label="Ações de leitura">
+          <div className={cn("grid gap-3", phase === "review" && "hidden")} aria-label="Ações de leitura">
             <Button
               size="lg"
               className="min-h-12 w-full"
@@ -651,7 +634,6 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 className="min-h-12 border border-[var(--border)]"
                 onClick={() => {
                   setReview(null);
-                  setProcessedPreviewUrl("");
                   setScreenMessage("");
                   setErrorMessage("");
                   setPhase("idle");
@@ -674,7 +656,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           ) : null}
 
           {errorMessage ? (
-            <StatusCard tone="error" title="Não foi possível concluir o OCR">
+          <StatusCard tone="error" title="Não foi possível ler o cartão">
               {errorMessage}
             </StatusCard>
           ) : null}
@@ -692,306 +674,76 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
           <div className="grid gap-5">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <p className="text-sm text-[var(--muted-foreground)]">Confira antes de salvar</p>
-                <h3 className="mt-1 text-2xl font-semibold text-[var(--foreground)]">Revise somente o que precisa de atenção</h3>
+                <h3 className="text-2xl font-semibold text-[var(--foreground)]">Confira o cartão do aluno</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-                  A leitura já preencheu o cartão. Confirme o aluno e toque apenas nas respostas que precisam de ajuste.
+                  Veja as respostas marcadas. Se estiverem certas, basta salvar. Para mudar uma delas, toque em “Corrigir resposta”.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge tone={review.identificationMethod === "qr" ? "success" : review.identificationMethod === "ocr" ? "accent" : "warning"}>
-                  {review.identificationMethod === "qr" ? "QR confirmado" : review.identificationMethod === "ocr" ? "OCR assistido" : "Manual"}
-                </Badge>
-                <Badge tone={review.qrStatus === "success" ? "success" : review.qrStatus === "invalid" ? "error" : "warning"}>
-                  {review.qrStatus === "success"
-                    ? "QR lido com sucesso"
-                    : review.qrStatus === "invalid"
-                      ? "Dados do QR inválidos"
-                      : review.qrStatus === "unreadable"
-                        ? "QR ilegível"
-                        : "QR não encontrado"}
-                </Badge>
-                <Badge tone={review.confidence >= MIN_CONFIDENCE_REVIEW ? "accent" : "warning"}>
-                  {review.confidence}% de confiança
-                </Badge>
-              </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <MetricCard label="Acertos" value={String(summary.acertos)} helper="comparado com o gabarito" />
-              <MetricCard label="Percentual" value={`${summary.percentual}%`} helper="resultado atual" />
-              <MetricCard label="Para revisar" value={String(summary.revisao)} helper="marcados pelo sistema" />
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+              <p className="text-sm text-[var(--muted-foreground)]">Resultado até agora</p>
+              <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{summary.acertos} respostas corretas de {review.answers.length}</p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="p-4">
-                <p className="text-sm font-semibold text-[var(--foreground)]">Dados detectados</p>
-                <div className="mt-4 grid gap-3">
-                  <FieldLabel label="Nome detectado">
-                    <Input
-                      value={review.detectedName}
-                      onChange={(event) =>
-                        setReview((previous) =>
-                          previous ? { ...previous, detectedName: event.target.value } : previous,
-                        )
-                      }
-                    />
-                  </FieldLabel>
-                  <FieldLabel label="Aluno encontrado no sistema">
-                    <Select
-                      value={review.matchedStudentId}
-                      onChange={(event) =>
-                        setReview((previous) =>
-                          previous ? { ...previous, matchedStudentId: event.target.value } : previous,
-                        )
-                      }
-                    >
-                      {studentsForSelectedClass.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.nome}
-                        </option>
-                      ))}
-                    </Select>
-                  </FieldLabel>
-                </div>
-              </Card>
-
-              <details className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver detalhes técnicos da leitura</summary>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <InfoPanel label="Orientacao" value={review.qualitySummary.orientation} />
-                  <InfoPanel label="Brilho" value={review.qualitySummary.brightness} />
-                  <InfoPanel label="Dimensoes" value={review.qualitySummary.dimensions} />
-                  <InfoPanel
-                    label="Recorte automatico"
-                    value={review.qualitySummary.cropApplied ? "Aplicado" : "Não necessário"}
-                  />
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Badge tone={review.qualitySummary.lowLight ? "warning" : "success"}>
-                    {review.qualitySummary.lowLight ? "Pouca luz" : "Luz adequada"}
-                  </Badge>
-                  <Badge tone={review.qualitySummary.shadowRisk ? "warning" : "neutral"}>
-                    {review.qualitySummary.shadowRisk ? "Sombra detectada" : "Sem sombra forte"}
-                  </Badge>
-                </div>
-                <ul className="mt-4 space-y-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                  {review.notes.map((note) => (
-                    <li key={note} className="rounded-2xl bg-[var(--surface)] px-3 py-2">
-                      {note}
-                    </li>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
+              <FieldLabel label="Aluno que fez esta prova">
+                <Select
+                  value={review.matchedStudentId}
+                  onChange={(event) =>
+                    setReview((previous) =>
+                      previous ? { ...previous, matchedStudentId: event.target.value } : previous,
+                    )
+                  }
+                >
+                  {studentsForSelectedClass.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome}
+                    </option>
                   ))}
-                </ul>
-              </details>
+                </Select>
+              </FieldLabel>
+              <p className="mt-3 text-sm text-[var(--muted-foreground)]">Se este não for o aluno, escolha o nome correto antes de salvar.</p>
             </div>
 
-            <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold text-[var(--foreground)]">Filtros de revisão</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { key: "review", label: "Revisar agora" },
-                    { key: "wrong", label: "Erros" },
-                    { key: "all", label: "Todas" },
-                  ].map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setResultFilter(item.key as ResultFilter)}
-                      aria-pressed={resultFilter === item.key}
-                      className={cn(
-                        "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
-                        resultFilter === item.key
-                          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                          : "border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)]",
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div>
+              <h4 className="text-xl font-semibold text-[var(--foreground)]">Respostas marcadas pelo aluno</h4>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">Cada cartão mostra uma questão e a resposta marcada.</p>
             </div>
 
-            <div className="space-y-3 lg:hidden">
-              {visibleAnswers.map((answer) => (
-                <MobileAnswerCard
-                  key={`mobile-${answer.question}`}
-                  alternatives={exam.alternativas}
-                  answer={answer}
-                  onSelect={(alternative) => {
-                    setReview((previous) =>
-                      previous
-                        ? {
-                            ...previous,
-                            answers: previous.answers.map((item) =>
-                              item.question === answer.question ? { ...item, markedAnswers: [alternative] } : item,
-                            ),
-                          }
-                        : previous,
-                    );
-                  }}
-                  onMarkBlank={() => {
-                    setReview((previous) =>
-                      previous
-                        ? {
-                            ...previous,
-                            answers: previous.answers.map((item) =>
-                              item.question === answer.question ? { ...item, markedAnswers: [] } : item,
-                            ),
-                          }
-                        : previous,
-                    );
-                  }}
-                  onMarkMultiple={() => {
-                    const alternate = exam.alternativas.find((item) => item !== answer.correctAnswer) ?? answer.correctAnswer;
-                    setReview((previous) =>
-                      previous
-                        ? {
-                            ...previous,
-                            answers: previous.answers.map((item) =>
-                              item.question === answer.question
-                                ? { ...item, markedAnswers: [answer.correctAnswer, alternate] }
-                                : item,
-                            ),
-                          }
-                        : previous,
-                    );
-                  }}
+            <AnswerReviewGrid
+              alternatives={exam.alternativas}
+              answers={review.answers}
+              editingQuestion={editingQuestion}
+              onEdit={setEditingQuestion}
+              onMarkBlank={(question) => updateMarkedAnswer(question, [])}
+              onMarkMultiple={(answer) => {
+                const alternate = exam.alternativas.find((item) => item !== answer.correctAnswer) ?? answer.correctAnswer;
+                updateMarkedAnswer(answer.question, [answer.correctAnswer, alternate]);
+              }}
+              onSelect={(question, alternative) => updateMarkedAnswer(question, [alternative])}
+            />
+
+            <details className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Adicionar uma observação (opcional)</summary>
+              <FieldLabel label="Observação" >
+                <Textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="mt-3 min-h-28"
+                  placeholder="Escreva algo que deseja lembrar sobre esta correção."
                 />
-              ))}
-            </div>
+              </FieldLabel>
+            </details>
 
-            <div className="hidden overflow-hidden rounded-[28px] border border-[var(--border)] lg:block">
-              <div className="grid grid-cols-[100px_1fr_1fr_160px_120px] gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                <span>Questao</span>
-                <span>Gabarito correto</span>
-                <span>Resposta do aluno</span>
-                <span>Status final</span>
-                <span>Confianca</span>
-              </div>
-              <div className="divide-y divide-[var(--border)]">
-                {visibleAnswers.map((answer) => {
-                  const status = getAnswerState(answer);
-                  const isCorrect = status === "acerto";
-                  const needsReview = answer.confidence < MIN_CONFIDENCE_REVIEW;
-                  return (
-                    <div
-                      key={answer.question}
-                      className="grid grid-cols-[100px_1fr_1fr_160px_120px] gap-3 px-4 py-4"
-                    >
-                      <div className="font-semibold text-[var(--foreground)]">Q{String(answer.question).padStart(2, "0")}</div>
-                      <div className="flex items-center gap-2">
-                        <Badge tone="neutral">{answer.correctAnswer}</Badge>
-                        <span className="text-sm text-[var(--muted-foreground)]">Alternativa correta</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {exam.alternativas.map((alternative) => (
-                          <button
-                            key={`${answer.question}-${alternative}`}
-                            type="button"
-                            onClick={() => {
-                              setReview((previous) =>
-                                previous
-                                  ? {
-                                      ...previous,
-                                      answers: previous.answers.map((item) =>
-                                        item.question === answer.question
-                                          ? { ...item, markedAnswers: [alternative] }
-                                          : item,
-                                      ),
-                                    }
-                                  : previous,
-                              );
-                            }}
-                            className={cn(
-                              "grid size-11 place-items-center rounded-2xl border text-sm font-semibold transition-colors",
-                              answer.correctAnswer === alternative
-                                ? "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--success)]"
-                                : "border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)]",
-                              answer.markedAnswers.includes(alternative) &&
-                                !isCorrect &&
-                                "border-[var(--error-border)] bg-[var(--error-soft)] text-[var(--error)]",
-                            )}
-                          >
-                            {alternative}
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReview((previous) =>
-                              previous
-                                ? {
-                                    ...previous,
-                                    answers: previous.answers.map((item) =>
-                                      item.question === answer.question ? { ...item, markedAnswers: [] } : item,
-                                    ),
-                                  }
-                                : previous,
-                            );
-                          }}
-                          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted-foreground)]"
-                        >
-                          Em branco
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const alternate = exam.alternativas.find((item) => item !== answer.correctAnswer) ?? answer.correctAnswer;
-                            setReview((previous) =>
-                              previous
-                                ? {
-                                    ...previous,
-                                    answers: previous.answers.map((item) =>
-                                      item.question === answer.question
-                                        ? { ...item, markedAnswers: [answer.correctAnswer, alternate] }
-                                        : item,
-                                    ),
-                                  }
-                                : previous,
-                            );
-                          }}
-                          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--muted-foreground)]"
-                        >
-                          Multipla
-                        </button>
-                      </div>
-                      <div className="flex items-center">
-                        <Badge tone={status === "em-branco" ? "warning" : status === "multipla-marcacao" ? "warning" : isCorrect ? "success" : "error"}>
-                          {getAnswerLabel(answer)}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-sm font-semibold", needsReview ? "text-[var(--warning)]" : "text-[var(--foreground)]")}>
-                          {answer.confidence}%
-                        </span>
-                        {needsReview ? <AlertTriangle className="size-4 text-[var(--warning)]" /> : <CheckCircle2 className="size-4 text-[var(--success)]" />}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <FieldLabel label="Observações finais da revisão">
-              <Textarea
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                className="min-h-28"
-                placeholder="Anote ajustes manuais, observações de câmera, sombra, baixa luz ou necessidade de nova captura."
-              />
-            </FieldLabel>
-
-            <div className="sticky bottom-3 z-10 grid gap-3 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)] sm:grid-cols-2">
-              <Button size="lg" className="min-h-12 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
+            <div className="sticky bottom-3 z-10 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)]">
+              <Button size="lg" className="min-h-14 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
-                Salvar correção
+                Salvar resultado
               </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="min-h-12 w-full"
+              <button
+                type="button"
+                className="mt-3 w-full rounded-[var(--radius-sm)] px-4 py-3 text-sm font-semibold text-[var(--muted-foreground)] underline decoration-[var(--border-strong)] underline-offset-4 transition-colors hover:text-[var(--foreground)] focus-visible:text-[var(--foreground)]"
                 onClick={() => {
                   if (selectedFile) {
                     void processSelectedImage();
@@ -1000,9 +752,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   setErrorMessage("Envie ou fotografe uma imagem antes de tentar novamente.");
                 }}
               >
-                <RotateCw className="size-4" />
-                Tentar novamente
-              </Button>
+                A leitura não ficou boa? Ler a foto novamente
+              </button>
             </div>
           </div>
         </Card>
@@ -1036,134 +787,116 @@ export function EmptyReviewState() {
   );
 }
 
-function MobileAnswerCard({
+function AnswerReviewGrid({
   alternatives,
-  answer,
-  onSelect,
+  answers,
+  editingQuestion,
+  onEdit,
   onMarkBlank,
   onMarkMultiple,
+  onSelect,
 }: {
   alternatives: string[];
-  answer: ScanAnswer;
-  onSelect: (alternative: string) => void;
-  onMarkBlank: () => void;
-  onMarkMultiple: () => void;
+  answers: ScanAnswer[];
+  editingQuestion: number | null;
+  onEdit: (question: number | null) => void;
+  onMarkBlank: (question: number) => void;
+  onMarkMultiple: (answer: ScanAnswer) => void;
+  onSelect: (question: number, alternative: string) => void;
 }) {
-  const status = getAnswerState(answer);
-  const isCorrect = status === "acerto";
-  const needsReview = answer.confidence < MIN_CONFIDENCE_REVIEW;
-
   return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-base font-semibold text-[var(--foreground)]">Questao {answer.question}</p>
-          <p className="text-xs text-[var(--muted-foreground)]">Layout vertical otimizado para toque</p>
-        </div>
-        <Badge tone={status === "em-branco" || status === "multipla-marcacao" ? "warning" : isCorrect ? "success" : "error"}>
-          {getAnswerLabel(answer)}
-        </Badge>
-      </div>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {answers.map((answer) => {
+        const status = getAnswerState(answer);
+        const isCorrect = status === "acerto";
+        const isEditing = editingQuestion === answer.question;
 
-      <div className="mt-4 grid gap-3">
-        <SectionBlock title="Gabarito correto" value={answer.correctAnswer} />
-        <div className="rounded-[20px] border border-[var(--border)] p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Resposta do aluno / para lancar</p>
-          <div className="mt-3 grid grid-cols-5 gap-2">
-            {alternatives.map((alternative) => (
-              <button
-                key={`${answer.question}-mobile-${alternative}`}
-                type="button"
-                onClick={() => onSelect(alternative)}
-                className={cn(
-                  "min-h-12 rounded-2xl border text-sm font-semibold",
-                  answer.correctAnswer === alternative
-                    ? "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--success)]"
-                    : "border-[var(--border)] bg-[var(--card-solid)] text-[var(--foreground)]",
-                  answer.markedAnswers.includes(alternative) &&
-                    !isCorrect &&
-                    "border-[var(--error-border)] bg-[var(--error-soft)] text-[var(--error)]",
-                )}
-              >
-                {alternative}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={onMarkBlank} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm font-semibold text-[var(--foreground)]">
-              Em branco
-            </button>
-            <button type="button" onClick={onMarkMultiple} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm font-semibold text-[var(--foreground)]">
-              Multipla
-            </button>
-          </div>
-        </div>
-        <SectionBlock title="Gabarito do aluno" value={getDetectedAnswerLabel(answer)} />
-        <div
-          className={cn(
-            "rounded-[20px] border p-4",
-            isCorrect
-              ? "border-[var(--success-border)] bg-[var(--success-soft)]"
-              : "border-[var(--error-border)] bg-[var(--error-soft)]",
-          )}
-        >
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Status final</p>
-          <div className="mt-2 flex items-center gap-2">
-            {isCorrect ? (
-              <CheckCircle2 className="size-4 text-[var(--success)]" />
-            ) : (
-              <XCircle className="size-4 text-[var(--error)]" />
+        return (
+          <section
+            key={answer.question}
+            className={cn(
+              "rounded-[var(--radius-md)] border bg-[var(--card-solid)] p-4",
+              isCorrect ? "border-[var(--success-border)]" : "border-[var(--border)]",
             )}
-            <p className={cn("text-sm font-semibold", isCorrect ? "text-[var(--success)]" : "text-[var(--error)]")}>
-              {isCorrect ? "Resposta correta confirmada" : getStatusDescription(answer)}
-            </p>
-          </div>
-          <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
-            {needsReview ? <AlertTriangle className="size-4 text-[var(--warning)]" /> : <CheckCircle2 className="size-4 text-[var(--success)]" />}
-            <span>{needsReview ? "Baixa confiança: revise manualmente." : `Confiança de ${answer.confidence}%.`}</span>
-          </div>
-        </div>
-      </div>
-    </Card>
+            aria-label={`Questão ${answer.question}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h5 className="text-lg font-semibold text-[var(--foreground)]">Questão {answer.question}</h5>
+              <Badge tone={isCorrect ? "success" : status === "erro" ? "error" : "warning"}>{getAnswerLabel(answer)}</Badge>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-[var(--radius-sm)] bg-[var(--surface)] p-3">
+                <p className="text-sm text-[var(--muted-foreground)]">Aluno marcou</p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{getDetectedAnswerLabel(answer)}</p>
+              </div>
+              <div className="rounded-[var(--radius-sm)] bg-[var(--surface)] p-3">
+                <p className="text-sm text-[var(--muted-foreground)]">Gabarito</p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{answer.correctAnswer}</p>
+              </div>
+            </div>
+
+            {isEditing ? (
+              <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--accent)] bg-[var(--accent-soft)] p-3">
+                <p className="text-sm font-semibold text-[var(--foreground)]">Qual resposta está marcada no cartão?</p>
+                <div className="mt-3 grid grid-cols-5 gap-2">
+                  {alternatives.map((alternative) => (
+                    <button
+                      key={`${answer.question}-${alternative}`}
+                      type="button"
+                      className={cn(
+                        "min-h-12 rounded-[var(--radius-sm)] border bg-[var(--card-solid)] text-base font-bold text-[var(--foreground)] transition-colors",
+                        answer.markedAnswers.includes(alternative)
+                          ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]"
+                          : "border-[var(--border-strong)] hover:border-[var(--accent)]",
+                      )}
+                      onClick={() => onSelect(answer.question, alternative)}
+                    >
+                      {alternative}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <Button size="default" variant="secondary" className="min-h-12" onClick={() => onMarkBlank(answer.question)}>Em branco</Button>
+                  <Button size="default" variant="secondary" className="min-h-12" onClick={() => onMarkMultiple(answer)}>Mais de uma</Button>
+                </div>
+                <button type="button" className="mt-3 text-sm font-semibold text-[var(--accent)] underline underline-offset-4" onClick={() => onEdit(null)}>Cancelar</button>
+              </div>
+            ) : (
+              <Button size="default" variant="secondary" className="mt-4 min-h-12 w-full" onClick={() => onEdit(answer.question)}>
+                Corrigir resposta
+              </Button>
+            )}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
 function ImagePreviewCard({
-  fileName,
   onZoomChange,
-  phase,
-  processedPreviewUrl,
   rawPreviewUrl,
   zoom,
 }: {
-  fileName: string;
   onZoomChange: (value: number) => void;
-  phase: ScanPhase;
-  processedPreviewUrl: string;
   rawPreviewUrl: string;
   zoom: number;
 }) {
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="grid gap-3">
       <PreviewPane
-        label="Imagem original"
-        helper={fileName}
+        label="Foto enviada"
+        helper="Confira se este é o cartão que deseja corrigir."
         src={rawPreviewUrl}
-        emptyText="A foto aparece aqui antes do processamento."
+        emptyText="A foto aparece aqui depois de enviada."
         zoom={zoom}
       />
-      <PreviewPane
-        label="Imagem processada"
-        helper={phase === "processing" ? "Ajustando brilho, contraste, escala de cinza e binarização." : "Pronta para OCR e revisão visual."}
-        src={processedPreviewUrl}
-        emptyText="O preview tratado aparece aqui sem estourar o layout."
-        zoom={zoom}
-      />
-      <div className="lg:col-span-2 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-[var(--foreground)]">Zoom do preview</p>
-            <p className="text-xs leading-5 text-[var(--muted-foreground)]">Ajuste a ampliacao para inspecionar nome, QR e marcacoes sem perder proporcao.</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">Aumentar foto</p>
+            <p className="text-xs leading-5 text-[var(--muted-foreground)]">Use apenas se quiser conferir uma marcação no cartão.</p>
           </div>
           <span className="text-sm font-semibold text-[var(--foreground)]">{Math.round(zoom * 100)}%</span>
         </div>
@@ -1232,7 +965,7 @@ function ProcessingCard({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[var(--foreground)]">{label}</p>
-          <p className="text-xs text-[var(--muted-foreground)]">Fluxo assincrono com preview mantido na tela.</p>
+          <p className="text-xs text-[var(--muted-foreground)]">Isso pode levar alguns segundos.</p>
         </div>
         <Button variant="ghost" onClick={onCancel}>
           Cancelar processamento
@@ -1243,14 +976,6 @@ function ProcessingCard({
           className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-strong))] transition-all"
           style={{ width: `${progress}%` }}
         />
-      </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-5">
-        {PROCESSING_STEPS.map((step) => (
-          <div key={step.label} className="rounded-[20px] border border-[var(--border)] bg-[var(--card)] p-3">
-            <div className="mb-3 h-3 w-20 animate-pulse rounded-full bg-[var(--surface-strong)]" />
-            <p className="text-xs leading-5 text-[var(--muted-foreground)]">{step.label}</p>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -1282,15 +1007,6 @@ function StatusCard({
   );
 }
 
-function SectionBlock({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="rounded-[20px] border border-[var(--border)] p-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">{title}</p>
-      <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{value}</p>
-    </div>
-  );
-}
-
 function FieldLabel({
   children,
   label,
@@ -1303,25 +1019,6 @@ function FieldLabel({
       {label}
       {children}
     </label>
-  );
-}
-
-function MetricCard({ helper, label, value }: { helper: string; label: string; value: string }) {
-  return (
-    <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
-      <p className="text-sm text-[var(--muted-foreground)]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p>
-      <p className="mt-1 text-xs text-[var(--muted-foreground)]">{helper}</p>
-    </div>
-  );
-}
-
-function InfoPanel({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">{value}</p>
-    </div>
   );
 }
 
@@ -1717,17 +1414,6 @@ function getAnswerLabel(answer: ScanAnswer) {
   if (status === "erro") return "Erro";
   if (status === "em-branco") return "Em branco";
   return "Multipla";
-}
-
-function getStatusDescription(answer: ScanAnswer) {
-  const status = getAnswerState(answer);
-  if (status === "em-branco") {
-    return "Questao marcada como em branco";
-  }
-  if (status === "multipla-marcacao") {
-    return "Questao com multipla marcacao";
-  }
-  return "Resposta divergente do gabarito";
 }
 
 function clamp(value: number, min: number, max: number) {
