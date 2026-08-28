@@ -1,4 +1,5 @@
 import type { ClassRoom, Student } from "@/types/domain";
+import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
 
 type AnswerSection = {
   answers?: string[];
@@ -12,6 +13,25 @@ export type OrderedAnswer = {
   question: number;
   subject: string;
 };
+
+export function getStudentCardPrintLayout(questionCount: number, alternatives: string[]) {
+  const layout = getQuestionLayout(questionCount, alternatives);
+  const pagePixelToMillimeter = 210 / ANSWER_SHEET_TEMPLATE.page.width;
+
+  return {
+    answerAreaHeight: ANSWER_SHEET_TEMPLATE.answerArea.height * 297,
+    answerAreaLeft: ANSWER_SHEET_TEMPLATE.answerArea.x * 210,
+    answerAreaTop: ANSWER_SHEET_TEMPLATE.answerArea.y * 297,
+    answerAreaWidth: ANSWER_SHEET_TEMPLATE.answerArea.width * 210,
+    bubbleCellWidth: layout.bubbleGap * pagePixelToMillimeter,
+    bubbleSize: Math.max(5, layout.bubbleRadius * 2 * pagePixelToMillimeter),
+    columnCount: layout.columnCount,
+    columnGap: layout.columnGap * pagePixelToMillimeter,
+    numberColumnWidth: layout.numberColumnWidth * pagePixelToMillimeter,
+    rowRightPadding: 12 * pagePixelToMillimeter,
+    rowsPerColumn: layout.rowsPerColumn,
+  };
+}
 
 export function buildOrderedAnswerKey(sections: AnswerSection[]): OrderedAnswer[] {
   return sections

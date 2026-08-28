@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildOrderedAnswerKey, sortStudentsForPrinting } from "../services/collaborative-printing";
+import { buildOrderedAnswerKey, getStudentCardPrintLayout, sortStudentsForPrinting } from "../services/collaborative-printing";
 
 const ordered = buildOrderedAnswerKey([
   { questionStart: 11, questionCount: 2, answers: ["D", "E"], subject: "Ciências" },
@@ -22,9 +22,18 @@ const students = sortStudentsForPrinting(
 );
 
 assert.deepEqual(students.map((item) => item.nome), ["Ana", "Zoé"]);
+
+const fortyFiveQuestionLayout = getStudentCardPrintLayout(45, ["A", "B", "C", "D", "E"]);
+assert.equal(fortyFiveQuestionLayout.columnCount, 3);
+assert.equal(fortyFiveQuestionLayout.rowsPerColumn, 15);
+assert.ok(fortyFiveQuestionLayout.bubbleSize >= 5, `As bolhas de 45 questões devem ter ao menos 5 mm; recebido ${fortyFiveQuestionLayout.bubbleSize.toFixed(2)} mm.`);
+
 const workspace = readFileSync(new URL("../components/collaborative-exams-workspace.tsx", import.meta.url), "utf8");
 assert.match(workspace, /class=\"subject-map\"/);
 assert.match(workspace, /section\.questionCount} questões/);
-assert.match(workspace, /140 \/ Math\.max\(exam\.questionCount, 1\)/);
+assert.match(workspace, /class=\"question-column\"/);
+assert.match(workspace, /class=\"question-header\"/);
+assert.match(workspace, /getStudentCardPrintLayout\(exam\.questionCount, exam\.alternatives\)/);
 assert.match(workspace, /question--section-start/);
+assert.doesNotMatch(workspace, /140 \/ Math\.max\(exam\.questionCount, 1\)/);
 console.log("Collaborative printing checks passed.");
