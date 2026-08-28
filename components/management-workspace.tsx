@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Download, Edit3, Heart, KeyRound, Printer, QrCode, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { AdministrationCenter } from "@/components/administration-center";
 import { useAppData } from "@/components/app-data-provider";

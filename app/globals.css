@@ -204,6 +204,26 @@ input, select, textarea { color: var(--input-foreground); }
 input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: .78; }
 select option, select optgroup { background: var(--card-solid); color: var(--foreground); }
 
+/* Shared selection control: clear current value, generous target and a predictable option list. */
+.app-select { position: relative; width: 100%; }
+.app-select__trigger { display: flex; min-height: 44px; width: 100%; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--input-bg); padding: 0 12px 0 14px; color: var(--foreground); text-align: left; transition: border-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle); }
+.app-select__trigger:hover { border-color: color-mix(in srgb, var(--accent) 56%, var(--border)); background: var(--surface); }
+.app-select__trigger:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring), inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); outline: 0; }
+.app-select__trigger:disabled { cursor: not-allowed; opacity: .5; }
+.app-select__value { min-width: 0; flex: 1; overflow: hidden; font-size: 13px; font-weight: 650; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+.app-select__chevron { width: 16px; height: 16px; flex: 0 0 auto; color: var(--muted-foreground); transition: transform var(--motion-fast) var(--motion-settle); }
+.app-select__chevron--open { transform: rotate(180deg); }
+.app-select__panel { position: absolute; z-index: 60; top: calc(100% + 8px); left: 0; max-height: min(320px, 48dvh); width: 100%; overflow-y: auto; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border)); border-radius: 14px; background: var(--card-elevated); box-shadow: var(--shadow-floating); padding: 6px; animation: app-select-enter 180ms var(--motion-settle) both; }
+.app-select__option { display: flex; width: 100%; min-height: 40px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; padding: 0 10px; color: var(--foreground); text-align: left; font-size: 13px; font-weight: 600; transition: background-color var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast); }
+.app-select__option:hover, .app-select__option:focus-visible { border-color: color-mix(in srgb, var(--accent) 54%, var(--border)); background: var(--accent-soft); color: var(--accent-strong); outline: 0; }
+.app-select__option:disabled { cursor: not-allowed; color: var(--muted-foreground); opacity: .48; }
+.app-select__option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-select__check { display: grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border-strong); border-radius: 999px; color: transparent; }
+.app-select__option--selected { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent-strong); }
+.app-select__option--selected .app-select__check { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
+@keyframes app-select-enter { from { opacity: 0; transform: translateY(-4px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .app-select__panel { animation: none; } .app-select__chevron { transition: none; } }
+
 /* Date selection is a compact scheduling instrument, not the browser's generic calendar. */
 .date-picker__trigger { display: flex; width: 100%; height: 44px; align-items: center; gap: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--input-bg); padding: 0 11px 0 13px; color: var(--foreground); text-align: left; transition: border-color var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) var(--motion-settle), background-color var(--motion-normal) var(--motion-settle); }
 .date-picker__trigger:hover, .date-picker__trigger:focus-visible { border-color: color-mix(in srgb, var(--accent) 72%, var(--border)); box-shadow: 0 0 0 3px var(--focus-ring), inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent); outline: 0; }
@@ -1039,12 +1059,12 @@ button, input, select, textarea { font-size: max(16px, 1rem); }
 .dashboard-row-title, .dashboard-activity__row p, .dashboard-empty-state p { font-size: 17px; }
 .dashboard-row-action, .dashboard-text-link { min-height: 44px; font-size: 16px; font-weight: 750; }
 
-.date-picker__trigger, .teacher-select__trigger { min-height: 52px; height: 52px; font-size: 16px; }
-.date-picker__trigger > span:not(.date-picker__marker) { font-size: 16px; }
+.date-picker__trigger, .teacher-select__trigger, .app-select__trigger { min-height: 52px; height: 52px; font-size: 16px; }
+.date-picker__trigger > span:not(.date-picker__marker), .app-select__value { font-size: 16px; }
 .date-picker__panel { width: min(360px, calc(100vw - 24px)); border-radius: 18px; padding: 16px; }
 .date-picker__day { min-height: 42px; font-size: 14px; }
 .teacher-select__panel { font-size: 16px; }
-.teacher-select__option { min-height: 48px; font-size: 16px; }
+.teacher-select__option, .app-select__option { min-height: 48px; font-size: 16px; }
 
 input:not([type="checkbox"]):not([type="radio"]), textarea, select { min-height: 52px !important; border-width: 2px !important; border-radius: 12px !important; padding-inline: 16px !important; font-size: 16px !important; }
 textarea { padding-block: 14px !important; line-height: 1.55; }
