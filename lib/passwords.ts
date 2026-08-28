@@ -3,6 +3,10 @@ import { compare, hash } from "bcryptjs";
 
 export type PasswordFormat = "PLAIN" | "BCRYPT";
 
+// Keeps rejected login attempts on the bcrypt path without introducing a real
+// credential. This prevents the response time from revealing account status.
+const LOGIN_VERIFICATION_PLACEHOLDER_HASH = "$2b$12$/fIgrAJX.3U6jBvgFmh86eLf5lR4WYTLUlJerATAjbuh1JHNL.xv2";
+
 export function getPasswordFormat(storedPassword: string, declaredFormat?: string): PasswordFormat {
   const bcryptPrefix = storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$") || storedPassword.startsWith("$2y$");
   if (declaredFormat?.trim().toUpperCase() === "BCRYPT" || bcryptPrefix) return "BCRYPT";
@@ -10,9 +14,17 @@ export function getPasswordFormat(storedPassword: string, declaredFormat?: strin
 }
 
 export async function verifyPassword(plainTextPassword: string, storedPassword: string, declaredFormat?: string) {
-  return getPasswordFormat(storedPassword, declaredFormat) === "BCRYPT"
-    ? compare(plainTextPassword, storedPassword)
-    : plainTextPassword === storedPassword;
+  if (getPasswordFormat(storedPassword, declaredFormat) === "BCRYPT") {
+    return compare(plainTextPassword, storedPassword);
+  }
+
+  const matches = plainTextPassword === storedPassword;
+  await burnPasswordVerification(plainTextPassword);
+  return matches;
+}
+
+export async function burnPasswordVerification(plainTextPassword: string) {
+  await compare(plainTextPassword, LOGIN_VERIFICATION_PLACEHOLDER_HASH);
 }
 
 export async function hashPassword(password: string) {

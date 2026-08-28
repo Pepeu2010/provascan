@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   applyPreAuthCookie,
 } from "@/lib/auth";
-import { verifyPassword } from "@/lib/passwords";
+import { burnPasswordVerification, verifyPassword } from "@/lib/passwords";
 import { getMfaPolicy, getNextAuthStep } from "@/lib/auth-flow";
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -74,12 +74,9 @@ export async function POST(request: Request) {
 
     const user = await getUserByEmail(payload.email);
 
-    if (!user) {
+    if (!user || !isActiveUser(user.ativo)) {
+      await burnPasswordVerification(payload.password);
       return invalidCredentialsResponse();
-    }
-
-    if (!isActiveUser(user.ativo)) {
-      return NextResponse.json({ error: "Usuário inativo." }, { status: 403 });
     }
 
     const passwordMatches = await verifyPassword(payload.password, user.senha, user.senha_formato);
