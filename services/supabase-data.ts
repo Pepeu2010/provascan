@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
-import { normalizeClasses } from "@/lib/exam-audience";
+import { getStudentsForExam, normalizeClasses } from "@/lib/exam-audience";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
 import type { ClassRoom, CorrectionSession, Exam, ExamCorrectionRule, Student, TeacherProfile } from "@/types/domain";
 import type { UserRecord } from "@/types/auth";
@@ -193,6 +193,22 @@ export async function resetManagedUserMfa(userId: string) {
   dbError(error);
 }
 
+export async function setManagedUserTemporaryPassword(userId: string, passwordHash: string) {
+  const { error } = await client().from("app_users").update({
+    password_hash: passwordHash,
+    force_password_change: true,
+    sessions_revoked_at: new Date().toISOString(),
+  }).eq("legacy_id", userId);
+  dbError(error);
+}
+
+export async function deleteManagedUser(userId: string) {
+  await assertAdminContinuity(userId, "deleted", false);
+  const { data, error } = await client().from("app_users").delete().eq("legacy_id", userId).select("legacy_id");
+  dbError(error);
+  if (!data?.length) throw new SupabaseSchemaError("Usuário não encontrado.");
+}
+
 export async function appendAuditEvent(input: { actorId: string; event: string; targetId?: string; ipHash?: string; metadata?: Record<string, string | number | boolean> }) {
   const { error } = await client().from("audit_log_internal").insert({ id: crypto.randomUUID(), occurred_at: new Date().toISOString(), actor_id: input.actorId, event: input.event, target_id: input.targetId ?? "", ip_hash: input.ipHash ?? "", metadata: input.metadata ?? {} });
   dbError(error);
@@ -231,6 +247,72 @@ export async function getOperationalAppData(): Promise<AppDataState> {
 
 export async function getOperationalRevision() { const { data, error } = await client().from("operational_meta_internal").select("revision").eq("singleton", true).maybeSingle(); dbError(error); return String(data?.revision ?? 0); }
 export async function getOperationalSnapshot() { const [data, revision] = await Promise.all([getOperationalAppData(), getOperationalRevision()]); return { data, revision }; }
+
+export async function getTeacherCorrectionSnapshot(teacherId: string) {
+  const database = client();
+  const [{ data: sectionRows, error: sectionsError }, snapshot] = await Promise.all([
+    database.from("exam_sections").select("exam_id").eq("teacher_id", teacherId),
+    getOperationalSnapshot(),
+  ]);
+  dbError(sectionsError);
+  const assignedExamIds = new Set((sectionRows ?? []).map((item) => String(item.exam_id)));
+  const exams = snapshot.data.exams.filter((exam) => assignedExamIds.has(exam.id) && Boolean(exam.releasedAt));
+  const examIds = new Set(exams.map((exam) => exam.id));
+  const studentIds = new Set(exams.flatMap((exam) => getStudentsForExam(exam, snapshot.data.students, snapshot.data.classes).map((student) => student.id)));
+
+  return {
+    data: {
+      ...snapshot.data,
+      answerKeys: snapshot.data.answerKeys.filter((item) => examIds.has(item.provaId)),
+      correctionRules: snapshot.data.correctionRules.filter((item) => examIds.has(item.provaId)),
+      corrections: snapshot.data.corrections.filter((item) => examIds.has(item.correction.provaId)),
+      exams,
+      students: snapshot.data.students.filter((student) => studentIds.has(student.id)),
+    } satisfies AppDataState,
+    revision: snapshot.revision,
+  };
+}
+
+export async function teacherCanCorrectExam(teacherId: string, examId: string) {
+  const database = client();
+  const [{ count, error }, { data: exam, error: examError }] = await Promise.all([
+    database.from("exam_sections").select("id", { count: "exact", head: true }).eq("teacher_id", teacherId).eq("exam_id", examId),
+    database.from("exams").select("released_at").eq("id", examId).maybeSingle(),
+  ]);
+  dbError(error);
+  dbError(examError);
+  return Boolean(count && exam?.released_at);
+}
+
+export async function saveCorrectionSession(session: CorrectionSession) {
+  const item = session;
+  const { error } = await client().from("corrections").insert({
+    id: item.correction.id,
+    exam_id: item.correction.provaId,
+    student_id: item.correction.alunoId || null,
+    detected_name: item.correction.nomeDetectado,
+    score: item.correction.nota,
+    correct_count: item.correction.acertos,
+    incorrect_count: item.correction.erros,
+    blank_count: item.correction.emBranco,
+    multiple_marks_count: item.correction.multiplasMarcacoes,
+    voided_count: item.correction.anuladas,
+    percentage: item.correction.percentual,
+    corrected_at: item.correction.data,
+    source_image: item.correction.imagem,
+    correction_time: item.correction.tempoCorrecao,
+    identification_method: item.correction.metodoIdentificacao,
+    student_snapshot: item.aluno,
+    exam_snapshot: item.prova,
+    class_snapshot: item.turma,
+    answers: item.respostas,
+    ocr_confidence: item.confiancaOcr,
+    processed_image: item.imagemProcessada,
+    observations: item.observacoes,
+    identification: item.identificacao,
+  });
+  dbError(error);
+}
 export async function saveOperationalAppData(data: AppDataState, metadata?: { actorId: string; revision: string }) {
   const { data: revision, error } = await client().rpc("replace_operational_state", { payload: data, actor_id: metadata?.actorId ?? "system", expected_revision: Number(metadata?.revision ?? 0) });
   dbError(error); return String(revision);

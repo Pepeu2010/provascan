@@ -347,6 +347,7 @@ function analyzeProvaScanCard(params: {
       alternatives,
       canvasHeight: imageData.height,
       canvasWidth: imageData.width,
+      questionCount: answerKeyLength,
       questionIndex,
     }),
     imageData,
@@ -403,13 +404,18 @@ function getCompactPrintBubbleBounds(params: {
   alternatives: string[];
   canvasHeight: number;
   canvasWidth: number;
+  questionCount: number;
   questionIndex: number;
 }) {
-  const { alternatives, canvasHeight, canvasWidth, questionIndex } = params;
+  const { alternatives, canvasHeight, canvasWidth, questionCount, questionIndex } = params;
   const startX = canvasWidth * 0.352;
   const endX = canvasWidth * 0.775;
-  const startY = canvasHeight * 0.318;
-  const rowGap = canvasHeight * 0.0418;
+  const answerBoxTop = 64.7 / 297;
+  const verticalPadding = 16 / 297;
+  const contentHeight = 140 / 297;
+  const rowGap = canvasHeight * Math.min(12.5 / 297, contentHeight / Math.max(questionCount, 1));
+  const usedHeight = (rowGap / canvasHeight) * questionCount;
+  const startY = canvasHeight * (answerBoxTop + verticalPadding + (contentHeight - usedHeight) / 2) + rowGap / 2;
   const radius = Math.max(8, Math.min(canvasWidth, canvasHeight) * 0.021);
 
   return alternatives.map((alternative, alternativeIndex) => ({
@@ -605,15 +611,19 @@ function readBlockAnswers(params: {
   return rows;
 }
 
-function classifyBubbleRow(scores: AnswerBubbleScore[]) {
+export function classifyBubbleRow(scores: AnswerBubbleScore[]) {
   const ordered = [...scores].sort((left, right) => right.score - left.score);
   const strongest = ordered[0]?.score ?? 0;
   const second = ordered[1]?.score ?? 0;
   const weakest = ordered.at(-1)?.score ?? 0;
-  const median = ordered[Math.floor(ordered.length / 2)]?.score ?? 0;
-  const clearSignal = strongest >= 0.16 && strongest - median >= 0.035;
+  const background = ordered[Math.min(ordered.length - 1, Math.max(1, Math.floor(ordered.length * 0.75)))]?.score ?? weakest;
+  const clearSignal = strongest >= 0.16 && strongest - background >= 0.035;
+  // Uma segunda bolha preenchida à mão pode ficar sensivelmente mais clara do
+  // que a primeira. Compare cada candidata com o ruído da própria linha, não
+  // apenas com uma diferença fixa em relação à marca mais escura.
+  const multipleThreshold = Math.max(0.22, background + Math.max(0.08, (strongest - background) * 0.30));
   const multipleAnswers = ordered
-    .filter((item) => item.score >= Math.max(0.17, strongest - 0.035))
+    .filter((item) => item.score >= multipleThreshold)
     .map((item) => item.alternative);
   const confidence = clamp(
     Math.round(34 + (strongest - second) * 300 + (strongest - weakest) * 180),
@@ -629,7 +639,7 @@ function classifyBubbleRow(scores: AnswerBubbleScore[]) {
     };
   }
 
-  if (multipleAnswers.length > 1 && second >= strongest - 0.025) {
+  if (multipleAnswers.length > 1) {
     return {
       confidence,
       markedAnswers: multipleAnswers,

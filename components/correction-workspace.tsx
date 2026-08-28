@@ -142,7 +142,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
     const acertos = review.answers.filter((item) => getAnswerState(item) === "acerto").length;
     const erros = review.answers.filter((item) => getAnswerState(item) === "erro").length;
-    const revisao = review.answers.filter((item) => item.confidence < MIN_CONFIDENCE_REVIEW).length;
+    const revisao = review.answers.filter((item) => item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1).length;
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
     return { acertos, erros, percentual, revisao };
   }, [review]);
@@ -262,7 +262,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         preprocessing.lowLight ||
         preprocessing.shadowRisk ||
         identity.confidence < MIN_CONFIDENCE_REVIEW ||
-        detectedAnswers.some((item) => item.confidence < MIN_CONFIDENCE_REVIEW);
+        detectedAnswers.some((item) => item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1);
 
       setReview({
         answers: detectedAnswers,

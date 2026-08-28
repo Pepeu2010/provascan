@@ -624,6 +624,39 @@ export function AppDataProvider({
         return { ok: false, message: "Esta prova ainda não possui gabarito salvo." };
       }
 
+      if (session?.role === "professor") {
+        if (isPersistingRef.current) return { ok: false, message: "Uma correção já está sendo salva. Aguarde a conclusão." };
+        isPersistingRef.current = true;
+        setSyncStatus("saving");
+        setSyncError("");
+        try {
+          const response = await fetch("/api/corrections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(input),
+          });
+          const payload = (await response.json().catch(() => ({}))) as { correction?: CorrectionSession; error?: string; message?: string };
+          if (!response.ok || !payload.correction) {
+            const message = payload.error ?? "Não foi possível salvar esta correção.";
+            setSyncStatus("error");
+            setSyncError(message);
+            return { ok: false, message };
+          }
+          const nextData = { ...data, corrections: [payload.correction, ...data.corrections] };
+          setData(nextData);
+          lastSyncedPayloadRef.current = JSON.stringify(nextData);
+          setSyncStatus("idle");
+          return { ok: true, message: payload.message ?? "Correção salva com sucesso." };
+        } catch {
+          const message = "Falha de rede ao salvar esta correção.";
+          setSyncStatus("error");
+          setSyncError(message);
+          return { ok: false, message };
+        } finally {
+          isPersistingRef.current = false;
+        }
+      }
+
       const sessionToSave = buildCorrectionSession({
         answerKey,
         answers: input.answers,
