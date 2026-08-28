@@ -681,12 +681,62 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </div>
             </div>
 
-            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
-              <p className="text-sm text-[var(--muted-foreground)]">Resultado até agora</p>
-              <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">
-                {summary.acertos === 1 ? "1 resposta correta" : `${summary.acertos} respostas corretas`} de {review.answers.length}
-              </p>
-            </div>
+            <section
+              aria-label="Resumo da correção"
+              aria-live="polite"
+              className="overflow-hidden rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--accent)_36%,var(--border))] bg-[color-mix(in_srgb,var(--accent-soft)_48%,var(--surface))]"
+            >
+              <div className="grid gap-5 px-5 py-5 sm:px-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h4 className="text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">Resultado da correção</h4>
+                    <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                      {summary.acertos === 1 ? "1 resposta correta" : `${summary.acertos} respostas corretas`} de {review.answers.length}
+                    </p>
+                  </div>
+                  <p className="text-3xl font-semibold tabular-nums tracking-[-0.04em] text-[var(--foreground)]">
+                    {summary.percentual}%
+                  </p>
+                </div>
+
+                <div>
+                  <div
+                    aria-label={`Aproveitamento: ${summary.percentual}%`}
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={summary.percentual}
+                    aria-valuetext={`${summary.percentual}% de aproveitamento, ${summary.acertos} de ${review.answers.length} respostas corretas`}
+                    className="h-2 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,var(--border))]"
+                    role="progressbar"
+                  >
+                    <span
+                      className="block h-full rounded-full bg-[var(--accent)] transition-[width] duration-200 motion-reduce:transition-none"
+                      style={{ width: `${summary.percentual}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs font-medium text-[var(--muted-foreground)]">
+                    {summary.revisao > 0
+                      ? `${summary.revisao} ${summary.revisao === 1 ? "resposta precisa" : "respostas precisam"} de conferência antes de salvar.`
+                      : "Todas as respostas estão prontas para salvar."}
+                  </p>
+                </div>
+              </div>
+
+              <dl className="grid border-t border-[color-mix(in_srgb,var(--accent)_22%,var(--border))] sm:grid-cols-3">
+                <div className="px-5 py-4 sm:px-6">
+                  <dt className="text-xs font-medium text-[var(--muted-foreground)]">Acertos</dt>
+                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.acertos}</dd>
+                </div>
+                <div className="border-t border-[color-mix(in_srgb,var(--accent)_22%,var(--border))] px-5 py-4 sm:border-t-0 sm:border-l sm:px-6">
+                  <dt className="text-xs font-medium text-[var(--muted-foreground)]">Divergências</dt>
+                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.erros}</dd>
+                </div>
+                <div className="border-t border-[color-mix(in_srgb,var(--accent)_22%,var(--border))] px-5 py-4 sm:border-t-0 sm:border-l sm:px-6">
+                  <dt className="text-xs font-medium text-[var(--muted-foreground)]">Para revisar</dt>
+                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.revisao}</dd>
+                </div>
+              </dl>
+            </section>
 
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
               <FieldLabel label="Aluno que fez esta prova">
