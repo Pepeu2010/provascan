@@ -16,6 +16,7 @@
     "test:dashboard-loading-stability": "npx --no-install tsx scripts/verify-dashboard-loading-stability.ts",
     "test:dashboard-responsive-card": "npx --no-install tsx scripts/verify-dashboard-responsive-card.ts",
     "test:correction-review-simplicity": "npx --no-install tsx scripts/verify-correction-review-simplicity.ts",
+    "test:settings-simplicity": "npx --no-install tsx scripts/verify-settings-simplicity.ts",
     "test:security-hardening": "npx --no-install tsx scripts/verify-security-hardening.ts",
     "test:collaborative-exam-draft": "npx --no-install tsx scripts/verify-collaborative-exam-draft.ts",
     "test:fresh-schema-migrations": "npx --no-install tsx scripts/verify-fresh-schema-migrations.ts",

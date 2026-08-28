@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, BookCheck, ClipboardCheck, DatabaseBackup, GraduationCap, ScanLine, Settings2, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, BookCheck, ClipboardCheck, GraduationCap, ScanLine, Settings2, ShieldCheck, Users } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,11 +56,10 @@ export function AdministrationCenter() {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">Governança e continuidade</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Abaixo, gerencie pessoas, recuperação de acesso e cópias de segurança. Admin e Vice-direção têm o mesmo alcance institucional.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Abaixo, gerencie pessoas, recuperação de acesso e segurança. Admin e Vice-direção têm o mesmo alcance institucional.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary"><a href="#equipe"><ShieldCheck className="size-4" />Equipe e acessos</a></Button>
-            {hasInstitutionalControl ? <Button asChild variant="secondary"><a href="#dados"><DatabaseBackup className="size-4" />Backup e restauração</a></Button> : null}
             <Button asChild variant="ghost"><a href="#seguranca"><Settings2 className="size-4" />Segurança</a></Button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Download, Edit3, FileUp, Heart, KeyRound, Printer, QrCode, RotateCcw, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { Download, Edit3, Heart, KeyRound, Printer, QrCode, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { AdministrationCenter } from "@/components/administration-center";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
@@ -1084,10 +1084,7 @@ export function ReportsWorkspace() {
 }
 
 export function SettingsWorkspace() {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { data, exportData, getOperationalCsv, importData, resetData, session, syncError, syncStatus } = useAppData();
-  const [payload, setPayload] = useState("");
-  const [message, setMessage] = useState("");
+  const { session } = useAppData();
   const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
   const [adminMessage, setAdminMessage] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
@@ -1258,89 +1255,6 @@ export function SettingsWorkspace() {
           <Button variant="secondary" onClick={() => window.dispatchEvent(new Event("provascan:open-support"))}><Heart className="size-4" aria-hidden="true" /> Apoiar o ProvaScan</Button>
         </div>
       </Card>
-
-      {hasInstitutionalControl ? <div id="dados" className="grid gap-5 scroll-mt-6 xl:grid-cols-2">
-      <Card className="p-6">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Persistência operacional</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Os dados do painel são lidos e gravados com segurança no Supabase. O backup JSON continua disponível como contingência manual.</p>
-        <div className="mt-6 rounded-[24px] bg-[var(--surface)] p-5">
-          <p className="text-sm text-[var(--muted-foreground)]">Resumo atual</p>
-          <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
-            {data.classes.length} turmas, {data.students.length} alunos, {data.exams.length} provas
-          </p>
-        </div>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button
-            onClick={() => {
-              const content = exportData();
-              setPayload(content);
-              downloadTextFile("provascan-backup-manual.json", content, "application/json");
-              setMessage("Backup JSON gerado e baixado.");
-            }}
-          >
-            Gerar backup JSON
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              downloadTextFile("provascan-resumo-operacional.csv", getOperationalCsv(), "text/csv;charset=utf-8");
-              setMessage("Resumo CSV baixado.");
-            }}
-          >
-            Exportar resumo CSV
-          </Button>
-          <Button
-            variant="ghost"
-            loading={syncStatus === "saving"}
-            onClick={() => {
-              void (async () => {
-                const result = await resetData();
-                setMessage(result.message);
-              })();
-            }}
-          >
-            <RotateCcw className="size-4" />
-            Restaurar base inicial
-          </Button>
-        </div>
-      </Card>
-      <Card className="p-6">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)]">Importação e restauração</h2>
-        <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">Importe um backup JSON colando o conteúdo abaixo ou escolhendo um arquivo salvo anteriormente.</p>
-        <Textarea
-          value={payload}
-          onChange={(event) => setPayload(event.target.value)}
-          className="mt-6 min-h-56"
-          placeholder="Cole aqui o JSON de backup do ProvaScan."
-        />
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button loading={syncStatus === "saving"} onClick={() => void (async () => setMessage((await importData(payload)).message))()}>
-            <FileUp className="size-4" />
-            Importar backup
-          </Button>
-          <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-            Escolher arquivo JSON
-          </Button>
-          <Badge tone="accent">Pronto para Vercel</Badge>
-        </div>
-        {message ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">{message}</p> : null}
-        {syncStatus === "error" && syncError ? <p className="mt-2 text-sm text-[var(--error)]">{syncError}</p> : null}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json"
-          className="hidden"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-            const text = await file.text();
-            setPayload(text);
-            setMessage((await importData(text)).message);
-            event.target.value = "";
-          }}
-        />
-      </Card>
-      </div> : null}
     </div>
   );
 }
