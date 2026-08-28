@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { buildOrderedAnswerKey, sortStudentsForPrinting } from "../services/collaborative-printing";
 
 const ordered = buildOrderedAnswerKey([
@@ -21,4 +22,9 @@ const students = sortStudentsForPrinting(
 );
 
 assert.deepEqual(students.map((item) => item.nome), ["Ana", "Zoé"]);
+const workspace = readFileSync(new URL("../components/collaborative-exams-workspace.tsx", import.meta.url), "utf8");
+assert.match(workspace, /class=\"subject-map\"/);
+assert.match(workspace, /section\.questionCount} questões/);
+assert.match(workspace, /140 \/ Math\.max\(exam\.questionCount, 1\)/);
+assert.match(workspace, /question--section-start/);
 console.log("Collaborative printing checks passed.");

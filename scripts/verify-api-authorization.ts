@@ -20,6 +20,8 @@ assert.equal(canAssignManagedRole("vice_diretor", "admin"), true);
 assert.equal(canManageTargetUser("vice_diretor", "admin"), true);
 assert.equal(canAccessPath("vice_diretor", "/admin"), true);
 assert.equal(canAccessPath("vice_diretor", "/painel"), true);
+assert.equal(canAccessPath("professor", "/dashboard/correcao"), true);
+assert.equal(canAccessPath("professor", "/dashboard/alunos"), false);
 
 const orderedClassNames = ["3E", "1C", "2A", "1A", "2C", "1B", "3A"].sort((left, right) => compareClassrooms({ nome: left }, { nome: right }));
 assert.deepEqual(orderedClassNames, ["1A", "1B", "1C", "2A", "2C", "3A", "3E"]);
@@ -31,7 +33,12 @@ assert.match(operationalRoute, /canAccessOperationalData\(validation\.session\.r
 
 const usersRoute = readFileSync(new URL("../app/api/admin/users/route.ts", import.meta.url), "utf8");
 const managedUserRoute = readFileSync(new URL("../app/api/admin/users/[userId]/route.ts", import.meta.url), "utf8");
+const correctionsRoute = readFileSync(new URL("../app/api/corrections/route.ts", import.meta.url), "utf8");
 assert.match(usersRoute, /canAssignManagedRole/);
 assert.match(managedUserRoute, /canManageTargetUser/);
+assert.match(managedUserRoute, /export async function DELETE/);
+assert.match(managedUserRoute, /setManagedUserTemporaryPassword/);
+assert.match(correctionsRoute, /teacherCanCorrectExam/);
+assert.match(correctionsRoute, /getStudentsForExam/);
 
 console.log("API authorization regression passed: operational data is denied to teachers and unknown roles.");

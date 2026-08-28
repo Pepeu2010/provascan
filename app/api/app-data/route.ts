@@ -8,6 +8,7 @@ import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionT
 import {
   getOperationalSnapshot,
   getOperationalRevision,
+  getTeacherCorrectionSnapshot,
   SupabaseConfigError,
   SupabaseConnectionError,
   SupabaseSchemaError,
@@ -15,6 +16,7 @@ import {
 } from "@/services/supabase-data";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
 import { canAccessOperationalData } from "@/lib/access-control";
+import { isTeacherRole } from "@/lib/collaborative-access";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -57,12 +59,14 @@ export async function GET() {
     return response;
   }
 
-  if (!canAccessOperationalData(validation.session.role)) {
+  if (!canAccessOperationalData(validation.session.role) && !isTeacherRole(validation.session.role)) {
     return NextResponse.json({ data: cloneDefaultAppData(), revision: "0" }, { headers: { "Cache-Control": "no-store" } });
   }
 
   try {
-    const snapshot = await getOperationalSnapshot();
+    const snapshot = isTeacherRole(validation.session.role)
+      ? await getTeacherCorrectionSnapshot(validation.session.id)
+      : await getOperationalSnapshot();
     const data = snapshot.data;
     const finalResponse = NextResponse.json({ data, revision: snapshot.revision }, {
       headers: { "Cache-Control": "no-store" },

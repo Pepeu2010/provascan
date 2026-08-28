@@ -38,6 +38,7 @@ export function canAccessPath(role: UserRole, pathname: string) {
 
   if (pathname === "/dashboard") return true;
   if (pathname === "/dashboard/minhas-provas" || pathname.startsWith("/dashboard/minhas-provas/")) return role === "professor";
+  if (pathname === "/dashboard/correcao" || pathname.startsWith("/dashboard/correcao/")) return role === "professor" || isAcademicManagementRole(role);
   if (pathname === "/dashboard/provas" || pathname.startsWith("/dashboard/provas/")) return isAcademicManagementRole(role);
   if (pathname.startsWith("/dashboard/")) return isAcademicManagementRole(role);
 

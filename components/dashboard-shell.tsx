@@ -51,7 +51,10 @@ export function DashboardShell({
   );
   const commandItems = useMemo(
     () => (session?.role === "professor"
-      ? [{ href: "/dashboard/minhas-provas", label: "Minhas provas", icon: Command }]
+      ? [
+          { href: "/dashboard/minhas-provas", label: "Minhas provas", icon: Command },
+          { href: "/dashboard/correcao", label: "Correção por foto", icon: Command },
+        ]
       : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor"))),
     [session?.role],
   );
