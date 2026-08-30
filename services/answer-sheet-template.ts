@@ -24,7 +24,9 @@ export function getQuestionLayout(questionCount: number, alternatives: string[])
   const y = answerArea.y * page.height;
   const width = answerArea.width * page.width;
   const height = answerArea.height * page.height;
-  const columnCount = questionCount > 30 ? 3 : questionCount > 15 ? 2 : 1;
+  // Fifteen rows keep the printed bubbles and their OCR sampling area legible.
+  // More questions expand into another column instead of compressing a row.
+  const columnCount = Math.max(1, Math.ceil(questionCount / 15));
   const columnGap = columnCount > 1 ? 20 : 0;
   const columnWidth = (width - columnGap * (columnCount - 1)) / columnCount;
   const rowsPerColumn = Math.ceil(questionCount / columnCount);
