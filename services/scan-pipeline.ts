@@ -9,7 +9,7 @@ import {
   type BlockLayoutStyle,
   type NormalizedRect,
 } from "@/services/answer-sheet-models";
-import { ANSWER_SHEET_TEMPLATE, getBubbleBounds } from "@/services/answer-sheet-template";
+import { ANSWER_SHEET_TEMPLATE, getBubbleBounds, getQuestionLayout } from "@/services/answer-sheet-template";
 import { extractIdentityFromImage, extractTextFromImage } from "@/services/ocr";
 import { buildIdentificationCode } from "@/services/exam-correction";
 import type { Exam, Student } from "@/types/domain";
@@ -352,9 +352,24 @@ function analyzeProvaScanCard(params: {
     }),
     imageData,
   });
-  const answers = scoreProvaScanCardAnswers(compactPrintAnswers) > scoreProvaScanCardAnswers(standardAnswers)
-    ? compactPrintAnswers
-    : standardAnswers;
+  const templateAnswers = readProvaScanCardAnswers({
+    alternatives,
+    answerKeyLength,
+    getBounds: (questionIndex) => getBubbleBounds({
+      alternatives,
+      canvasHeight: imageData.height,
+      canvasWidth: imageData.width,
+      questionCount: answerKeyLength,
+      questionIndex,
+    }),
+    imageData,
+  });
+  const inkGridAnswers = readBlueInkGridAnswers({ alternatives, answerKeyLength, imageData });
+  const answers = inkGridAnswers.length
+    ? inkGridAnswers
+    : [standardAnswers, compactPrintAnswers, templateAnswers].reduce((best, candidate) =>
+      scoreProvaScanCardAnswers(candidate) > scoreProvaScanCardAnswers(best) ? candidate : best,
+    );
 
   return {
     answers,
@@ -374,6 +389,142 @@ function analyzeProvaScanCard(params: {
     totalQuestions: answerKeyLength,
     usedExpectedTemplate: true,
   } satisfies AnswerSheetAnalysis;
+}
+
+type BlueInkComponent = { area: number; x: number; y: number };
+
+function readBlueInkGridAnswers(params: {
+  alternatives: string[];
+  answerKeyLength: number;
+  imageData: ImageData;
+}) {
+  const { alternatives, answerKeyLength, imageData } = params;
+  const layout = getQuestionLayout(answerKeyLength, alternatives);
+  // The answer grid occupies the central card area. A blue object at the
+  // extreme page edge is commonly a pen/table reflection, not a response.
+  const components = keepLargestInkGrid(
+    detectBlueInkComponents(imageData)
+      .filter((component) => component.x > imageData.width * 0.08 && component.x < imageData.width * 0.88),
+    imageData.height,
+  );
+  if (components.length < Math.ceil(answerKeyLength * 0.7)) return [] as BubbleAnswerDetection[];
+
+  const groups = groupInkComponentsByColumn(components, layout.columnCount);
+  const answers: BubbleAnswerDetection[] = [];
+  for (let questionIndex = 0; questionIndex < answerKeyLength; questionIndex += 1) {
+    const columnIndex = Math.floor(questionIndex / layout.rowsPerColumn);
+    const rowIndex = questionIndex % layout.rowsPerColumn;
+    const column = groups[columnIndex] ?? [];
+    const rowGap = getComponentRowGap(column, layout.rowsPerColumn);
+    const expectedY = getExpectedComponentRowY(column, rowIndex, layout.rowsPerColumn);
+    const mark = column
+      .filter((component) => Math.abs(component.y - expectedY) <= rowGap * 0.46)
+      .sort((left, right) => Math.abs(left.y - expectedY) - Math.abs(right.y - expectedY))[0];
+    const selectedIndex = mark ? getAlternativeIndex(mark, column, alternatives.length) : -1;
+    const markedAnswer = selectedIndex >= 0 ? alternatives[selectedIndex] : "";
+    answers.push({
+      blockTitle: "CARTÃO-RESPOSTA",
+      confidence: markedAnswer ? 99 : 24,
+      markedAnswers: markedAnswer ? [markedAnswer] : [],
+      question: questionIndex + 1,
+      scores: alternatives.map((alternative, index) => ({ alternative, score: index === selectedIndex ? 1 : 0 })),
+      status: markedAnswer ? "MARKED" : "BLANK",
+    });
+  }
+  const found = answers.filter((answer) => answer.markedAnswers.length).length;
+  return found >= Math.ceil(answerKeyLength * 0.8) ? answers : [];
+}
+
+function keepLargestInkGrid(components: BlueInkComponent[], imageHeight: number) {
+  const ordered = [...components].sort((left, right) => left.y - right.y);
+  const groups: BlueInkComponent[][] = [];
+  const maxGap = Math.max(90, imageHeight * 0.08);
+  for (const component of ordered) {
+    const current = groups.at(-1);
+    if (!current || component.y - (current.at(-1)?.y ?? component.y) > maxGap) {
+      groups.push([component]);
+    } else {
+      current.push(component);
+    }
+  }
+  return groups.sort((left, right) => right.length - left.length)[0] ?? [];
+}
+
+function detectBlueInkComponents(imageData: ImageData) {
+  const { data, height, width } = imageData;
+  const visited = new Uint8Array(width * height);
+  const components: BlueInkComponent[] = [];
+  const step = 2;
+  const isBlue = (x: number, y: number) => {
+    const index = (y * width + x) * 4;
+    return data[index + 2] > data[index] + 12 && data[index + 2] > data[index + 1] + 12 && data[index + 2] > 60;
+  };
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const start = y * width + x;
+      if (visited[start] || !isBlue(x, y)) continue;
+      const queue: Array<[number, number]> = [[x, y]];
+      visited[start] = 1;
+      let area = 0;
+      let sumX = 0;
+      let sumY = 0;
+      while (queue.length) {
+        const [currentX, currentY] = queue.pop()!;
+        area += 1;
+        sumX += currentX;
+        sumY += currentY;
+        for (const [nextX, nextY] of [[currentX - step, currentY], [currentX + step, currentY], [currentX, currentY - step], [currentX, currentY + step]]) {
+          if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue;
+          const next = nextY * width + nextX;
+          if (!visited[next] && isBlue(nextX, nextY)) {
+            visited[next] = 1;
+            queue.push([nextX, nextY]);
+          }
+        }
+      }
+      if (area >= 50) components.push({ area, x: sumX / area, y: sumY / area });
+    }
+  }
+  return components;
+}
+
+function groupInkComponentsByColumn(components: BlueInkComponent[], columnCount: number) {
+  const usable = [...components].sort((left, right) => left.x - right.x);
+  const min = usable[0]?.x ?? 0;
+  const max = usable.at(-1)?.x ?? min;
+  let centers = Array.from({ length: columnCount }, (_, index) => min + ((max - min) * (index + 0.5)) / columnCount);
+  for (let iteration = 0; iteration < 6; iteration += 1) {
+    const groups = Array.from({ length: columnCount }, () => [] as BlueInkComponent[]);
+    for (const component of usable) {
+      const nearest = centers.reduce((best, center, index) => Math.abs(component.x - center) < Math.abs(component.x - centers[best]) ? index : best, 0);
+      groups[nearest].push(component);
+    }
+    centers = groups.map((group, index) => group.length ? average(group.map((component) => component.x)) : centers[index]);
+  }
+  const groups = Array.from({ length: columnCount }, () => [] as BlueInkComponent[]);
+  for (const component of usable) {
+    const nearest = centers.reduce((best, center, index) => Math.abs(component.x - center) < Math.abs(component.x - centers[best]) ? index : best, 0);
+    groups[nearest].push(component);
+  }
+  return groups;
+}
+
+function getComponentRowGap(column: BlueInkComponent[], rows: number) {
+  const ys = [...column].map((component) => component.y).sort((left, right) => left - right);
+  return Math.max(10, ((ys.at(-1) ?? 0) - (ys[0] ?? 0)) / Math.max(1, rows - 1));
+}
+
+function getExpectedComponentRowY(column: BlueInkComponent[], row: number, rows: number) {
+  const ys = [...column].map((component) => component.y).sort((left, right) => left - right);
+  const first = ys[0] ?? 0;
+  const last = ys.at(-1) ?? first;
+  return first + ((last - first) * row) / Math.max(1, rows - 1);
+}
+
+function getAlternativeIndex(mark: BlueInkComponent, column: BlueInkComponent[], alternativeCount: number) {
+  const min = Math.min(...column.map((component) => component.x));
+  const max = Math.max(...column.map((component) => component.x));
+  return clamp(Math.round(((mark.x - min) / Math.max(1, max - min)) * (alternativeCount - 1)), 0, alternativeCount - 1);
 }
 
 function readProvaScanCardAnswers(params: {

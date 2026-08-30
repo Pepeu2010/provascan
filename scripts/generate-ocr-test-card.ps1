@@ -1,5 +1,5 @@
 param(
-  [ValidateRange(1, 45)]
+  [ValidateRange(1, 60)]
   [int]$QuestionCount = 45
 )
 
@@ -45,7 +45,7 @@ $areaX = 0.11 * $width
 $areaY = 0.31 * $height
 $areaWidth = 0.78 * $width
 $areaHeight = 0.5 * $height
-$columnCount = if ($answers.Count -gt 30) { 3 } elseif ($answers.Count -gt 15) { 2 } else { 1 }
+$columnCount = [Math]::Min(3, [Math]::Max(1, [Math]::Ceiling($answers.Count / 15)))
 $columnGap = if ($columnCount -gt 1) { 20 } else { 0 }
 $columnWidth = ($areaWidth - $columnGap * ($columnCount - 1)) / $columnCount
 $rowsPerColumn = [Math]::Ceiling($answers.Count / $columnCount)

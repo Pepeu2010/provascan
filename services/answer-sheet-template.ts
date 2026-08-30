@@ -24,7 +24,9 @@ export function getQuestionLayout(questionCount: number, alternatives: string[])
   const y = answerArea.y * page.height;
   const width = answerArea.width * page.width;
   const height = answerArea.height * page.height;
-  const columnCount = questionCount > 30 ? 3 : questionCount > 15 ? 2 : 1;
+  // Five alternatives no longer fit legibly in a fourth A4 column. Keep the
+  // maximum at three columns and use additional rows for longer answer keys.
+  const columnCount = Math.min(3, Math.max(1, Math.ceil(questionCount / 15)));
   const columnGap = columnCount > 1 ? 20 : 0;
   const columnWidth = (width - columnGap * (columnCount - 1)) / columnCount;
   const rowsPerColumn = Math.ceil(questionCount / columnCount);
@@ -75,7 +77,9 @@ export function getBubbleBounds(params: {
       alternative,
       cx: cx * scaleX,
       cy: cy * scaleY,
-      radius: Math.max(7, layout.bubbleRadius * Math.min(scaleX, scaleY)),
+      // Four-column cards have smaller but still distinct bubbles. Enlarging
+      // the sample window to seven pixels mixes neighboring alternatives.
+      radius: Math.max(3, layout.bubbleRadius * Math.min(scaleX, scaleY)),
     };
   });
 }
