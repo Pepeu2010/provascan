@@ -29,8 +29,8 @@ assert.equal(fortyFiveQuestionLayout.rowsPerColumn, 15);
 assert.ok(fortyFiveQuestionLayout.bubbleSize >= 5, `As bolhas de 45 questões devem ter ao menos 5 mm; recebido ${fortyFiveQuestionLayout.bubbleSize.toFixed(2)} mm.`);
 
 const sixtyQuestionLayout = getStudentCardPrintLayout(60, ["A", "B", "C", "D", "E"]);
-assert.equal(sixtyQuestionLayout.columnCount, 4, "Cartões acima de 45 questões devem abrir uma quarta coluna.");
-assert.equal(sixtyQuestionLayout.rowsPerColumn, 15, "Cartões de 60 questões devem manter quinze linhas legíveis por coluna.");
+assert.equal(sixtyQuestionLayout.columnCount, 3, "Cartões de 60 questões devem preservar três colunas largas para as cinco alternativas.");
+assert.equal(sixtyQuestionLayout.rowsPerColumn, 20, "Cartões de 60 questões devem distribuir as respostas em vinte linhas por coluna.");
 assert.ok(sixtyQuestionLayout.bubbleSize >= 5, `As bolhas de 60 questões devem ter ao menos 5 mm; recebido ${sixtyQuestionLayout.bubbleSize.toFixed(2)} mm.`);
 
 const workspace = readFileSync(new URL("../components/collaborative-exams-workspace.tsx", import.meta.url), "utf8");
