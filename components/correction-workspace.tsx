@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Camera,
+  X,
   FileImage,
   ImagePlus,
   LoaderCircle,
@@ -417,6 +418,30 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setEditingQuestion(null);
   };
 
+  const closeCurrentCard = () => {
+    if (phase === "processing") {
+      cancelProcessingRef.current = true;
+    }
+
+    if (review && typeof window !== "undefined" && !window.confirm("Fechar esta correção e escolher outra foto? As alterações desta leitura serão descartadas.")) {
+      return;
+    }
+
+    if (rawPreviewUrl) {
+      URL.revokeObjectURL(rawPreviewUrl);
+    }
+    setSelectedFile(null);
+    setRawPreviewUrl("");
+    setReview(null);
+    setEditingQuestion(null);
+    setPreviewZoom(1);
+    setProgress(0);
+    setProgressLabel("Preparando fluxo...");
+    setScreenMessage("Leitura fechada. Você pode enviar ou tirar outra foto.");
+    setErrorMessage("");
+    setPhase("idle");
+  };
+
   const confirmCorrection = async () => {
     if (!review) {
       setErrorMessage("Nenhuma leitura para salvar. Inicie um OCR ou abra o modo manual.");
@@ -679,6 +704,16 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   Veja as respostas marcadas. Se estiverem certas, basta salvar. Para mudar uma delas, toque em “Corrigir resposta”.
                 </p>
               </div>
+              <button
+                type="button"
+                aria-label="Fechar esta correção e escolher outra foto"
+                title="Fechar e trocar foto"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center self-end rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card-solid)] xl:self-start"
+                onClick={closeCurrentCard}
+                data-testid="close-current-card"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
             </div>
 
             <section
