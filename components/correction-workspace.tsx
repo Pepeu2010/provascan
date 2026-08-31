@@ -1180,7 +1180,7 @@ async function preprocessImage(
   }
   const sourceImage = normalizedContext.getImageData(0, 0, normalizedCanvas.width, normalizedCanvas.height);
   const luminanceStats = getLuminanceStats(sourceImage.data);
-  const adjusted = applyAdjustments(sourceImage, luminanceStats.average, luminanceStats.deviation);
+  const adjusted = applyAdjustments(sourceImage, luminanceStats.average, luminanceStats.deviation, preserveCardGeometry);
   // PS-CARD uses fixed relative bubble coordinates. Cropping the page without
   // reprojecting those coordinates shifts every reading, so its full geometry
   // must remain intact. Generic answer sheets may still use automatic crop.
@@ -1214,7 +1214,7 @@ async function preprocessImage(
   }
 
   const finalImage = targetContext.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
-  const binaryImage = binarizeImage(finalImage);
+  const binaryImage = binarizeImage(finalImage, preserveCardGeometry);
   targetContext.putImageData(binaryImage, 0, 0);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
@@ -1338,7 +1338,7 @@ function getLuminanceStats(data: Uint8ClampedArray) {
   return { average, deviation: Math.sqrt(variance) };
 }
 
-function applyAdjustments(imageData: ImageData, average: number, deviation: number) {
+function applyAdjustments(imageData: ImageData, average: number, deviation: number, preserveBlueInk = false) {
   const output = new ImageData(imageData.width, imageData.height);
   const brightnessOffset = average < 110 ? 18 : average > 175 ? -8 : 0;
   const contrastFactor = deviation < 40 ? 1.28 : 1.12;
@@ -1351,14 +1351,19 @@ function applyAdjustments(imageData: ImageData, average: number, deviation: numb
     const adjusted = clamp((gray - 128) * contrastFactor + 128 + brightnessOffset, 0, 255);
     output.data[index] = adjusted;
     output.data[index + 1] = adjusted;
-    output.data[index + 2] = adjusted;
+    // Keep the blue chroma of filled bubbles for PS-CARD. The OCR pipeline
+    // uses it to separate pen marks from the printed frame and headings.
+    const blueChroma = preserveBlueInk
+      ? Math.max(0, imageData.data[index + 2] - Math.max(imageData.data[index], imageData.data[index + 1]))
+      : 0;
+    output.data[index + 2] = clamp(adjusted + blueChroma * 1.4, 0, 255);
     output.data[index + 3] = 255;
   }
 
   return output;
 }
 
-function binarizeImage(imageData: ImageData) {
+function binarizeImage(imageData: ImageData, preserveBlueInk = false) {
   const output = new ImageData(imageData.width, imageData.height);
   // Cell-local thresholds keep a shaded part of a photographed page white
   // while preserving pencil/pen fills as dark marks. A single global cutoff
@@ -1383,7 +1388,10 @@ function binarizeImage(imageData: ImageData) {
           const value = imageData.data[index] > threshold ? 255 : 18;
           output.data[index] = value;
           output.data[index + 1] = value;
-          output.data[index + 2] = value;
+          const blueChroma = preserveBlueInk
+            ? Math.max(0, imageData.data[index + 2] - Math.max(imageData.data[index], imageData.data[index + 1]))
+            : 0;
+          output.data[index + 2] = value === 255 ? 255 : clamp(value + blueChroma * 1.4, 0, 255);
           output.data[index + 3] = 255;
         }
       }
