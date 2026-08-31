@@ -404,8 +404,12 @@ function readBlueInkGridAnswers(params: {
   // the frame edge is commonly the blue border/reflection, not a response.
   // Keep a generous margin for photographed cards while excluding that edge
   // noise (which would otherwise stretch the A-E calibration range).
+  let detectedComponents = detectBlueInkComponents(imageData);
+  if (detectedComponents.length < Math.ceil(answerKeyLength * 0.8)) {
+    detectedComponents = detectBlueInkComponents(imageData, true);
+  }
   const components = keepLargestInkGrid(
-    detectBlueInkComponents(imageData)
+    detectedComponents
       .filter((component) =>
         component.x > imageData.width * 0.16 &&
         component.x < imageData.width * 0.88 &&
@@ -458,14 +462,16 @@ function keepLargestInkGrid(components: BlueInkComponent[], imageHeight: number)
   return groups.sort((left, right) => right.length - left.length)[0] ?? [];
 }
 
-function detectBlueInkComponents(imageData: ImageData) {
+function detectBlueInkComponents(imageData: ImageData, faintInk = false) {
   const { data, height, width } = imageData;
   const visited = new Uint8Array(width * height);
   const components: BlueInkComponent[] = [];
   const step = 2;
   const isBlue = (x: number, y: number) => {
     const index = (y * width + x) * 4;
-    return data[index + 2] > data[index] + 12 && data[index + 2] > data[index + 1] + 12 && data[index + 2] > 60;
+    const chromaMargin = faintInk ? 6 : 12;
+    const minimumBlue = faintInk ? 45 : 60;
+    return data[index + 2] > data[index] + chromaMargin && data[index + 2] > data[index + 1] + chromaMargin && data[index + 2] > minimumBlue;
   };
   for (let y = 0; y < height; y += step) {
     for (let x = 0; x < width; x += step) {
