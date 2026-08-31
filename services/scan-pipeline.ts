@@ -400,11 +400,19 @@ function readBlueInkGridAnswers(params: {
 }) {
   const { alternatives, answerKeyLength, imageData } = params;
   const layout = getQuestionLayout(answerKeyLength, alternatives);
-  // The answer grid occupies the central card area. A blue object at the
-  // extreme page edge is commonly a pen/table reflection, not a response.
+  // The answer grid starts well inside the printed frame. A blue object at
+  // the frame edge is commonly the blue border/reflection, not a response.
+  // Keep a generous margin for photographed cards while excluding that edge
+  // noise (which would otherwise stretch the A-E calibration range).
   const components = keepLargestInkGrid(
     detectBlueInkComponents(imageData)
-      .filter((component) => component.x > imageData.width * 0.08 && component.x < imageData.width * 0.88),
+      .filter((component) =>
+        component.x > imageData.width * 0.16 &&
+        component.x < imageData.width * 0.88 &&
+        // Printed headings and footer rules form much larger blue blobs than
+        // a filled answer bubble; excluding them keeps row calibration stable.
+        component.area <= 400,
+      ),
     imageData.height,
   );
   if (components.length < Math.ceil(answerKeyLength * 0.7)) return [] as BubbleAnswerDetection[];

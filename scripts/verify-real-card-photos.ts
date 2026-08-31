@@ -7,6 +7,10 @@ Object.assign(globalThis, { document: { createElement: () => createCanvas(1, 1) 
 
 const cases = [
   {
+    answers: ["A", "C", "E", "B", "A", "D", "C", "B", "E", "D"],
+    file: "provascan-card-10q-clean.png",
+  },
+  {
     answers: ["A", "C", "E", "B", "A", "D", "", "C", "B", "D"],
     file: "provascan-card-10q-phone-photo.png",
   },
