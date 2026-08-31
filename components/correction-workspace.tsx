@@ -7,6 +7,7 @@ import {
   FileImage,
   ImagePlus,
   LoaderCircle,
+  RotateCcw,
   RefreshCw,
   Save,
   ScanSearch,
@@ -43,6 +44,7 @@ const PROCESSING_STEPS = [
 ] as const;
 
 type ScanPhase = "idle" | "processing" | "review" | "error";
+type ReviewFilter = "all" | "divergences" | "review" | "blank";
 type ScanAnswer = {
   confidence: number;
   correctAnswer: string;
@@ -107,6 +109,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
   const [notes, setNotes] = useState("Revisão manual obrigatória antes da confirmação final.");
   const [editingQuestion, setEditingQuestion] = useState<number | null>(null);
   const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewRotation, setPreviewRotation] = useState(0);
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
 
   const exam = data.exams.find((item) => item.id === examId) ?? data.exams[0];
   const answerKey = useMemo(
@@ -147,6 +152,14 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
     return { acertos, erros, percentual, revisao };
   }, [review]);
+  const visibleAnswers = useMemo(() => {
+    if (!review || reviewFilter === "all") return review?.answers ?? [];
+    return review.answers.filter((item) => {
+      if (reviewFilter === "divergences") return getAnswerState(item) === "erro";
+      if (reviewFilter === "blank") return item.markedAnswers.length === 0;
+      return item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1;
+    });
+  }, [review, reviewFilter]);
   if (!exam || !studentsForExam.length) {
     return (
       <Card className="p-6">
@@ -162,6 +175,12 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     data.students.find((item) => item.id === review?.matchedStudentId) ??
     studentsForSelectedClass.find((item) => item.id === preferredStudentId) ??
     studentsForSelectedClass[0];
+  const identityMismatch = Boolean(
+    review?.identificationMethod !== "manual" &&
+      review?.detectedName &&
+      selectedReviewStudent?.nome &&
+      normalizePersonName(review.detectedName) !== normalizePersonName(selectedReviewStudent.nome),
+  );
 
   const processSelectedImage = async (fileToProcess = selectedFile) => {
     if (!fileToProcess) {
@@ -321,6 +340,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
       setNotes("Revisão manual obrigatória antes da confirmação final.");
       setPhase("review");
       setPreviewZoom(1);
+      setPreviewRotation(0);
+      setReviewFilter("all");
+      setIdentityConfirmed(false);
       setEditingQuestion(null);
       setScreenMessage("");
     } catch (error) {
@@ -370,6 +392,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setPhase("review");
     setEditingQuestion(null);
     setPreviewZoom(1);
+    setPreviewRotation(0);
+    setReviewFilter("all");
+    setIdentityConfirmed(false);
     setScreenMessage("Modo manual habilitado. A imagem continua disponível para consulta.");
   };
 
@@ -435,6 +460,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
     setReview(null);
     setEditingQuestion(null);
     setPreviewZoom(1);
+    setPreviewRotation(0);
+    setReviewFilter("all");
+    setIdentityConfirmed(false);
     setProgress(0);
     setProgressLabel("Preparando fluxo...");
     setScreenMessage("Leitura fechada. Você pode enviar ou tirar outra foto.");
@@ -451,6 +479,11 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
 
     if (!review.matchedStudentId) {
       setErrorMessage("Selecione manualmente o aluno antes de confirmar a correção.");
+      return;
+    }
+
+    if (identityMismatch && !identityConfirmed) {
+      setErrorMessage("Confirme que o aluno selecionado é realmente o dono deste cartão antes de salvar.");
       return;
     }
 
@@ -626,6 +659,8 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   rawPreviewUrl={rawPreviewUrl}
                   zoom={previewZoom}
                   onZoomChange={setPreviewZoom}
+                  rotation={previewRotation}
+                  onRotationChange={setPreviewRotation}
                 />
               </div>
             </details>
@@ -751,8 +786,10 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                   </div>
                   <p className="mt-2 text-xs font-medium text-[var(--muted-foreground)]">
                     {summary.revisao > 0
-                      ? `${summary.revisao} ${summary.revisao === 1 ? "resposta precisa" : "respostas precisam"} de conferência antes de salvar.`
-                      : "Todas as respostas estão prontas para salvar."}
+                      ? `Revise ${summary.revisao} ${summary.revisao === 1 ? "resposta" : "respostas"} com baixa confiança ou marcação especial antes de salvar.`
+                      : summary.erros > 0
+                        ? `Confira ${summary.erros} ${summary.erros === 1 ? "divergência" : "divergências"} com o cartão.`
+                        : "Todas as respostas foram lidas com boa confiança."}
                   </p>
                 </div>
               </div>
@@ -778,9 +815,12 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 <Select
                   value={review.matchedStudentId}
                   onChange={(event) =>
-                    setReview((previous) =>
-                      previous ? { ...previous, matchedStudentId: event.target.value } : previous,
-                    )
+                    {
+                      setIdentityConfirmed(false);
+                      setReview((previous) =>
+                        previous ? { ...previous, matchedStudentId: event.target.value } : previous,
+                      );
+                    }
                   }
                 >
                   {studentsForSelectedClass.map((item) => (
@@ -791,16 +831,59 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
                 </Select>
               </FieldLabel>
               <p className="mt-3 text-sm text-[var(--muted-foreground)]">Se este não for o aluno, escolha o nome correto antes de salvar.</p>
+              {identityMismatch ? (
+                <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--error-border)] bg-[var(--error-soft)] p-3" role="alert">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">Confira o aluno antes de salvar</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">
+                    O cartão parece ser de <strong>{review.detectedName}</strong>, mas o aluno selecionado é <strong>{selectedReviewStudent.nome}</strong>.
+                  </p>
+                  <label className="mt-3 flex items-start gap-3 text-sm font-semibold text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 accent-[var(--accent)]"
+                      checked={identityConfirmed}
+                      onChange={(event) => setIdentityConfirmed(event.target.checked)}
+                    />
+                    Confirmo que selecionei o aluno correto para este cartão.
+                  </label>
+                </div>
+              ) : null}
             </div>
 
             <div>
               <h4 className="text-xl font-semibold text-[var(--foreground)]">Respostas marcadas pelo aluno</h4>
-              <p className="mt-1 text-sm text-[var(--muted-foreground)]">Cada cartão mostra uma questão e a resposta marcada.</p>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">{review.answers.length} questões detectadas. Cada cartão mostra uma questão e a resposta marcada.</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2" aria-label="Filtros de questões">
+              <span className="mr-1 text-sm font-semibold text-[var(--muted-foreground)]">Mostrar:</span>
+              {([
+                ["all", "Todas"],
+                ["divergences", "Divergências"],
+                ["review", "Para revisar"],
+                ["blank", "Em branco"],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={cn(
+                    "min-h-10 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]",
+                    reviewFilter === value
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]"
+                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] hover:border-[var(--accent)]",
+                  )}
+                  aria-pressed={reviewFilter === value}
+                  onClick={() => setReviewFilter(value)}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="text-sm text-[var(--muted-foreground)]">{visibleAnswers.length} exibidas</span>
             </div>
 
             <AnswerReviewGrid
               alternatives={exam.alternativas}
-              answers={review.answers}
+              answers={visibleAnswers}
               editingQuestion={editingQuestion}
               onEdit={setEditingQuestion}
               onMarkBlank={(question) => updateMarkedAnswer(question, [])}
@@ -823,7 +906,7 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
               </FieldLabel>
             </details>
 
-            <div className="sticky bottom-3 z-10 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)]">
+            <div className="relative mt-2 rounded-[24px] border border-[var(--border-strong)] bg-[var(--card-solid)] p-3 shadow-[0_18px_42px_rgba(0,0,0,0.18)]">
               <Button size="lg" className="min-h-14 w-full" data-testid="save-correction" loading={syncStatus === "saving"} onClick={confirmCorrection}>
                 <Save className="size-4" />
                 Salvar resultado
@@ -909,7 +992,12 @@ function AnswerReviewGrid({
           >
             <div className="flex items-center justify-between gap-3">
               <h5 className="text-lg font-semibold text-[var(--foreground)]">Questão {answer.question}</h5>
-              <Badge tone={isCorrect ? "success" : status === "erro" ? "error" : "warning"}>{getAnswerLabel(answer)}</Badge>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Badge tone={isCorrect ? "success" : status === "erro" ? "error" : "warning"}>{getAnswerLabel(answer)}</Badge>
+                <Badge tone={answer.confidence >= 85 ? "success" : answer.confidence >= MIN_CONFIDENCE_REVIEW ? "warning" : "error"}>
+                  {answer.confidence >= 85 ? "Leitura forte" : answer.confidence >= MIN_CONFIDENCE_REVIEW ? "Revisar" : "Baixa confiança"}
+                </Badge>
+              </div>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
@@ -962,12 +1050,16 @@ function AnswerReviewGrid({
 }
 
 function ImagePreviewCard({
+  onRotationChange,
   onZoomChange,
   rawPreviewUrl,
+  rotation,
   zoom,
 }: {
+  onRotationChange: (value: number) => void;
   onZoomChange: (value: number) => void;
   rawPreviewUrl: string;
+  rotation: number;
   zoom: number;
 }) {
   return (
@@ -977,6 +1069,7 @@ function ImagePreviewCard({
         helper="Confira se este é o cartão que deseja corrigir."
         src={rawPreviewUrl}
         emptyText="A foto aparece aqui depois de enviada."
+        rotation={rotation}
         zoom={zoom}
       />
       <div className="rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -985,7 +1078,24 @@ function ImagePreviewCard({
             <p className="text-sm font-semibold text-[var(--foreground)]">Aumentar foto</p>
             <p className="text-xs leading-5 text-[var(--muted-foreground)]">Use apenas se quiser conferir uma marcação no cartão.</p>
           </div>
-          <span className="text-sm font-semibold text-[var(--foreground)]">{Math.round(zoom * 100)}%</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[var(--border)] px-3 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => onRotationChange((rotation + 90) % 360)}
+            >
+              <RotateCcw className="size-4" aria-hidden="true" />
+              Girar
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-10 items-center rounded-full border border-[var(--border)] px-3 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+              onClick={() => { onRotationChange(0); onZoomChange(1); }}
+            >
+              Restaurar
+            </button>
+            <span className="text-sm font-semibold text-[var(--foreground)]">{Math.round(zoom * 100)}%</span>
+          </div>
         </div>
         <input
           aria-label="Controle de zoom da imagem"
@@ -1007,12 +1117,14 @@ function PreviewPane({
   helper,
   label,
   src,
+  rotation,
   zoom,
 }: {
   emptyText: string;
   helper: string;
   label: string;
   src: string;
+  rotation: number;
   zoom: number;
 }) {
   return (
@@ -1028,7 +1140,7 @@ function PreviewPane({
             src={src}
             alt={label}
             className="max-h-[420px] w-full origin-center object-contain transition-transform duration-300"
-            style={{ transform: `scale(${zoom})` }}
+            style={{ transform: `rotate(${rotation}deg) scale(${zoom})` }}
           />
         ) : (
           <p className="max-w-[240px] px-4 text-center text-sm leading-6 text-[var(--muted-foreground)]">{emptyText}</p>
@@ -1501,6 +1613,15 @@ function getAnswerState(answer: ScanAnswer) {
   }
 
   return answer.markedAnswers[0] === answer.correctAnswer ? "acerto" : "erro";
+}
+
+function normalizePersonName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function getAnswerLabel(answer: ScanAnswer) {
