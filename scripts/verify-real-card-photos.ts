@@ -11,6 +11,10 @@ const cases = [
     file: "provascan-card-10q-clean.png",
   },
   {
+    answers: ["A", "C", "E", "B", "A", "D", "C", "B", "E", "D"],
+    file: "provascan-card-10q-faint-blue.png",
+  },
+  {
     answers: ["A", "C", "E", "B", "A", "D", "", "C", "B", "D"],
     file: "provascan-card-10q-phone-photo.png",
   },
