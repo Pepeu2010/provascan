@@ -988,6 +988,7 @@ function scaleCanvas(source: HTMLCanvasElement, factor: number) {
 function getBubbleSignal(imageData: ImageData, cx: number, cy: number, radius: number) {
   let innerDark = 0;
   let innerTotal = 0;
+  let innerBlue = 0;
   let ringDark = 0;
   let ringTotal = 0;
   const left = Math.max(0, Math.floor(cx - radius));
@@ -1009,9 +1010,11 @@ function getBubbleSignal(imageData: ImageData, cx: number, cy: number, radius: n
 
       const index = (y * imageData.width + x) * 4;
       const isDark = pixelLuminance(imageData.data, index) < darkThreshold;
+      const isBlueInk = imageData.data[index + 2] > Math.max(imageData.data[index], imageData.data[index + 1]) + 8 && imageData.data[index + 2] > 55;
 
       if (distance <= innerRadius) {
         innerDark += isDark ? 1 : 0;
+        innerBlue += isBlueInk ? 1 : 0;
         innerTotal += 1;
       } else {
         ringDark += isDark ? 1 : 0;
@@ -1021,8 +1024,12 @@ function getBubbleSignal(imageData: ImageData, cx: number, cy: number, radius: n
   }
 
   const innerRatio = innerTotal ? innerDark / innerTotal : 0;
+  const blueRatio = innerTotal ? innerBlue / innerTotal : 0;
   const ringRatio = ringTotal ? ringDark / ringTotal : 0;
-  return innerRatio * 0.78 + ringRatio * 0.22;
+  // Color is a useful secondary signal after JPEG/lighting changes make a
+  // blue pen less dark than the printed outline. It only contributes inside
+  // the bubble, so blue headings and borders cannot inflate a row score.
+  return innerRatio * 0.68 + ringRatio * 0.18 + blueRatio * 0.14;
 }
 
 function getLocalDarkThreshold(imageData: ImageData, cx: number, cy: number, radius: number) {
