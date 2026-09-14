@@ -22,7 +22,9 @@ O ProvaScan centraliza turmas, alunos, provas, gabaritos e correções. A equipe
 - Cadastro e manutenção de turmas, alunos, provas, gabaritos e resultados.
 - Provas colaborativas por seções, com autoria de professores, revisão e liberação pela gestão.
 - Emissão de cartões-resposta e gabaritos em ordem, com seleção de estudantes para impressão.
-- Correção assistida por foto ou PDF: leitura de QR, identificação por OCR, detecção de bolhas e indicação de confiança.
+- Correção assistida por foto, imagem ou PDF, tanto para cartões ProvaScan quanto para provas externas que nunca foram cadastradas no sistema.
+- Descoberta estrutural de cartões externos por agrupamento de bolhas, linhas e colunas, com confirmação de questões, alternativas e matérias antes da correção.
+- Gabarito externo manual ou importado, lotes com vários alunos, modelos reutilizáveis e revisão focada apenas em múltiplas marcações, baixa confiança ou possível rasura.
 - Retificação de foto de celular quando as bordas da folha são detectadas com segurança; em caso de dúvida, a imagem original é preservada.
 - Painéis de resultados e acompanhamento de correções.
 - Perfis `professor`, `coordenador`, `vice_diretor` e `admin`. `admin` e `vice_diretor` compartilham o escopo de gestão institucional; coordenação possui gestão acadêmica; professores acessam suas provas atribuídas.
@@ -53,8 +55,13 @@ flowchart LR
   A --> S[Serviços server-only]
   S --> DB[(Supabase/Postgres)]
   A --> R[Upstash Redis]
-  B --> C[Canvas: QR, OCR e OMR]
-  C --> H[Revisão humana]
+  B --> D[Document decoder: imagem e PDF]
+  D --> C[Canvas: orientação, perspectiva, layout e OMR]
+  C --> T{Estrutura conhecida?}
+  T -->|ProvaScan| Q[QR e template como otimizadores]
+  T -->|Externa| E[Descoberta e confirmação estrutural]
+  Q --> H[Revisão humana]
+  E --> H
   H --> A
 ```
 
@@ -75,6 +82,12 @@ A correção é executada no dispositivo do usuário:
 Para foto de celular, o sistema tenta nivelar a folha por transformação projetiva apenas quando detecta um documento plausível. A qualidade da imagem, iluminação, sombra, corte e impressão ainda afetam o resultado. O OCR não substitui a conferência humana.
 
 As imagens usadas nesse fluxo não são enviadas para armazenamento de arquivos pelo fluxo atual de correção. O endpoint `/api/scan` é protegido e limitado, mas hoje retorna uma análise demonstrativa; a leitura operacional do cartão acontece no cliente.
+
+### Provas externas
+
+Em **Correção → Prova externa**, o professor pode fotografar ou importar uma imagem/PDF. O documento passa pelo mesmo decoder e analisador visual; PDFs são renderizados página a página e o canvas é liberado depois da análise. O sistema propõe quantidade de questões, alternativas e colunas, e tenta reconhecer matérias quando encontra intervalos textuais contínuos. Nada é corrigido até a estrutura ser confirmada.
+
+O gabarito pode ser digitado ou lido de outra folha. Depois, várias folhas usam a mesma configuração. Marcações ambíguas mantêm todas as alternativas detectadas e geram revisão com confiança e recorte local; a nota só é aceita pelo servidor depois que o lote não possui pendências. Imagens e recortes ficam apenas na memória do navegador. A persistência guarda estrutura, gabarito e respostas como snapshots, permitindo auditar o resultado mesmo que o modelo reutilizável mude no futuro.
 
 ## Stack
 
@@ -146,6 +159,11 @@ Revise e aplique as migrations de [`supabase/migrations`](./supabase/migrations)
 | Servidor de produção | `npm run start` |
 | OCR com fixture | `npm run test:ocr-fixture` |
 | Foto de celular com fixture | `npm run test:mobile-photo-fixture` |
+| Núcleo do corretor universal | `npm run test:universal-exam-core` |
+| Entrada segura e layout externo | `npm run test:universal-document` |
+| PDF escaneado multipágina | `npm run test:universal-pdf` |
+| Persistência externa | `npm run test:universal-persistence` |
+| Fluxo de correção externa | `npm run test:universal-correction-flow` |
 | Fluxo de autenticação | `npm run test:auth-flow` |
 | Acesso colaborativo | `npm run test:collaborative-access` |
 | Impressão colaborativa | `npm run test:collaborative-printing` |
@@ -178,6 +196,8 @@ A aplicação publicada está em [provascan-app.vercel.app](https://provascan-ap
 ## Limitações conhecidas
 
 - A leitura de cartões depende de impressão legível e imagem bem enquadrada; respostas ambíguas exigem revisão.
+- O detector estrutural externo é baseado em grades de bolhas/caixas repetidas. Provas em que as alternativas aparecem apenas como texto corrido, sem região visual marcável, ainda exigem configuração ou um cartão-resposta compatível.
+- A fixture de fotografia difícil recupera atualmente 40 das 45 linhas no modo estrutural genérico; por segurança, divergências de quantidade interrompem a correção e pedem nova imagem ou ajuste, sem inventar respostas.
 - O processamento local de OCR pode ser mais lento em aparelhos de menor capacidade.
 - A abertura da janela de impressão depende de o navegador permitir pop-ups para o site.
 - Não existe um script npm de provisionamento automático do Supabase.
