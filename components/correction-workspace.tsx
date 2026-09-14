@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   X,
@@ -92,6 +92,12 @@ type PreprocessResult = {
 
 export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) {
   const [correctionMode, setCorrectionMode] = useState<"chooser" | "provascan" | "external">("chooser");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("modo") !== "externa") return;
+    const timeout = window.setTimeout(() => setCorrectionMode("external"), 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   if (correctionMode === "external") {
     return <ExternalCorrectionWorkspace onBack={() => setCorrectionMode("chooser")} />;

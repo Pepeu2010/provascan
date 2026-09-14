@@ -15,22 +15,21 @@ import {
   inferSubjectsFromText,
   normalizeAnswerKey,
   validateExamStructure,
-  type UniversalDetectedAnswer,
   type UniversalExamStructure,
 } from "@/services/universal-exam-core";
 import { analyzeUniversalPage, type UniversalBubbleRow } from "@/services/universal-layout-analysis";
 import { extractTextFromImage } from "@/services/ocr";
 import type { ExternalExamTemplate } from "@/types/universal-exams";
+import {
+  EXTERNAL_CORRECTION_DRAFT_KEY,
+  parseExternalCorrectionDraft,
+  serializeExternalCorrectionDraft,
+  type DraftBatchItem,
+  type ExternalCorrectionStage,
+} from "@/lib/external-correction-draft";
 
-type Stage = "source" | "structure" | "key" | "students" | "review" | "results";
-type BatchResult = {
-  answers: UniversalDetectedAnswer[];
-  elapsedMs: number;
-  grade: ReturnType<typeof gradeObjectiveAnswers>;
-  previewUrls: Record<number, string>;
-  sourceLabel: string;
-  studentName: string;
-};
+type Stage = ExternalCorrectionStage | "results";
+type BatchResult = DraftBatchItem;
 
 const STEPS: Array<{ id: Stage; label: string }> = [
   { id: "source", label: "Documento" },
@@ -56,6 +55,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   const keyFileRef = useRef<HTMLInputElement | null>(null);
   const studentFilesRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const draftReadyRef = useRef(false);
   const [stage, setStage] = useState<Stage>("source");
   const [templates, setTemplates] = useState<ExternalExamTemplate[]>([]);
   const [structure, setStructure] = useState<UniversalExamStructure | null>(null);
@@ -85,6 +85,48 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       .catch(() => undefined);
     return () => { active = false; abortRef.current?.abort(); };
   }, []);
+
+  useEffect(() => {
+    const draft = parseExternalCorrectionDraft(window.localStorage.getItem(EXTERNAL_CORRECTION_DRAFT_KEY));
+    const timeout = window.setTimeout(() => {
+      if (draft && draft.stage !== "source") {
+        setStage(draft.stage);
+        setStructure(draft.structure);
+        setTotalQuestions(draft.totalQuestions);
+        setAlternativeCount(draft.alternativeCount);
+        setColumnCount(draft.columnCount);
+        setSubjectsText(draft.subjectsText);
+        setAnswerKey(draft.answerKey);
+        setAnswerKeyText(draft.answerKeyText);
+        setTemplateId(draft.templateId);
+        setTemplateName(draft.templateName);
+        setBatch(draft.batch);
+        setMessage("Retomamos sua última correção salva neste aparelho.");
+      }
+      draftReadyRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReadyRef.current || stage === "results") return;
+    const timeout = window.setTimeout(() => {
+      window.localStorage.setItem(EXTERNAL_CORRECTION_DRAFT_KEY, serializeExternalCorrectionDraft({
+        alternativeCount,
+        answerKey,
+        answerKeyText,
+        batch,
+        columnCount,
+        stage,
+        structure,
+        subjectsText,
+        templateId,
+        templateName,
+        totalQuestions,
+      }));
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [alternativeCount, answerKey, answerKeyText, batch, columnCount, stage, structure, subjectsText, templateId, templateName, totalQuestions]);
 
   const issueCount = useMemo(
     () => batch.reduce((sum, item) => sum + item.grade.reviewQuestions.length, 0),
@@ -358,6 +400,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       if (!response.ok) throw new Error(body.error || "Não foi possível salvar o lote.");
       setProgress(100);
       setStage("results");
+      window.localStorage.removeItem(EXTERNAL_CORRECTION_DRAFT_KEY);
       setMessage(`${batch.length} ${batch.length === 1 ? "correção salva" : "correções salvas"} no histórico externo.`);
       setError("");
     } catch (caught) {
@@ -450,6 +493,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   }
 
   function resetFlow() {
+    window.localStorage.removeItem(EXTERNAL_CORRECTION_DRAFT_KEY);
     setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setTemplateId(null); setTemplateName(""); setPreviewUrl(""); setMessage(""); setError("");
   }
 }

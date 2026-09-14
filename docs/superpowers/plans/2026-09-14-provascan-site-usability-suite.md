@@ -26,11 +26,11 @@
 
 **Files:** `lib/external-correction-draft.ts`, `scripts/verify-external-correction-draft.ts`, `components/external-correction-workspace.tsx`, `components/dashboard-workspace.tsx`, `components/dashboard-sidebar.tsx`, `components/dashboard-shell.tsx`, `package.json`
 
-- [ ] Add a failing draft-contract test covering versioning, expiration, sanitization, and resume labels.
-- [ ] Implement the draft codec and browser persistence adapter.
-- [ ] Wire autosave/recovery into the external correction stages without storing file blobs or preview URLs.
-- [ ] Add **Continuar última correção** and rename the feature to **Corrigir provas**.
-- [ ] Run the focused test, typecheck, and lint; commit the slice.
+- [x] Add a failing draft-contract test covering versioning, expiration, sanitization, and resume labels.
+- [x] Implement the draft codec and browser persistence adapter.
+- [x] Wire autosave/recovery into the external correction stages without storing file blobs or preview URLs.
+- [x] Add **Continuar última correção** and rename the feature to **Corrigir provas**.
+- [x] Run the focused test, typecheck, and lint; commit the slice.
 
 ## Task 2: Pilot reading, capture quality, and batch reliability
 
