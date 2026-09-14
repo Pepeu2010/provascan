@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Check, FileImage, FileText, LoaderCircle, Save, ScanSearch, Upload, WandSparkles } from "lucide-react";
+import { AlertTriangle, Camera, Check, CheckCircle2, FileImage, FileText, LoaderCircle, RefreshCw, Save, ScanSearch, Upload, WandSparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,6 +20,15 @@ import {
 import { analyzeUniversalPage, type UniversalBubbleRow } from "@/services/universal-layout-analysis";
 import { extractTextFromImage } from "@/services/ocr";
 import type { ExternalExamTemplate } from "@/types/universal-exams";
+import { measureCaptureQuality, type CaptureQualityResult } from "@/services/capture-quality";
+import {
+  completeBatchItem,
+  createBatchQueue,
+  failBatchItem,
+  retryFailedBatchItems,
+  startBatchItem,
+  type CorrectionBatchItem,
+} from "@/lib/correction-batch";
 import {
   EXTERNAL_CORRECTION_DRAFT_KEY,
   parseExternalCorrectionDraft,
@@ -55,6 +64,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   const keyFileRef = useRef<HTMLInputElement | null>(null);
   const studentFilesRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const pendingFilesRef = useRef<File[]>([]);
   const draftReadyRef = useRef(false);
   const [stage, setStage] = useState<Stage>("source");
   const [templates, setTemplates] = useState<ExternalExamTemplate[]>([]);
@@ -68,6 +78,9 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [batch, setBatch] = useState<BatchResult[]>([]);
+  const [batchQueue, setBatchQueue] = useState<CorrectionBatchItem[]>([]);
+  const [pilotQuality, setPilotQuality] = useState<CaptureQualityResult | null>(null);
+  const [pilotReady, setPilotReady] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -301,64 +314,110 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     }
   };
 
-  const processStudentFiles = async (files: File[]) => {
+  const inspectStudentPilot = async (files: File[]) => {
     if (!structure || answerKey.length !== structure.totalQuestions || !files.length) return;
-    beginProcessing("Preparando folhas dos alunos...", 5);
+    pendingFilesRef.current = files;
+    const initialQueue = createBatchQueue(files.map((file) => file.name));
+    let nextQueue = startBatchItem(initialQueue, initialQueue[0].id);
+    setBatchQueue(nextQueue);
+    setBatch([]);
+    setPilotReady(false);
+    beginProcessing("Fazendo uma leitura de teste...", 5);
     const controller = new AbortController();
     abortRef.current = controller;
-    const results: BatchResult[] = [];
     try {
-      for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
-        const file = files[fileIndex];
-        const startedAt = window.performance.now();
-        const pageRows: Array<Array<UniversalBubbleRow & { previewUrl: string }>> = [];
-        await processDocumentPages(file, { signal: controller.signal, onPage: (page, total) => {
-          setProgressLabel(`Arquivo ${fileIndex + 1} de ${files.length}: página ${page} de ${total}...`);
-          setProgress(Math.round(((fileIndex + page / total) / files.length) * 70));
-        }, onDecodedPage: (page) => {
-          const analyzed = analyzeUniversalPage(page);
-          pageRows.push(analyzed.layout.rows.map((row) => ({
-            ...row,
-            previewUrl: row.marks.status !== "marked" && row.marks.status !== "blank"
-              ? cropRowPreview(analyzed.canvas, row)
-              : "",
-          })));
-        } });
-        const groups = groupPagesAsSheets(pageRows, structure.totalQuestions);
-        groups.forEach((rows, groupIndex) => {
-          const answers = rows.slice(0, structure.totalQuestions).map((row, index) => ({
-            confidence: row.marks.confidence,
-            detectedAnswers: row.marks.markedIndexes.map((mark) => structure.alternatives[mark]).filter(Boolean),
-            question: index + 1,
-            status: row.marks.status,
-          }));
-          const sourceLabel = safeSourceLabel(`${file.name}${groups.length > 1 ? ` · página ${groupIndex + 1}` : ""}`);
-          results.push({
-            answers,
-            elapsedMs: Math.round((window.performance.now() - startedAt) / Math.max(groups.length, 1)),
-            grade: gradeObjectiveAnswers({ answerKey, answers, maxScore: 10 }),
-            previewUrls: Object.fromEntries(rows
-              .map((row, index) => ({ question: index + 1, row }))
-              .filter(({ row }) => row.marks.status !== "marked" && row.marks.status !== "blank")
-              .map(({ question, row }) => [question, row.previewUrl])),
-            sourceLabel,
-            studentName: `Aluno ${results.length + 1}`,
-          });
-        });
-      }
-      setBatch(results);
-      setStage("review");
+      const pilot = await analyzeStudentFile(files[0], 0, files.length, controller.signal);
+      nextQueue = completeBatchItem(nextQueue, initialQueue[0].id, pilot.results.length);
+      setBatchQueue(nextQueue);
+      setBatch(pilot.results);
+      setPilotQuality(pilot.quality);
+      setPilotReady(true);
       setProgress(100);
-      setMessage(results.some((item) => item.grade.reviewQuestions.length)
-        ? "Leitura concluída. Revise somente as questões indicadas abaixo."
-        : "Leitura concluída sem marcações ambíguas. Confira os nomes e salve.");
+      setMessage("Leitura de teste concluída. Confira o resultado antes de liberar o restante do lote.");
       setError("");
     } catch (caught) {
-      setError(readError(caught, "Não foi possível processar todas as folhas."));
+      const reason = readError(caught, "Não foi possível ler a primeira folha.");
+      setBatchQueue(failBatchItem(nextQueue, initialQueue[0].id, reason));
+      setError(reason);
     } finally {
       setProcessing(false);
       abortRef.current = null;
     }
+  };
+
+  const processRemainingFiles = async (retryFailures = false) => {
+    if (!structure) return;
+    const files = pendingFilesRef.current;
+    let queue = retryFailures ? retryFailedBatchItems(batchQueue) : batchQueue;
+    let results = [...batch];
+    setBatchQueue(queue);
+    beginProcessing(retryFailures ? "Tentando novamente somente as falhas..." : "Processando o restante do lote...", 5);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      for (let index = 0; index < queue.length; index += 1) {
+        if (queue[index].status !== "pending") continue;
+        queue = startBatchItem(queue, queue[index].id);
+        setBatchQueue(queue);
+        try {
+          const analyzed = await analyzeStudentFile(files[index], index, files.length, controller.signal);
+          results = [...results, ...analyzed.results.map((item, itemIndex) => ({ ...item, studentName: `Aluno ${results.length + itemIndex + 1}` }))];
+          queue = completeBatchItem(queue, queue[index].id, analyzed.results.length);
+        } catch (caught) {
+          queue = failBatchItem(queue, queue[index].id, readError(caught, "Falha ao processar este arquivo."));
+        }
+        setBatchQueue(queue);
+        setBatch(results);
+      }
+      setProgress(100);
+      if (queue.some((item) => item.status === "failed")) {
+        setError("Alguns arquivos falharam. Os resultados concluídos foram preservados; tente novamente somente as falhas.");
+      } else {
+        setStage("review");
+        setMessage(results.some((item) => item.grade.reviewQuestions.length)
+          ? "Leitura concluída. Revise somente as questões indicadas abaixo."
+          : "Leitura concluída sem marcações ambíguas. Confira os nomes e salve.");
+        setError("");
+      }
+    } finally {
+      setProcessing(false);
+      abortRef.current = null;
+    }
+  };
+
+  const analyzeStudentFile = async (file: File, fileIndex: number, totalFiles: number, signal: AbortSignal) => {
+    const startedAt = window.performance.now();
+    const pageRows: Array<Array<UniversalBubbleRow & { previewUrl: string }>> = [];
+    let quality: CaptureQualityResult | null = null;
+    await processDocumentPages(file, { signal, onPage: (page, total) => {
+      setProgressLabel(`Arquivo ${fileIndex + 1} de ${totalFiles}: página ${page} de ${total}...`);
+      setProgress(Math.round(((fileIndex + page / total) / totalFiles) * 90));
+    }, onDecodedPage: (page) => {
+      const analyzed = analyzeUniversalPage(page);
+      quality ??= measureCaptureQuality(analyzed.canvas);
+      pageRows.push(analyzed.layout.rows.map((row) => ({
+        ...row,
+        previewUrl: row.marks.status !== "marked" && row.marks.status !== "blank" ? cropRowPreview(analyzed.canvas, row) : "",
+      })));
+    } });
+    const groups = groupPagesAsSheets(pageRows, structure!.totalQuestions);
+    const results = groups.map((rows, groupIndex) => {
+      const answers = rows.slice(0, structure!.totalQuestions).map((row, index) => ({
+        confidence: row.marks.confidence,
+        detectedAnswers: row.marks.markedIndexes.map((mark) => structure!.alternatives[mark]).filter(Boolean),
+        question: index + 1,
+        status: row.marks.status,
+      }));
+      return {
+        answers,
+        elapsedMs: Math.round((window.performance.now() - startedAt) / Math.max(groups.length, 1)),
+        grade: gradeObjectiveAnswers({ answerKey, answers, maxScore: 10 }),
+        previewUrls: Object.fromEntries(rows.map((row, index) => ({ question: index + 1, row })).filter(({ row }) => row.marks.status !== "marked" && row.marks.status !== "blank").map(({ question, row }) => [question, row.previewUrl])),
+        sourceLabel: safeSourceLabel(`${file.name}${groups.length > 1 ? ` · página ${groupIndex + 1}` : ""}`),
+        studentName: `Aluno ${groupIndex + 1}`,
+      } satisfies BatchResult;
+    });
+    return { quality: quality ?? measureCaptureQuality(document.createElement("canvas")), results };
   };
 
   const resolveQuestion = (batchIndex: number, question: number, answer: string) => {
@@ -457,7 +516,15 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
 
       {stage === "students" && structure ? <Card className="p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Adicionar folhas dos alunos</h3><p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">Selecione várias imagens ou um PDF multipágina. Cada página completa vira uma correção independente; páginas parciais são reunidas até completar a prova.</p></div><Badge tone="accent">{structure.totalQuestions} questões</Badge></div>
-        <button type="button" className="mt-5 flex min-h-44 w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-6 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" onClick={() => studentFilesRef.current?.click()}><ScanSearch className="size-8 text-[var(--accent)]" /><strong className="mt-3 text-base text-[var(--foreground)]">Selecionar folhas para corrigir</strong><span className="mt-1 text-sm text-[var(--muted-foreground)]">Imagens ou PDF, inclusive multipágina</span></button>
+        {!batchQueue.length ? <button type="button" className="mt-5 flex min-h-44 w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] p-6 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" onClick={() => studentFilesRef.current?.click()}><ScanSearch className="size-8 text-[var(--accent)]" /><strong className="mt-3 text-base text-[var(--foreground)]">Selecionar folhas para corrigir</strong><span className="mt-1 text-sm text-[var(--muted-foreground)]">Primeiro faremos um teste com apenas uma folha</span></button> : null}
+
+        {pilotReady ? <div className="mt-5 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface)] p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h4 className="font-semibold text-[var(--foreground)]">Leitura de teste pronta</h4><p className="mt-1 text-sm text-[var(--muted-foreground)]">{batch[0]?.grade.summary.correct ?? 0} acertos detectados e {batch[0]?.grade.reviewQuestions.length ?? 0} pontos para revisar na primeira folha.</p></div><Badge tone={pilotQuality?.accepted ? "success" : "warning"}>{pilotQuality?.accepted ? "Foto adequada" : "Melhore a captura"}</Badge></div>
+          {pilotQuality?.issues.length ? <div className="mt-4 grid gap-2">{pilotQuality.issues.map((issue) => <div key={issue.code} className="flex gap-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-3"><AlertTriangle className="mt-0.5 size-5 shrink-0 text-[var(--warning)]" /><div><strong className="text-sm text-[var(--foreground)]">{issue.label}</strong><p className="mt-1 text-sm text-[var(--muted-foreground)]">{issue.advice}</p></div></div>)}</div> : <p className="mt-4 flex items-center gap-2 rounded-xl bg-[var(--success-soft)] px-4 py-3 text-sm text-[var(--foreground)]"><CheckCircle2 className="size-5 text-[var(--success)]" />Nitidez, luz e enquadramento parecem adequados.</p>}
+          <div className="mt-4 flex flex-wrap gap-3"><Button size="lg" onClick={() => void processRemainingFiles()}>A leitura parece boa — corrigir lote</Button><Button variant="secondary" onClick={() => { setBatchQueue([]); setBatch([]); setPilotReady(false); setPilotQuality(null); pendingFilesRef.current = []; }}>Escolher outras fotos</Button></div>
+        </div> : null}
+
+        {batchQueue.length ? <div className="mt-5 rounded-2xl border border-[var(--border)] p-4"><div className="flex items-center justify-between gap-3"><h4 className="font-semibold text-[var(--foreground)]">Andamento do lote</h4><span className="text-sm text-[var(--muted-foreground)]">{batchQueue.filter((item) => item.status === "done").length} de {batchQueue.length}</span></div><div className="mt-3 grid gap-2">{batchQueue.map((item) => <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-[var(--surface)] px-3 py-3 sm:flex-row sm:items-center"><span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--foreground)]">{item.label}</span><Badge tone={item.status === "done" ? "success" : item.status === "failed" ? "error" : item.status === "processing" ? "accent" : "neutral"}>{item.status === "done" ? `${item.sheetCount} concluída(s)` : item.status === "failed" ? "Falhou" : item.status === "processing" ? "Processando" : "Aguardando"}</Badge>{item.error ? <span className="text-xs text-[var(--error)]">{item.error}</span> : null}</div>)}</div>{batchQueue.some((item) => item.status === "failed") && pilotReady ? <Button className="mt-4" variant="secondary" onClick={() => void processRemainingFiles(true)}><RefreshCw className="size-4" />Tentar somente as falhas</Button> : null}</div> : null}
         <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h4 className="font-semibold text-[var(--foreground)]">Salvar como modelo de correção</h4><p className="mt-1 text-sm text-[var(--muted-foreground)]">Reutilize esta estrutura e este gabarito em outra turma.</p></div>{templateId ? <Badge tone="success">Modelo salvo</Badge> : null}</div><div className="mt-3 flex flex-col gap-3 sm:flex-row"><Input aria-label="Nome do modelo" placeholder="Ex.: Simulado Geral — 1º EM" value={templateName} onChange={(event) => setTemplateName(event.target.value)} /><Button variant="secondary" disabled={processing || Boolean(templateId)} onClick={() => void saveTemplate()}><Save className="size-4" />Salvar modelo</Button></div></div>
       </Card> : null}
 
@@ -477,7 +544,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       <input ref={imageRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { void inspectStructureDocument(event.target.files?.[0] ?? null); event.target.value = ""; }} />
       <input ref={pdfRef} className="hidden" type="file" accept="application/pdf" onChange={(event) => { void inspectStructureDocument(event.target.files?.[0] ?? null); event.target.value = ""; }} />
       <input ref={keyFileRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => { void importAnswerKey(event.target.files?.[0] ?? null); event.target.value = ""; }} />
-      <input ref={studentFilesRef} className="hidden" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => { void processStudentFiles(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+      <input ref={studentFilesRef} className="hidden" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => { void inspectStudentPilot(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
     </div>
   );
 
@@ -494,7 +561,8 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
 
   function resetFlow() {
     window.localStorage.removeItem(EXTERNAL_CORRECTION_DRAFT_KEY);
-    setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setTemplateId(null); setTemplateName(""); setPreviewUrl(""); setMessage(""); setError("");
+    pendingFilesRef.current = [];
+    setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setBatchQueue([]); setPilotReady(false); setPilotQuality(null); setTemplateId(null); setTemplateName(""); setPreviewUrl(""); setMessage(""); setError("");
   }
 }
 

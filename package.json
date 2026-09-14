@@ -17,6 +17,8 @@
     "test:universal-correction-flow": "npx --no-install tsx scripts/verify-universal-correction-flow.ts",
     "test:universal-pdf": "npx --no-install tsx scripts/verify-universal-pdf.ts",
     "test:external-correction-draft": "npx --no-install tsx scripts/verify-external-correction-draft.ts",
+    "test:capture-quality": "npx --no-install tsx scripts/verify-capture-quality.ts",
+    "test:correction-batch": "npx --no-install tsx scripts/verify-correction-batch.ts",
     "test:auth-flow": "npx --no-install tsx scripts/verify-auth-flow.ts",
     "test:collaborative-access": "npx --no-install tsx scripts/verify-collaborative-access.ts",
     "test:collaborative-printing": "npx --no-install tsx scripts/verify-collaborative-printing.ts",

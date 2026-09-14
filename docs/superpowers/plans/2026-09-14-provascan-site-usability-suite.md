@@ -36,11 +36,11 @@
 
 **Files:** `services/capture-quality.ts`, `lib/correction-batch.ts`, `scripts/verify-capture-quality.ts`, `scripts/verify-correction-batch.ts`, `components/external-correction-workspace.tsx`, `package.json`
 
-- [ ] Add failing tests for blur/exposure/crop advice and batch state transitions.
-- [ ] Implement deterministic quality classification and queue transitions.
-- [ ] Add a first-file pilot step before full-batch processing.
-- [ ] Show per-file states, failure reasons, and **Tentar falhas novamente**.
-- [ ] Run focused tests and commit the slice.
+- [x] Add failing tests for blur/exposure/crop advice and batch state transitions.
+- [x] Implement deterministic quality classification and queue transitions.
+- [x] Add a first-file pilot step before full-batch processing.
+- [x] Show per-file states, failure reasons, and **Tentar falhas novamente**.
+- [x] Run focused tests and commit the slice.
 
 ## Task 3: Flexible grading and safer identity review
 
