@@ -14,6 +14,7 @@ import {
   UserRoundSearch,
   WandSparkles,
 } from "lucide-react";
+import { ExternalCorrectionWorkspace } from "@/components/external-correction-workspace";
 import { useAppData } from "@/components/app-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,32 @@ type PreprocessResult = {
 };
 
 export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) {
+  const [correctionMode, setCorrectionMode] = useState<"chooser" | "provascan" | "external">("chooser");
+
+  if (correctionMode === "external") {
+    return <ExternalCorrectionWorkspace onBack={() => setCorrectionMode("chooser")} />;
+  }
+
+  if (correctionMode === "provascan") {
+    return <ProvaScanCorrectionWorkspace compact={compact} onBack={() => setCorrectionMode("chooser")} />;
+  }
+
+  return (
+    <div className="grid max-w-4xl gap-5">
+      <Card className="border-[var(--border-strong)] p-5 sm:p-6">
+        <Badge tone="accent">Correção</Badge>
+        <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">Qual prova você quer corrigir?</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted-foreground)]">Escolha o caminho que corresponde ao documento que você já tem em mãos.</p>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <button type="button" className="group min-h-48 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] p-5 text-left transition-[border-color,transform] hover:-translate-y-0.5 hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] motion-reduce:transform-none" onClick={() => setCorrectionMode("provascan")}><span className="grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><ScanSearch className="size-5" /></span><strong className="mt-8 block text-xl text-[var(--foreground)]">Prova do ProvaScan</strong><span className="mt-2 block text-sm leading-6 text-[var(--muted-foreground)]">Use o gabarito, o QR e a geometria já cadastrados no sistema.</span></button>
+          <button type="button" className="group min-h-48 rounded-[24px] border border-[var(--accent)] bg-[var(--accent-soft)] p-5 text-left transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] motion-reduce:transform-none" onClick={() => setCorrectionMode("external")}><span className="grid size-11 place-items-center rounded-xl bg-[var(--accent)] text-white"><FileImage className="size-5" /></span><strong className="mt-8 block text-xl text-[var(--foreground)]">Prova externa</strong><span className="mt-2 block text-sm leading-6 text-[var(--muted-foreground)]">Detecte e confirme uma prova feita no Word, escola, apostila ou outro sistema.</span></button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: boolean; onBack: () => void }) {
   const { data, saveCorrection, syncStatus } = useAppData();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -524,6 +551,9 @@ export function CorrectionWorkspace({ compact = false }: { compact?: boolean }) 
         review ? "2xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.65fr)]" : "max-w-4xl",
       )}
     >
+      <div className="2xl:col-span-2">
+        <button type="button" className="text-sm font-semibold text-[var(--accent)] hover:underline" onClick={onBack}>← Voltar aos tipos de correção</button>
+      </div>
       <Card className="correction-workspace__control border-[var(--border-strong)] p-5 sm:p-6">
         <div className={cn("grid gap-5", compact ? "" : "")}>
           <div className="correction-workspace__intro">
