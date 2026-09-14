@@ -6,19 +6,32 @@ import { externalCorrectionBatchSchema, externalCorrectionSchema } from "@/lib/u
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
-import { getExternalExamTemplate, saveExternalCorrections } from "@/services/external-exams";
+import { getExternalExamTemplate, listExternalCorrections, saveExternalCorrections } from "@/services/external-exams";
 import { gradeObjectiveAnswers } from "@/services/universal-exam-core";
 import { appendAuditEvent } from "@/services/supabase-data";
 
 export const runtime = "nodejs";
 
+async function authorizedSession() {
+  const validation = await validateSessionToken((await cookies()).get(AUTH_COOKIE_NAME)?.value);
+  if (!validation.ok) return null;
+  return isTeacherRole(validation.session.role) || canManageAcademicExams(validation.session.role) ? validation : null;
+}
+
+export async function GET() {
+  const validation = await authorizedSession();
+  if (!validation) return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
+  try {
+    return NextResponse.json({ corrections: await listExternalCorrections(validation.session.id) }, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Não foi possível carregar o histórico de correções externas." }, { status: 503 });
+  }
+}
+
 export async function POST(request: Request) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
-  const validation = await validateSessionToken((await cookies()).get(AUTH_COOKIE_NAME)?.value);
-  if (!validation.ok) return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
-  if (!isTeacherRole(validation.session.role) && !canManageAcademicExams(validation.session.role)) {
-    return NextResponse.json({ error: "Seu perfil não pode salvar correções." }, { status: 403 });
-  }
+  const validation = await authorizedSession();
+  if (!validation) return NextResponse.json({ error: "Seu perfil não pode salvar correções." }, { status: 403 });
   const limit = await consumeRateLimit({
     bucket: "external-correction-create",
     key: buildRateLimitKey(getClientIp(request.headers), validation.session.id),
