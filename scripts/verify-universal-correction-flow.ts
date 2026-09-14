@@ -5,6 +5,8 @@ import path from "node:path";
 const root = process.cwd();
 const correction = fs.readFileSync(path.join(root, "components", "correction-workspace.tsx"), "utf8");
 const external = fs.readFileSync(path.join(root, "components", "external-correction-workspace.tsx"), "utf8");
+const reports = fs.readFileSync(path.join(root, "components", "management-workspace.tsx"), "utf8");
+const correctionApi = fs.readFileSync(path.join(root, "app", "api", "external-corrections", "route.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260914180000_universal_external_exams.sql"), "utf8");
 
 for (const contract of ["Prova do ProvaScan", "Prova externa", "ExternalCorrectionWorkspace"]) {
@@ -30,6 +32,8 @@ for (const contract of [
 assert.match(external, /multiple_marks/);
 assert.match(external, /decodeDocumentPages/);
 assert.match(external, /processDocumentPages/);
+assert.match(correctionApi, /export async function GET/);
+assert.match(reports, /Histórico de correções externas/);
 assert.match(external, /analyzeUniversalPage/);
 assert.match(migration, /enable row level security/i);
 assert.match(migration, /revoke all/i);

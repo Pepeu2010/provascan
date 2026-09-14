@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import type { ExternalCorrectionInput, ExternalTemplateInput } from "@/lib/universal-exam-validation";
-import type { ExternalExamTemplate } from "@/types/universal-exams";
+import type { ExternalCorrectionRecord, ExternalExamTemplate } from "@/types/universal-exams";
 
 function db() {
   const url = process.env.SUPABASE_URL;
@@ -62,6 +62,27 @@ export async function getExternalExamTemplate(ownerId: string, templateId: strin
     structure: data.structure as ExternalExamTemplate["structure"],
     updatedAt: String(data.updated_at),
   };
+}
+
+export async function listExternalCorrections(ownerId: string): Promise<ExternalCorrectionRecord[]> {
+  const { data, error } = await db()
+    .from("external_corrections")
+    .select("id,template_id,student_name,source_label,structure_snapshot,answer_key_snapshot,answers,summary,corrected_at")
+    .eq("owner_id", ownerId)
+    .order("corrected_at", { ascending: false })
+    .limit(200);
+  ensure(error);
+  return (data ?? []).map((row) => ({
+    answerKey: Array.isArray(row.answer_key_snapshot) ? row.answer_key_snapshot.map(String) : [],
+    answers: Array.isArray(row.answers) ? row.answers as ExternalCorrectionRecord["answers"] : [],
+    correctedAt: String(row.corrected_at),
+    id: String(row.id),
+    sourceLabel: String(row.source_label),
+    studentName: String(row.student_name),
+    structure: row.structure_snapshot as ExternalCorrectionRecord["structure"],
+    summary: row.summary as ExternalCorrectionRecord["summary"],
+    templateId: row.template_id ? String(row.template_id) : null,
+  }));
 }
 
 export async function saveExternalCorrections(

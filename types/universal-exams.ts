@@ -10,11 +10,13 @@ export type ExternalExamTemplate = {
 };
 
 export type ExternalCorrectionRecord = {
+  answerKey: string[];
   answers: UniversalDetectedAnswer[];
   correctedAt: string;
   id: string;
   sourceLabel: string;
   studentName: string;
+  structure: UniversalExamStructure;
   summary: {
     blank: number;
     correct: number;
