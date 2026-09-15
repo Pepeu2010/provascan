@@ -85,10 +85,10 @@
 
 **Files:** `lib/print-preflight.ts`, `scripts/verify-print-preflight.ts`, print-related components, `app/globals.css`, `package.json`
 
-- [ ] Add a failing test for paper size, scale warnings, calibration marks, and instruction content.
-- [ ] Implement reusable preflight/calibration document builders.
-- [ ] Gate print actions behind a clear A4/100% scale check and offer a calibration sheet.
-- [ ] Run focused and collaborative-printing regressions; commit the slice.
+- [x] Add a failing test for paper size, scale warnings, calibration marks, and instruction content.
+- [x] Implement reusable preflight/calibration document builders.
+- [x] Gate print actions behind a clear A4/100% scale check and offer a calibration sheet.
+- [x] Run focused and collaborative-printing regressions; commit the slice.
 
 ## Task 8: Easy mode, tutorial, and PWA/offline safety
 

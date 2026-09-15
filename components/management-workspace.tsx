@@ -32,6 +32,7 @@ import type { StudentStatus } from "@/types/domain";
 import type { ExternalCorrectionRecord } from "@/types/universal-exams";
 import { parseStudentCsv, type StudentImportResult } from "@/lib/student-import";
 import { buildExternalCorrectionCsv, buildExternalReport, filterExternalCorrections } from "@/lib/external-reporting";
+import { buildCalibrationSheetHtml, buildPrintInstructionSheetHtml, getPrintPreflight } from "@/lib/print-preflight";
 
 type AdminUserRow = {
   id: string;
@@ -365,6 +366,8 @@ export function ExamsManager() {
   const [selectedExamId, setSelectedExamId] = useState(data.exams[0]?.id ?? "");
   const [sheetMode, setSheetMode] = useState<"blank" | "class" | "student">("class");
   const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [a4Confirmed, setA4Confirmed] = useState(false);
+  const [scaleConfirmed, setScaleConfirmed] = useState(false);
   const audienceOptions = useMemo(() => buildExamAudienceOptions(data.classes), [data.classes]);
   const fallbackAudience = audienceOptions[0];
   const [form, setForm] = useState({
@@ -388,6 +391,7 @@ export function ExamsManager() {
   const hasYearTwoAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "2"), [data.classes]);
   const hasYearThreeAmbiguity = useMemo(() => hasAmbiguousClasses(data.classes, "3"), [data.classes]);
   const questionCount = Math.max(0, Number(form.quantidadeQuestoes) || 0);
+  const printPreflight = getPrintPreflight({ paperSize: a4Confirmed ? "A4" : "", scalePercent: scaleConfirmed ? 100 : 0 });
 
   const resetExamForm = () => {
     setForm({
@@ -816,16 +820,19 @@ export function ExamsManager() {
                 <p>Inclui código único da prova, aluno, turma e payload para leitura de QR antes do OCR nominal.</p>
               </div>
             </div>
+            <div className="mt-5 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4"><h4 className="font-semibold text-[var(--foreground)]">Confira antes de imprimir</h4><div className="mt-3 grid gap-3"><label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--foreground)]"><input className="size-5 accent-[var(--accent)]" type="checkbox" checked={a4Confirmed} onChange={(event) => setA4Confirmed(event.target.checked)} />Papel A4 selecionado</label><label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--foreground)]"><input className="size-5 accent-[var(--accent)]" type="checkbox" checked={scaleConfirmed} onChange={(event) => setScaleConfirmed(event.target.checked)} />Escala 100% e “Ajustar à página” desativado</label></div>{!printPreflight.ready ? <p className="mt-3 text-xs text-[var(--muted-foreground)]">A impressão fica liberada após estas duas confirmações.</p> : <p className="mt-3 text-sm font-semibold text-[var(--success)]">Tudo pronto para imprimir.</p>}</div>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button
                 onClick={() => {
                   void printSheets();
                 }}
-                disabled={sheetMode === "student" && !selectedStudentId}
+                disabled={!printPreflight.ready || (sheetMode === "student" && !selectedStudentId)}
               >
                 <Printer className="size-4" />
                 Imprimir / salvar PDF
               </Button>
+              <Button variant="secondary" onClick={() => { if (!openPrintWindow("Calibração ProvaScan", buildCalibrationSheetHtml())) setMessage("Permita pop-ups para abrir a calibração."); }}><Printer className="size-4" />Folha de calibração</Button>
+              <Button variant="ghost" onClick={() => { if (!openPrintWindow("Instruções ProvaScan", buildPrintInstructionSheetHtml())) setMessage("Permita pop-ups para abrir as instruções."); }}>Ver instruções de impressão</Button>
               <Button
                 variant="secondary"
                 onClick={() => {
