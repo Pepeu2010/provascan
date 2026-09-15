@@ -8,6 +8,7 @@ import { ExamSheetIcon, ScanCaptureIcon } from "@/components/provascan-action-ic
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EXTERNAL_CORRECTION_DRAFT_KEY, buildDraftResumeLabel, parseExternalCorrectionDraft } from "@/lib/external-correction-draft";
+import { UsabilityControls } from "@/components/usability-controls";
 
 export function DashboardWorkspace() {
   const { data } = useAppData();
@@ -29,6 +30,7 @@ export function DashboardWorkspace() {
 
   return (
     <div className="dashboard-command-center mx-auto grid max-w-[1380px] gap-5">
+      <UsabilityControls tutorialOnly />
       <section className="dashboard-next-action">
         <div className="dashboard-next-action__icon" aria-hidden="true">
           <ScanCaptureIcon className="size-8" />

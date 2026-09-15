@@ -94,11 +94,11 @@
 
 **Files:** `lib/usability-preferences.ts`, `lib/offline-sync-queue.ts`, focused tests, `components/providers.tsx`, new preference/tutorial components, `app/layout.tsx`, `app/manifest.ts`, `public/sw.js`, `app/globals.css`, `package.json`
 
-- [ ] Read the Next.js metadata/manifest guide before editing framework files.
-- [ ] Add failing tests for preference parsing and offline queue retry semantics.
-- [ ] Add persistent easy mode, larger targets, sequential tutorial, and collapsed advanced controls.
-- [ ] Add an installable manifest and an allowlisted static-shell service worker.
-- [ ] Queue safe retryable writes and reconcile them when connectivity returns.
+- [x] Read the Next.js metadata/manifest guide before editing framework files.
+- [x] Add failing tests for preference parsing and offline queue retry semantics.
+- [x] Add persistent easy mode, larger targets, sequential tutorial, and collapsed advanced controls.
+- [x] Add an installable manifest and an allowlisted static-shell service worker.
+- [x] Queue safe retryable writes and reconcile them when connectivity returns.
 - [ ] Run focused tests, accessibility-oriented browser checks, and commit the slice.
 
 ## Task 9: Full verification and publication

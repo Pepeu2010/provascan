@@ -1026,6 +1026,12 @@ button, input, select, textarea { font-size: max(16px, 1rem); }
 ::selection { background: var(--accent); color: var(--accent-contrast); }
 :focus-visible { outline: 3px solid var(--accent) !important; outline-offset: 3px; }
 
+html[data-easy-mode] body { font-size: 18px; }
+html[data-easy-mode] button, html[data-easy-mode] input, html[data-easy-mode] select, html[data-easy-mode] textarea { font-size: 18px !important; }
+html[data-easy-mode] button { min-height: 56px; }
+html[data-easy-mode] .app-page-header__meta, html[data-easy-mode] p { line-height: 1.7; }
+html[data-easy-mode] details:not([open]) > :not(summary) { display: none; }
+
 .dashboard-shell { background: var(--background); }
 .dashboard-shell__main { max-width: 1540px; padding: 28px 36px 56px; }
 .dashboard-shell-panel { min-height: auto; margin-bottom: 28px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; padding: 0 0 20px; }

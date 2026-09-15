@@ -24,6 +24,7 @@ import { DEFAULT_UNIVERSAL_GRADING_RULES, gradeWithRules, type UniversalGradingR
 import { findStudentCandidatesInText, normalizePersonText } from "@/lib/student-matching";
 import { applyReviewEdit, undoReviewEdit, type ReviewAuditEntry } from "@/lib/correction-review";
 import { applyTemplateLibraryAction, sortTemplateLibrary } from "@/lib/external-template-actions";
+import { queueOfflineSyncJob } from "@/lib/offline-sync-queue";
 import { measureCaptureQuality, type CaptureQualityResult } from "@/services/capture-quality";
 import {
   completeBatchItem,
@@ -86,6 +87,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   const [annulledText, setAnnulledText] = useState("");
   const [weightsText, setWeightsText] = useState("");
   const [reviewAudit, setReviewAudit] = useState<Array<ReviewAuditEntry & { batchIndex: number }>>([]);
+  const [syncPending, setSyncPending] = useState(false);
   const [batch, setBatch] = useState<BatchResult[]>([]);
   const [batchQueue, setBatchQueue] = useState<CorrectionBatchItem[]>([]);
   const [pilotQuality, setPilotQuality] = useState<CaptureQualityResult | null>(null);
@@ -518,21 +520,30 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       setError("Há nomes repetidos no lote. Confirme se nenhuma folha foi associada duas vezes ao mesmo aluno.");
       return;
     }
+    const correctionPayload = {
+      corrections: batch.map((item) => ({
+        answerKey,
+        answers: item.answers,
+        gradingRules,
+        reviewAudit: reviewAudit.filter((entry) => entry.batchIndex === batch.indexOf(item)).map(stripBatchIndex),
+        sourceLabel: item.sourceLabel,
+        studentName: item.studentName.trim(),
+        structure,
+        templateId,
+      })),
+    };
+    if (!navigator.onLine) {
+      queueOfflineSyncJob(window.localStorage, { body: JSON.stringify(correctionPayload), id: crypto.randomUUID(), method: "POST", url: "/api/external-corrections" });
+      window.localStorage.removeItem(EXTERNAL_CORRECTION_DRAFT_KEY);
+      setSyncPending(true);
+      setStage("results");
+      setMessage("Resultados guardados neste aparelho. Eles serão enviados quando a internet voltar.");
+      return;
+    }
     beginProcessing("Salvando resultados...", 10);
     try {
       const response = await fetch("/api/external-corrections", {
-        body: JSON.stringify({
-          corrections: batch.map((item) => ({
-            answerKey,
-            answers: item.answers,
-            gradingRules,
-            reviewAudit: reviewAudit.filter((entry) => entry.batchIndex === batch.indexOf(item)).map(stripBatchIndex),
-            sourceLabel: item.sourceLabel,
-            studentName: item.studentName.trim(),
-            structure,
-            templateId,
-          })),
-        }),
+        body: JSON.stringify(correctionPayload),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
@@ -634,7 +645,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
         {reviewAudit.length ? <details className="mt-4 rounded-xl border border-[var(--border)] p-3"><summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Histórico de alterações ({reviewAudit.length})</summary><ol className="mt-3 grid gap-2 text-sm text-[var(--muted-foreground)]">{reviewAudit.map((entry, index) => <li key={`${entry.at}-${entry.question}-${index}`}>Questão {entry.question}: {entry.from} → {entry.to}</li>)}</ol></details> : null}
       </Card> : null}
 
-      {stage === "results" ? <Card className="p-5 sm:p-6"><div className="rounded-2xl border border-[var(--success-border)] bg-[var(--success-soft)] p-5"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-[var(--success)] text-white"><Check className="size-5" /></span><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Lote concluído</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">As correções externas foram registradas sem armazenar as imagens originais.</p></div></div></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{batch.map((item) => <div key={item.sourceLabel} className="rounded-2xl border border-[var(--border)] p-4"><strong className="text-sm text-[var(--foreground)]">{item.studentName}</strong><p className="mt-2 text-3xl font-semibold tabular-nums text-[var(--foreground)]">{item.grade.summary.score.toFixed(1)}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.grade.summary.correct} acertos · {item.grade.summary.blank} em branco · {item.elapsedMs} ms</p></div>)}</div><Button className="mt-5" size="lg" onClick={() => resetFlow()}><WandSparkles className="size-4" />Corrigir outro lote</Button></Card> : null}
+      {stage === "results" ? <Card className="p-5 sm:p-6"><div className={`rounded-2xl border p-5 ${syncPending ? "border-[var(--warning-border)] bg-[var(--warning-soft)]" : "border-[var(--success-border)] bg-[var(--success-soft)]"}`}><div className="flex items-center gap-3"><span className={`grid size-10 place-items-center rounded-full text-white ${syncPending ? "bg-[var(--warning)]" : "bg-[var(--success)]"}`}>{syncPending ? <Upload className="size-5" /> : <Check className="size-5" />}</span><div><h3 className="text-xl font-semibold text-[var(--foreground)]">{syncPending ? "Lote aguardando internet" : "Lote concluído"}</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{syncPending ? "Os dados ficam neste aparelho e serão sincronizados automaticamente. As imagens originais não foram guardadas." : "As correções externas foram registradas sem armazenar as imagens originais."}</p></div></div></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{batch.map((item) => <div key={item.sourceLabel} className="rounded-2xl border border-[var(--border)] p-4"><strong className="text-sm text-[var(--foreground)]">{item.studentName}</strong><p className="mt-2 text-3xl font-semibold tabular-nums text-[var(--foreground)]">{item.grade.summary.score.toFixed(1)}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.grade.summary.correct} acertos · {item.grade.summary.blank} em branco · {item.elapsedMs} ms</p></div>)}</div><Button className="mt-5" size="lg" onClick={() => resetFlow()}><WandSparkles className="size-4" />Corrigir outro lote</Button></Card> : null}
 
       {processing ? <Card className="p-4" aria-live="polite" aria-busy="true"><div className="flex items-center gap-3"><LoaderCircle className="size-5 animate-spin text-[var(--accent)] motion-reduce:animate-none" /><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-3"><strong className="text-sm text-[var(--foreground)]">{progressLabel}</strong><span className="text-sm tabular-nums text-[var(--muted-foreground)]">{progress}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface)]"><span className="block h-full rounded-full bg-[var(--accent)] transition-[width] motion-reduce:transition-none" style={{ width: `${progress}%` }} /></div></div><Button variant="ghost" onClick={() => abortRef.current?.abort()}>Cancelar</Button></div></Card> : null}
       {error ? <p role="alert" className="rounded-xl border border-[var(--error-border)] bg-[var(--error-soft)] px-4 py-3 text-sm text-[var(--foreground)]">{error}</p> : null}
@@ -662,7 +673,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   function resetFlow() {
     window.localStorage.removeItem(EXTERNAL_CORRECTION_DRAFT_KEY);
     pendingFilesRef.current = [];
-    setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setBatchQueue([]); setPilotReady(false); setPilotQuality(null); setTemplateId(null); setTemplateName(""); setGradingRules(DEFAULT_UNIVERSAL_GRADING_RULES); setAnnulledText(""); setWeightsText(""); setReviewAudit([]); setPreviewUrl(""); setMessage(""); setError("");
+    setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setBatchQueue([]); setPilotReady(false); setPilotQuality(null); setTemplateId(null); setTemplateName(""); setGradingRules(DEFAULT_UNIVERSAL_GRADING_RULES); setAnnulledText(""); setWeightsText(""); setReviewAudit([]); setSyncPending(false); setPreviewUrl(""); setMessage(""); setError("");
   }
 }
 

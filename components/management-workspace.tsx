@@ -33,6 +33,7 @@ import type { ExternalCorrectionRecord } from "@/types/universal-exams";
 import { parseStudentCsv, type StudentImportResult } from "@/lib/student-import";
 import { buildExternalCorrectionCsv, buildExternalReport, filterExternalCorrections } from "@/lib/external-reporting";
 import { buildCalibrationSheetHtml, buildPrintInstructionSheetHtml, getPrintPreflight } from "@/lib/print-preflight";
+import { UsabilityControls } from "@/components/usability-controls";
 
 type AdminUserRow = {
   id: string;
@@ -1227,6 +1228,7 @@ export function SettingsWorkspace() {
 
   return (
     <div className="grid gap-5">
+      <UsabilityControls />
       {session ? <AdministrationCenter /> : null}
       {session && canManagePasswordPolicy ? <section id="equipe" className="scroll-mt-6"><UserManagementPanel currentUserId={session.id} currentRole={session.role} /></section> : null}
       {canManagePasswordPolicy ? (

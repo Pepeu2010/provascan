@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Providers } from "@/components/providers";
@@ -21,7 +21,10 @@ export const metadata: Metadata = {
   authors: [{ name: CREATOR_NAME }],
   description:
     "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Supabase.",
+  manifest: "/manifest.webmanifest",
 };
+
+export const viewport: Viewport = { themeColor: "#6d5dfc" };
 
 export default function RootLayout({
   children,
