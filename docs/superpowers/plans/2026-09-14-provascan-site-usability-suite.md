@@ -107,4 +107,4 @@
 - [x] Run `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.
 - [x] Inspect desktop and mobile changed flows; capture evidence and record any manual-verification boundary.
 - [x] Review the complete diff for secrets, generated files, unrelated work, and migration safety.
-- [ ] Push the feature branch, open a PR, wait for CI/CodeQL/Vercel, merge, and synchronize local `main`.
+- [x] Push the feature branch, open a PR, wait for CI/CodeQL/Vercel, merge, and synchronize local `main`.
