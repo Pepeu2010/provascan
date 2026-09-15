@@ -67,10 +67,10 @@
 
 **Files:** `lib/student-import.ts`, `scripts/verify-student-import.ts`, `contexts/app-data-context.tsx`, `components/management-workspace.tsx`, `package.json`
 
-- [ ] Add a failing test for BOM, delimiter detection, header aliases, row validation, and duplicate handling.
-- [ ] Implement the parser and one-shot batch persistence method.
-- [ ] Add upload, preview, validation summary, and import confirmation to student management.
-- [ ] Run focused tests and commit the slice.
+- [x] Add a failing test for BOM, delimiter detection, header aliases, row validation, and duplicate handling.
+- [x] Implement the parser and one-shot batch persistence method.
+- [x] Add upload, preview, validation summary, and import confirmation to student management.
+- [x] Run focused tests and commit the slice.
 
 ## Task 6: History, export, and reports
 

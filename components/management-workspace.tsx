@@ -1,7 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Download, Edit3, Heart, KeyRound, Printer, QrCode, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Download, Edit3, FileSpreadsheet, Heart, KeyRound, Printer, QrCode, Save, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { AdministrationCenter } from "@/components/administration-center";
 import { useAppData } from "@/components/app-data-provider";
 import { AnalyticsPanels } from "@/components/analytics-panels";
@@ -30,6 +30,7 @@ import {
 } from "@/services/exam-correction";
 import type { StudentStatus } from "@/types/domain";
 import type { ExternalCorrectionRecord } from "@/types/universal-exams";
+import { parseStudentCsv, type StudentImportResult } from "@/lib/student-import";
 
 type AdminUserRow = {
   id: string;
@@ -253,7 +254,9 @@ export function ClassesManager() {
 }
 
 export function StudentsManager() {
-  const { createStudent, data, deleteStudent, syncError, syncStatus, updateStudent } = useAppData();
+  const { createStudent, createStudents, data, deleteStudent, syncError, syncStatus, updateStudent } = useAppData();
+  const importRef = useRef<HTMLInputElement | null>(null);
+  const [importPreview, setImportPreview] = useState<StudentImportResult | null>(null);
   const [status, setStatus] = useState<StudentStatus>("Ativo");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -272,6 +275,13 @@ export function StudentsManager() {
           </div>
           <Badge tone="accent">{data.students.length} alunos salvos</Badge>
         </div>
+        <details className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <summary className="cursor-pointer font-semibold text-[var(--foreground)]">Importar uma lista CSV</summary>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">Use uma planilha com as colunas <strong>Aluno</strong>, <strong>Turma</strong> e, opcionalmente, <strong>Status</strong>. Salve como CSV antes de enviar.</p>
+          <div className="mt-3 flex flex-wrap gap-3"><Button variant="secondary" onClick={() => importRef.current?.click()}><Upload className="size-4" />Escolher arquivo CSV</Button>{importPreview?.rows.length ? <Button loading={syncStatus === "saving"} onClick={() => void (async () => { const result = await createStudents(importPreview.rows); setMessage(result.message); if (result.ok) setImportPreview(null); })()}><FileSpreadsheet className="size-4" />Importar {importPreview.rows.length} alunos</Button> : null}</div>
+          {importPreview ? <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-soft)] p-3"><strong className="text-xl text-[var(--foreground)]">{importPreview.rows.length}</strong><p className="text-xs text-[var(--muted-foreground)]">prontos para importar</p></div><div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-3"><strong className="text-xl text-[var(--foreground)]">{importPreview.duplicates.length}</strong><p className="text-xs text-[var(--muted-foreground)]">duplicados ignorados</p></div><div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-soft)] p-3"><strong className="text-xl text-[var(--foreground)]">{importPreview.errors.length}</strong><p className="text-xs text-[var(--muted-foreground)]">linhas com erro</p></div>{importPreview.errors.length ? <ul className="sm:col-span-3 grid gap-1 text-sm text-[var(--error)]">{importPreview.errors.slice(0, 5).map((error) => <li key={error}>{error}</li>)}</ul> : null}</div> : null}
+          <input ref={importRef} className="hidden" type="file" accept=".csv,text/csv,text/plain" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; if (file.size > 2 * 1024 * 1024) { setMessage("O CSV deve ter no máximo 2 MB."); return; } void file.text().then((content) => { setImportPreview(parseStudentCsv(content, data.classes, data.students)); setMessage(""); }).catch(() => setMessage("Não foi possível ler o CSV.")); }} />
+        </details>
         <div className="mt-6 grid gap-3 lg:grid-cols-3">
           <Input placeholder="Nome do aluno" value={student.nome} onChange={(event) => setStudent((prev) => ({ ...prev, nome: event.target.value }))} />
           <FieldSelect value={student.turma} onChange={(turma) => setStudent((prev) => ({ ...prev, turma }))}>
