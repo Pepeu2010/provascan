@@ -21,8 +21,8 @@ import { analyzeUniversalPage, type UniversalBubbleRow } from "@/services/univer
 import { extractTextFromImage } from "@/services/ocr";
 import type { ExternalExamTemplate } from "@/types/universal-exams";
 import { DEFAULT_UNIVERSAL_GRADING_RULES, gradeWithRules, type UniversalGradingRules } from "@/services/universal-grading-rules";
-import { findStudentCandidatesInText, normalizePersonText } from "@/lib/student-matching";
-import { applyReviewEdit, undoReviewEdit, type ReviewAuditEntry } from "@/lib/correction-review";
+import { findStudentCandidatesInText, normalizePersonText, sortCorrectionBatchesByRoster } from "@/lib/student-matching";
+import { applyReviewEdit, buildReviewQueue, undoReviewEdit, type ReviewAuditEntry } from "@/lib/correction-review";
 import { applyTemplateLibraryAction, sortTemplateLibrary } from "@/lib/external-template-actions";
 import { queueOfflineSyncJob } from "@/lib/offline-sync-queue";
 import { measureCaptureQuality, type CaptureQualityResult } from "@/services/capture-quality";
@@ -158,10 +158,8 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     return () => window.clearTimeout(timeout);
   }, [alternativeCount, answerKey, answerKeyText, batch, columnCount, gradingRules, reviewAudit, stage, structure, subjectsText, templateId, templateName, totalQuestions]);
 
-  const issueCount = useMemo(
-    () => batch.reduce((sum, item) => sum + item.grade.reviewQuestions.length, 0),
-    [batch],
-  );
+  const reviewQueue = useMemo(() => buildReviewQueue(batch), [batch]);
+  const issueCount = reviewQueue.length;
   const duplicateStudentNames = useMemo(() => {
     const counts = new Map<string, number>();
     batch.forEach((item) => {
@@ -423,6 +421,8 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       if (queue.some((item) => item.status === "failed")) {
         setError("Alguns arquivos falharam. Os resultados concluídos foram preservados; tente novamente somente as falhas.");
       } else {
+        results = sortCorrectionBatchesByRoster(results, data.students);
+        setBatch(results);
         setStage("review");
         setMessage(results.some((item) => item.grade.reviewQuestions.length)
           ? "Leitura concluída. Revise somente as questões indicadas abaixo."

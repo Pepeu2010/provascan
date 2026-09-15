@@ -23,6 +23,11 @@ export function findStudentCandidatesInText(rawText: string, students: Student[]
   return findStudentCandidates(nameLine?.replace(/^.*?:/, "") ?? rawText, students, limit);
 }
 
+export function sortCorrectionBatchesByRoster<T extends { studentId?: string }>(batches: T[], students: Student[]) {
+  const order = new Map(students.map((student, index) => [student.id, index]));
+  return [...batches].sort((left, right) => (order.get(left.studentId ?? "") ?? Number.MAX_SAFE_INTEGER) - (order.get(right.studentId ?? "") ?? Number.MAX_SAFE_INTEGER));
+}
+
 export function normalizePersonText(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }

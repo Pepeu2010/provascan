@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         }
       }
       const trustedValidation = externalCorrectionSchema.safeParse(template
-        ? { ...correction, answerKey: template.answerKey, structure: template.structure }
+        ? { ...correction, answerKey: template.answerKey, gradingRules: template.gradingRules, structure: template.structure }
         : correction);
       if (!trustedValidation.success) {
         return NextResponse.json({ error: "As respostas não correspondem ao modelo salvo." }, { status: 400 });

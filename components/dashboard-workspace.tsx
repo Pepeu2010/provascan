@@ -8,6 +8,7 @@ import { ExamSheetIcon, ScanCaptureIcon } from "@/components/provascan-action-ic
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EXTERNAL_CORRECTION_DRAFT_KEY, buildDraftResumeLabel, parseExternalCorrectionDraft } from "@/lib/external-correction-draft";
+import { flushOfflineSyncQueue } from "@/lib/offline-sync-queue";
 import { UsabilityControls } from "@/components/usability-controls";
 
 export function DashboardWorkspace() {
@@ -18,6 +19,7 @@ export function DashboardWorkspace() {
     const draft = parseExternalCorrectionDraft(window.localStorage.getItem(EXTERNAL_CORRECTION_DRAFT_KEY));
     const label = draft && draft.stage !== "source" ? buildDraftResumeLabel(draft) : "";
     const timeout = window.setTimeout(() => setDraftLabel(label), 0);
+    if (navigator.onLine) void flushOfflineSyncQueue(window.localStorage);
     return () => window.clearTimeout(timeout);
   }, []);
   const recentCorrections = [...data.corrections]
