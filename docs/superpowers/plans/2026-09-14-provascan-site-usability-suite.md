@@ -57,11 +57,11 @@
 
 **Files:** `lib/external-template-actions.ts`, `scripts/verify-external-template-actions.ts`, `services/external-exam-service.ts`, `app/api/external-exams/*`, `components/external-correction-workspace.tsx`, migration, `package.json`
 
-- [ ] Add failing tests for rename, favorite, duplicate, archive, and sort-by-last-use semantics.
-- [ ] Implement validation and owner-scoped API/service actions.
-- [ ] Add a compact template library with archived templates hidden by default.
-- [ ] Record last use when a correction starts.
-- [ ] Run focused and authorization regressions; commit the slice.
+- [x] Add failing tests for rename, favorite, duplicate, archive, and sort-by-last-use semantics.
+- [x] Implement validation and owner-scoped API/service actions.
+- [x] Add a compact template library with archived templates hidden by default.
+- [x] Record last use when a correction starts.
+- [x] Run focused and authorization regressions; commit the slice.
 
 ## Task 5: Student CSV import
 

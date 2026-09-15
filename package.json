@@ -22,6 +22,7 @@
     "test:universal-grading-rules": "npx --no-install tsx scripts/verify-universal-grading-rules.ts",
     "test:student-matching": "npx --no-install tsx scripts/verify-student-matching.ts",
     "test:correction-review": "npx --no-install tsx scripts/verify-correction-review.ts",
+    "test:external-template-actions": "npx --no-install tsx scripts/verify-external-template-actions.ts",
     "test:auth-flow": "npx --no-install tsx scripts/verify-auth-flow.ts",
     "test:collaborative-access": "npx --no-install tsx scripts/verify-collaborative-access.ts",
     "test:collaborative-printing": "npx --no-install tsx scripts/verify-collaborative-printing.ts",

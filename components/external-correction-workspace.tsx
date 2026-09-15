@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { AlertTriangle, Camera, Check, CheckCircle2, FileImage, FileText, LoaderCircle, RefreshCw, Save, ScanSearch, Upload, WandSparkles } from "lucide-react";
+import { AlertTriangle, Archive, Camera, Check, CheckCircle2, Copy, FileImage, FileText, LoaderCircle, Pencil, RefreshCw, Save, ScanSearch, Star, Upload, WandSparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import type { ExternalExamTemplate } from "@/types/universal-exams";
 import { DEFAULT_UNIVERSAL_GRADING_RULES, gradeWithRules, type UniversalGradingRules } from "@/services/universal-grading-rules";
 import { findStudentCandidatesInText, normalizePersonText } from "@/lib/student-matching";
 import { applyReviewEdit, undoReviewEdit, type ReviewAuditEntry } from "@/lib/correction-review";
+import { applyTemplateLibraryAction, sortTemplateLibrary } from "@/lib/external-template-actions";
 import { measureCaptureQuality, type CaptureQualityResult } from "@/services/capture-quality";
 import {
   completeBatchItem,
@@ -182,6 +183,24 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     setStage("students");
     setMessage(`Modelo “${saved.name}” carregado. Agora adicione as folhas dos alunos.`);
     setError("");
+    void manageTemplate(saved, { action: "used" });
+  };
+
+  const manageTemplate = async (saved: ExternalExamTemplate, action: { action: "archive" | "duplicate" | "used" } | { action: "favorite"; value: boolean } | { action: "rename"; name: string }) => {
+    try {
+      const response = await fetch(`/api/external-exams/${saved.id}`, { body: JSON.stringify(action), headers: { "Content-Type": "application/json" }, method: "PATCH" });
+      const body = await response.json() as { error?: string; id?: string };
+      if (!response.ok) throw new Error(body.error || "Não foi possível atualizar o modelo.");
+      const at = new Date().toISOString();
+      setTemplates((current) => sortTemplateLibrary(applyTemplateLibraryAction(current, saved.id,
+        action.action === "duplicate" ? { at, id: body.id ?? crypto.randomUUID(), type: "duplicate" }
+          : action.action === "favorite" ? { at, type: "favorite", value: action.value }
+            : action.action === "rename" ? { at, name: action.name, type: "rename" }
+              : action.action === "archive" ? { at, type: "archive" }
+                : { at, type: "used" })));
+    } catch (caught) {
+      setError(readError(caught, "Não foi possível atualizar o modelo."));
+    }
   };
 
   const inspectStructureDocument = async (file: File | null) => {
@@ -558,7 +577,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
           <SourceButton icon={<FileImage className="size-5" />} label="Enviar imagem" helper="JPG, PNG ou WebP" onClick={() => imageRef.current?.click()} />
           <SourceButton icon={<FileText className="size-5" />} label="Enviar PDF" helper="Uma ou várias páginas" onClick={() => pdfRef.current?.click()} />
         </div>
-        {templates.length ? <div className="mt-7 border-t border-[var(--border)] pt-5"><h4 className="font-semibold text-[var(--foreground)]">Ou reutilize um modelo de correção</h4><div className="mt-3 grid gap-2 sm:grid-cols-2">{templates.map((saved) => <button type="button" key={saved.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition-colors hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" onClick={() => chooseTemplate(saved)}><strong className="block text-sm text-[var(--foreground)]">{saved.name}</strong><span className="mt-1 block text-xs text-[var(--muted-foreground)]">{saved.structure.totalQuestions} questões · {saved.structure.subjects.length} matérias</span></button>)}</div></div> : null}
+        {templates.length ? <div className="mt-7 border-t border-[var(--border)] pt-5"><h4 className="font-semibold text-[var(--foreground)]">Ou reutilize um modelo de correção</h4><div className="mt-3 grid gap-3 sm:grid-cols-2">{templates.map((saved) => <div key={saved.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3"><button type="button" className="w-full rounded-lg p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" onClick={() => chooseTemplate(saved)}><span className="flex items-center gap-2"><strong className="block min-w-0 flex-1 truncate text-sm text-[var(--foreground)]">{saved.name}</strong>{saved.isFavorite ? <Star className="size-4 fill-current text-[var(--warning)]" aria-label="Favorito" /> : null}</span><span className="mt-1 block text-xs text-[var(--muted-foreground)]">{saved.structure.totalQuestions} questões · {saved.structure.subjects.length} matérias{saved.lastUsedAt ? " · usado recentemente" : ""}</span></button><div className="mt-2 flex flex-wrap gap-1 border-t border-[var(--border)] pt-2"><Button size="icon" variant="ghost" title={saved.isFavorite ? "Remover dos favoritos" : "Favoritar"} aria-label={saved.isFavorite ? "Remover dos favoritos" : "Favoritar"} onClick={() => void manageTemplate(saved, { action: "favorite", value: !saved.isFavorite })}><Star className="size-4" /></Button><Button size="icon" variant="ghost" title="Duplicar" aria-label="Duplicar modelo" onClick={() => void manageTemplate(saved, { action: "duplicate" })}><Copy className="size-4" /></Button><Button size="icon" variant="ghost" title="Renomear" aria-label="Renomear modelo" onClick={() => { const name = window.prompt("Novo nome do modelo", saved.name)?.trim(); if (name && name !== saved.name) void manageTemplate(saved, { action: "rename", name }); }}><Pencil className="size-4" /></Button><Button size="icon" variant="ghost" title="Arquivar" aria-label="Arquivar modelo" onClick={() => void manageTemplate(saved, { action: "archive" })}><Archive className="size-4" /></Button></div></div>)}</div></div> : null}
       </Card> : null}
 
       {stage === "structure" ? <Card className="p-5 sm:p-6">

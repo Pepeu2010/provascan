@@ -115,5 +115,13 @@ export const externalCorrectionBatchSchema = z.object({
   corrections: z.array(externalCorrectionSchema).min(1).max(100),
 }).strict();
 
+export const externalTemplateActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("archive") }).strict(),
+  z.object({ action: z.literal("duplicate") }).strict(),
+  z.object({ action: z.literal("favorite"), value: z.boolean() }).strict(),
+  z.object({ action: z.literal("rename"), name: safeText }).strict(),
+  z.object({ action: z.literal("used") }).strict(),
+]);
+
 export type ExternalTemplateInput = z.infer<typeof externalTemplateSchema>;
 export type ExternalCorrectionInput = z.infer<typeof externalCorrectionSchema>;

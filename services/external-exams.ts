@@ -19,15 +19,21 @@ function ensure(error: { message?: string } | null) {
 export async function listExternalExamTemplates(ownerId: string): Promise<ExternalExamTemplate[]> {
   const { data, error } = await db()
     .from("external_exam_templates")
-    .select("id,name,structure,answer_key,grading_rules,created_at,updated_at")
+    .select("id,name,structure,answer_key,grading_rules,is_favorite,archived_at,last_used_at,created_at,updated_at")
     .eq("owner_id", ownerId)
+    .is("archived_at", null)
+    .order("is_favorite", { ascending: false })
+    .order("last_used_at", { ascending: false, nullsFirst: false })
     .order("updated_at", { ascending: false });
   ensure(error);
   return (data ?? []).map((row) => ({
     answerKey: Array.isArray(row.answer_key) ? row.answer_key.map(String) : [],
+    archivedAt: row.archived_at ? String(row.archived_at) : null,
     createdAt: String(row.created_at),
     gradingRules: row.grading_rules ?? DEFAULT_UNIVERSAL_GRADING_RULES,
     id: String(row.id),
+    isFavorite: Boolean(row.is_favorite),
+    lastUsedAt: row.last_used_at ? String(row.last_used_at) : null,
     name: String(row.name),
     structure: row.structure as ExternalExamTemplate["structure"],
     updatedAt: String(row.updated_at),
@@ -51,7 +57,7 @@ export async function createExternalExamTemplate(ownerId: string, input: Externa
 export async function getExternalExamTemplate(ownerId: string, templateId: string): Promise<ExternalExamTemplate | null> {
   const { data, error } = await db()
     .from("external_exam_templates")
-    .select("id,name,structure,answer_key,grading_rules,created_at,updated_at")
+    .select("id,name,structure,answer_key,grading_rules,is_favorite,archived_at,last_used_at,created_at,updated_at")
     .eq("owner_id", ownerId)
     .eq("id", templateId)
     .maybeSingle();
@@ -59,13 +65,27 @@ export async function getExternalExamTemplate(ownerId: string, templateId: strin
   if (!data) return null;
   return {
     answerKey: Array.isArray(data.answer_key) ? data.answer_key.map(String) : [],
+    archivedAt: data.archived_at ? String(data.archived_at) : null,
     createdAt: String(data.created_at),
     gradingRules: data.grading_rules ?? DEFAULT_UNIVERSAL_GRADING_RULES,
     id: String(data.id),
+    isFavorite: Boolean(data.is_favorite),
+    lastUsedAt: data.last_used_at ? String(data.last_used_at) : null,
     name: String(data.name),
     structure: data.structure as ExternalExamTemplate["structure"],
     updatedAt: String(data.updated_at),
   };
+}
+
+export async function updateExternalExamTemplate(ownerId: string, templateId: string, changes: { archived_at?: string; is_favorite?: boolean; last_used_at?: string; name?: string }) {
+  const { data, error } = await db().from("external_exam_templates")
+    .update({ ...changes, updated_at: new Date().toISOString() })
+    .eq("owner_id", ownerId)
+    .eq("id", templateId)
+    .select("id")
+    .maybeSingle();
+  ensure(error);
+  return Boolean(data);
 }
 
 export async function listExternalCorrections(ownerId: string): Promise<ExternalCorrectionRecord[]> {

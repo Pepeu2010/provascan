@@ -4,9 +4,12 @@ import type { ReviewAuditEntry } from "@/lib/correction-review";
 
 export type ExternalExamTemplate = {
   answerKey: string[];
+  archivedAt: string | null;
   createdAt: string;
   gradingRules: UniversalGradingRules;
   id: string;
+  isFavorite: boolean;
+  lastUsedAt: string | null;
   name: string;
   structure: UniversalExamStructure;
   updatedAt: string;
