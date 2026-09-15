@@ -99,12 +99,12 @@
 - [x] Add persistent easy mode, larger targets, sequential tutorial, and collapsed advanced controls.
 - [x] Add an installable manifest and an allowlisted static-shell service worker.
 - [x] Queue safe retryable writes and reconcile them when connectivity returns.
-- [ ] Run focused tests, accessibility-oriented browser checks, and commit the slice.
+- [x] Run focused tests, accessibility-oriented browser checks, and commit the slice.
 
 ## Task 9: Full verification and publication
 
-- [ ] Run every new focused test and all existing universal/OCR/auth/print regression tests.
-- [ ] Run `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.
-- [ ] Inspect desktop and mobile changed flows; capture evidence and record any manual-verification boundary.
-- [ ] Review the complete diff for secrets, generated files, unrelated work, and migration safety.
+- [x] Run every new focused test and all existing universal/OCR/auth/print regression tests.
+- [x] Run `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check`.
+- [x] Inspect desktop and mobile changed flows; capture evidence and record any manual-verification boundary.
+- [x] Review the complete diff for secrets, generated files, unrelated work, and migration safety.
 - [ ] Push the feature branch, open a PR, wait for CI/CodeQL/Vercel, merge, and synchronize local `main`.
