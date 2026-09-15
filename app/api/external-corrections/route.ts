@@ -7,7 +7,7 @@ import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
 import { getExternalExamTemplate, listExternalCorrections, saveExternalCorrections } from "@/services/external-exams";
-import { gradeObjectiveAnswers } from "@/services/universal-exam-core";
+import { gradeWithRules } from "@/services/universal-grading-rules";
 import { appendAuditEvent } from "@/services/supabase-data";
 
 export const runtime = "nodejs";
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     const templates = new Map<string, Awaited<ReturnType<typeof getExternalExamTemplate>>>();
     const entries = [] as Array<{
       input: ReturnType<typeof externalCorrectionSchema.parse>;
-      summary: ReturnType<typeof gradeObjectiveAnswers>["summary"];
+      summary: ReturnType<typeof gradeWithRules>["summary"];
     }>;
     for (const correction of parsed.data.corrections) {
       let template = null;
@@ -65,12 +65,12 @@ export async function POST(request: Request) {
         }
       }
       const trustedValidation = externalCorrectionSchema.safeParse(template
-        ? { ...correction, answerKey: template.answerKey, structure: template.structure }
+        ? { ...correction, answerKey: template.answerKey, gradingRules: template.gradingRules, structure: template.structure }
         : correction);
       if (!trustedValidation.success) {
         return NextResponse.json({ error: "As respostas não correspondem ao modelo salvo." }, { status: 400 });
       }
-      const grade = gradeObjectiveAnswers({ answerKey: trustedValidation.data.answerKey, answers: trustedValidation.data.answers, maxScore: 10 });
+      const grade = gradeWithRules({ answerKey: trustedValidation.data.answerKey, answers: trustedValidation.data.answers, rules: trustedValidation.data.gradingRules, structure: trustedValidation.data.structure });
       if (grade.reviewQuestions.length) {
         return NextResponse.json({ error: "Conclua a revisão das marcações ambíguas antes de salvar." }, { status: 400 });
       }

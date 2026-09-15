@@ -53,7 +53,7 @@ export function DashboardShell({
     () => (session?.role === "professor"
       ? [
           { href: "/dashboard/minhas-provas", label: "Minhas provas", icon: Command },
-          { href: "/dashboard/correcao", label: "Correção por foto", icon: Command },
+          { href: "/dashboard/correcao", label: "Corrigir provas", icon: Command },
         ]
       : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor"))),
     [session?.role],

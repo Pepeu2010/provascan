@@ -1,14 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, ClipboardList, UsersRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, CheckCircle2, ClipboardList, History, UsersRound } from "lucide-react";
 import { useAppData } from "@/components/app-data-provider";
 import { ExamSheetIcon, ScanCaptureIcon } from "@/components/provascan-action-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EXTERNAL_CORRECTION_DRAFT_KEY, buildDraftResumeLabel, parseExternalCorrectionDraft } from "@/lib/external-correction-draft";
+import { flushOfflineSyncQueue } from "@/lib/offline-sync-queue";
+import { UsabilityControls } from "@/components/usability-controls";
 
 export function DashboardWorkspace() {
   const { data } = useAppData();
+  const [draftLabel, setDraftLabel] = useState("");
+
+  useEffect(() => {
+    const draft = parseExternalCorrectionDraft(window.localStorage.getItem(EXTERNAL_CORRECTION_DRAFT_KEY));
+    const label = draft && draft.stage !== "source" ? buildDraftResumeLabel(draft) : "";
+    const timeout = window.setTimeout(() => setDraftLabel(label), 0);
+    if (navigator.onLine) void flushOfflineSyncQueue(window.localStorage);
+    return () => window.clearTimeout(timeout);
+  }, []);
   const recentCorrections = [...data.corrections]
     .sort((left, right) => right.correction.data.localeCompare(left.correction.data))
     .slice(0, 4);
@@ -19,12 +32,13 @@ export function DashboardWorkspace() {
 
   return (
     <div className="dashboard-command-center mx-auto grid max-w-[1380px] gap-5">
+      <UsabilityControls tutorialOnly />
       <section className="dashboard-next-action">
         <div className="dashboard-next-action__icon" aria-hidden="true">
           <ScanCaptureIcon className="size-8" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2>Corrigir provas por foto</h2>
+          <h2>Corrigir provas</h2>
           <p>Envie o cartão-resposta. O sistema lê as marcações e deixa para você apenas a conferência final.</p>
         </div>
         <div className="dashboard-next-action__meta">
@@ -38,6 +52,12 @@ export function DashboardWorkspace() {
           </Link>
         </Button>
       </section>
+
+      {draftLabel ? <Card className="flex flex-col gap-4 border-[var(--accent)] bg-[var(--accent-soft)] p-5 sm:flex-row sm:items-center">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--accent)] text-white"><History className="size-5" aria-hidden="true" /></span>
+        <div className="min-w-0 flex-1"><h2 className="font-semibold text-[var(--foreground)]">Você tem uma correção em andamento</h2><p className="mt-1 text-sm text-[var(--muted-foreground)]">O rascunho foi salvo automaticamente neste aparelho.</p></div>
+        <Button asChild size="lg"><Link href="/dashboard/correcao?modo=externa">{draftLabel}<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
+      </Card> : null}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(330px,0.75fr)]">
         <Card className="dashboard-worklist">

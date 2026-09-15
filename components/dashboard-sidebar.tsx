@@ -29,7 +29,7 @@ export const dashboardNavigationItems = [
   { href: "/dashboard/alunos", label: "Alunos", icon: Users },
   { href: "/dashboard/provas", label: "Provas", icon: BookCheck },
   { href: "/dashboard/gabaritos", label: "Gabaritos", icon: ClipboardCheck },
-  { href: "/dashboard/correcao", label: "Correção por foto", icon: ScanLine },
+  { href: "/dashboard/correcao", label: "Corrigir provas", icon: ScanLine },
   { href: "/dashboard/relatorios", label: "Relatórios", icon: BarChart3 },
   { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings, privileged: true },
 ];
@@ -103,7 +103,7 @@ export function DashboardSidebar({
         {(session?.role === "professor"
           ? [
               { href: "/dashboard/minhas-provas", label: "Minhas provas", icon: ClipboardCheck },
-              { href: "/dashboard/correcao", label: "Correção por foto", icon: ScanLine },
+              { href: "/dashboard/correcao", label: "Corrigir provas", icon: ScanLine },
             ]
           : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor")))
           .map((item, index) => {

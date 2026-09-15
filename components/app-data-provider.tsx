@@ -99,6 +99,7 @@ type AppDataContextValue = {
   createClass: (input: CreateClassInput) => Promise<MutationResult>;
   createExam: (input: CreateExamInput) => Promise<MutationResult>;
   createStudent: (input: CreateStudentInput) => Promise<MutationResult>;
+  createStudents: (input: CreateStudentInput[]) => Promise<MutationResult>;
   deleteClass: (classId: string) => Promise<MutationResult>;
   deleteExam: (examId: string) => Promise<MutationResult>;
   deleteStudent: (studentId: string) => Promise<MutationResult>;
@@ -453,6 +454,14 @@ export function AppDataProvider({
         "Aluno cadastrado com sucesso.",
       );
 
+    const createStudentsHandler = async (input: CreateStudentInput[]) => {
+      if (!input.length) return { ok: false, message: "Nenhum aluno válido para importar." };
+      return persistAppData(
+        { ...data, students: [...input.map((student) => ({ id: createId("A"), ...student })), ...data.students] },
+        `${input.length} ${input.length === 1 ? "aluno importado" : "alunos importados"} com sucesso.`,
+      );
+    };
+
     const updateStudentHandler = async (studentId: string, input: CreateStudentInput) =>
       persistAppData(
         {
@@ -800,6 +809,7 @@ export function AppDataProvider({
       createClass: createClassHandler,
       createExam: createExamHandler,
       createStudent: createStudentHandler,
+      createStudents: createStudentsHandler,
       data,
       deleteClass: deleteClassHandler,
       deleteExam: deleteExamHandler,

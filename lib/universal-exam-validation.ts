@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_UNIVERSAL_GRADING_RULES } from "@/services/universal-grading-rules";
 
 const safeText = z.string().trim().min(1).max(200).refine((value) => !/[\\/\u0000-\u001f]/.test(value), "Texto contém caminho ou caractere inválido.");
 const safeSourceLabel = z.string().trim().min(1).max(260).refine((value) => !/[\\/\u0000-\u001f]/.test(value), "Nome do documento contém caminho ou caractere inválido.");
@@ -8,6 +9,28 @@ const subjectSchema = z.object({
   name: z.string().trim().min(1).max(120),
   questionEnd: z.number().int().min(1).max(200),
   questionStart: z.number().int().min(1).max(200),
+}).strict();
+
+export const universalGradingRulesSchema = z.object({
+  annulledPolicy: z.enum(["full_credit", "ignore"]),
+  annulledQuestions: z.array(z.number().int().min(1).max(200)).max(200),
+  defaultWeight: z.number().finite().positive().max(100),
+  maxScore: z.number().finite().positive().max(1000),
+  multipleMarksPolicy: z.enum(["blank", "incorrect", "review"]),
+  questionWeights: z.record(z.string().regex(/^\d{1,3}$/), z.number().finite().positive().max(100)),
+}).strict();
+
+const reviewAuditSchema = z.object({
+  at: z.string().datetime(),
+  from: z.string().max(40),
+  previous: z.object({
+    confidence: z.number().finite().min(0).max(1),
+    detectedAnswers: z.array(alternative).max(10),
+    question: z.number().int().min(1).max(200),
+    status: z.enum(["marked", "blank", "multiple_marks", "uncertain", "erasure_suspected"]),
+  }).strict(),
+  question: z.number().int().min(1).max(200),
+  to: z.string().max(40),
 }).strict();
 
 export const universalStructureSchema = z.object({
@@ -33,6 +56,7 @@ export const universalStructureSchema = z.object({
 
 export const externalTemplateSchema = z.object({
   answerKey: z.array(alternative).min(1).max(200),
+  gradingRules: universalGradingRulesSchema.default(DEFAULT_UNIVERSAL_GRADING_RULES),
   name: safeText,
   structure: universalStructureSchema,
 }).strict().superRefine((template, context) => {
@@ -55,6 +79,8 @@ const detectedAnswerSchema = z.object({
 export const externalCorrectionSchema = z.object({
   answerKey: z.array(alternative).min(1).max(200),
   answers: z.array(detectedAnswerSchema).min(1).max(200),
+  gradingRules: universalGradingRulesSchema.default(DEFAULT_UNIVERSAL_GRADING_RULES),
+  reviewAudit: z.array(reviewAuditSchema).max(500).default([]),
   sourceLabel: safeSourceLabel,
   studentName: z.string().trim().min(1).max(160),
   structure: universalStructureSchema,
@@ -88,6 +114,14 @@ export const externalCorrectionSchema = z.object({
 export const externalCorrectionBatchSchema = z.object({
   corrections: z.array(externalCorrectionSchema).min(1).max(100),
 }).strict();
+
+export const externalTemplateActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("archive") }).strict(),
+  z.object({ action: z.literal("duplicate") }).strict(),
+  z.object({ action: z.literal("favorite"), value: z.boolean() }).strict(),
+  z.object({ action: z.literal("rename"), name: safeText }).strict(),
+  z.object({ action: z.literal("used") }).strict(),
+]);
 
 export type ExternalTemplateInput = z.infer<typeof externalTemplateSchema>;
 export type ExternalCorrectionInput = z.infer<typeof externalCorrectionSchema>;
