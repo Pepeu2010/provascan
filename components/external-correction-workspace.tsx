@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAppData } from "@/components/app-data-provider";
 import { decodeDocumentPages, processDocumentPages } from "@/services/document-ingestion";
 import {
   buildExamStructure,
-  gradeObjectiveAnswers,
   inferSubjectsFromText,
   normalizeAnswerKey,
   validateExamStructure,
@@ -20,6 +20,9 @@ import {
 import { analyzeUniversalPage, type UniversalBubbleRow } from "@/services/universal-layout-analysis";
 import { extractTextFromImage } from "@/services/ocr";
 import type { ExternalExamTemplate } from "@/types/universal-exams";
+import { DEFAULT_UNIVERSAL_GRADING_RULES, gradeWithRules, type UniversalGradingRules } from "@/services/universal-grading-rules";
+import { findStudentCandidatesInText, normalizePersonText } from "@/lib/student-matching";
+import { applyReviewEdit, undoReviewEdit, type ReviewAuditEntry } from "@/lib/correction-review";
 import { measureCaptureQuality, type CaptureQualityResult } from "@/services/capture-quality";
 import {
   completeBatchItem,
@@ -58,6 +61,7 @@ const STATUS_LABEL = {
 } as const;
 
 export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) {
+  const { data } = useAppData();
   const cameraRef = useRef<HTMLInputElement | null>(null);
   const imageRef = useRef<HTMLInputElement | null>(null);
   const pdfRef = useRef<HTMLInputElement | null>(null);
@@ -77,6 +81,10 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   const [answerKeyText, setAnswerKeyText] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState("");
+  const [gradingRules, setGradingRules] = useState<UniversalGradingRules>(DEFAULT_UNIVERSAL_GRADING_RULES);
+  const [annulledText, setAnnulledText] = useState("");
+  const [weightsText, setWeightsText] = useState("");
+  const [reviewAudit, setReviewAudit] = useState<Array<ReviewAuditEntry & { batchIndex: number }>>([]);
   const [batch, setBatch] = useState<BatchResult[]>([]);
   const [batchQueue, setBatchQueue] = useState<CorrectionBatchItem[]>([]);
   const [pilotQuality, setPilotQuality] = useState<CaptureQualityResult | null>(null);
@@ -113,6 +121,10 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
         setAnswerKeyText(draft.answerKeyText);
         setTemplateId(draft.templateId);
         setTemplateName(draft.templateName);
+        setGradingRules(draft.gradingRules ?? DEFAULT_UNIVERSAL_GRADING_RULES);
+        setAnnulledText((draft.gradingRules?.annulledQuestions ?? []).join(", "));
+        setWeightsText(formatQuestionWeights(draft.gradingRules?.questionWeights ?? {}));
+        setReviewAudit(draft.reviewAudit ?? []);
         setBatch(draft.batch);
         setMessage("Retomamos sua última correção salva neste aparelho.");
       }
@@ -130,6 +142,8 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
         answerKeyText,
         batch,
         columnCount,
+        gradingRules,
+        reviewAudit,
         stage,
         structure,
         subjectsText,
@@ -139,12 +153,21 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       }));
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [alternativeCount, answerKey, answerKeyText, batch, columnCount, stage, structure, subjectsText, templateId, templateName, totalQuestions]);
+  }, [alternativeCount, answerKey, answerKeyText, batch, columnCount, gradingRules, reviewAudit, stage, structure, subjectsText, templateId, templateName, totalQuestions]);
 
   const issueCount = useMemo(
     () => batch.reduce((sum, item) => sum + item.grade.reviewQuestions.length, 0),
     [batch],
   );
+  const duplicateStudentNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    batch.forEach((item) => {
+      const name = normalizePersonText(item.studentName);
+      if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    });
+    return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name));
+  }, [batch]);
+  const unresolvedIdentityCount = batch.filter((item) => !item.identityConfirmed).length;
 
   const chooseTemplate = (saved: ExternalExamTemplate) => {
     setStructure({ ...saved.structure, source: "saved_template" });
@@ -152,6 +175,9 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     setAnswerKeyText(saved.answerKey.map((answer, index) => `${index + 1} ${answer}`).join("\n"));
     setTemplateId(saved.id);
     setTemplateName(saved.name);
+    setGradingRules(saved.gradingRules ?? DEFAULT_UNIVERSAL_GRADING_RULES);
+    setAnnulledText((saved.gradingRules?.annulledQuestions ?? []).join(", "));
+    setWeightsText(formatQuestionWeights(saved.gradingRules?.questionWeights ?? {}));
     syncStructureFields(saved.structure);
     setStage("students");
     setMessage(`Modelo “${saved.name}” carregado. Agora adicione as folhas dos alunos.`);
@@ -298,7 +324,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     setProcessing(true);
     try {
       const response = await fetch("/api/external-exams", {
-        body: JSON.stringify({ answerKey, name: templateName.trim(), structure }),
+        body: JSON.stringify({ answerKey, gradingRules, name: templateName.trim(), structure }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
@@ -361,7 +387,10 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
         setBatchQueue(queue);
         try {
           const analyzed = await analyzeStudentFile(files[index], index, files.length, controller.signal);
-          results = [...results, ...analyzed.results.map((item, itemIndex) => ({ ...item, studentName: `Aluno ${results.length + itemIndex + 1}` }))];
+          results = [...results, ...analyzed.results.map((item, itemIndex) => ({
+            ...item,
+            studentName: item.identityCandidates?.length ? item.studentName : `Aluno ${results.length + itemIndex + 1}`,
+          }))];
           queue = completeBatchItem(queue, queue[index].id, analyzed.results.length);
         } catch (caught) {
           queue = failBatchItem(queue, queue[index].id, readError(caught, "Falha ao processar este arquivo."));
@@ -389,12 +418,19 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     const startedAt = window.performance.now();
     const pageRows: Array<Array<UniversalBubbleRow & { previewUrl: string }>> = [];
     let quality: CaptureQualityResult | null = null;
+    const pageCandidates: BatchResult["identityCandidates"][] = [];
     await processDocumentPages(file, { signal, onPage: (page, total) => {
       setProgressLabel(`Arquivo ${fileIndex + 1} de ${totalFiles}: página ${page} de ${total}...`);
       setProgress(Math.round(((fileIndex + page / total) / totalFiles) * 90));
-    }, onDecodedPage: (page) => {
+    }, onDecodedPage: async (page) => {
       const analyzed = analyzeUniversalPage(page);
       quality ??= measureCaptureQuality(analyzed.canvas);
+      try {
+        const ocr = await extractTextFromImage(analyzed.canvas.toDataURL("image/jpeg", 0.8));
+        pageCandidates.push(findStudentCandidatesInText(ocr.rawText, data.students));
+      } catch {
+        pageCandidates.push([]);
+      }
       pageRows.push(analyzed.layout.rows.map((row) => ({
         ...row,
         previewUrl: row.marks.status !== "marked" && row.marks.status !== "blank" ? cropRowPreview(analyzed.canvas, row) : "",
@@ -408,26 +444,42 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
         question: index + 1,
         status: row.marks.status,
       }));
+      const identityCandidates = pageCandidates[groupIndex] ?? [];
       return {
         answers,
         elapsedMs: Math.round((window.performance.now() - startedAt) / Math.max(groups.length, 1)),
-        grade: gradeObjectiveAnswers({ answerKey, answers, maxScore: 10 }),
+        grade: gradeWithRules({ answerKey, answers, rules: gradingRules, structure: structure! }),
+        identityCandidates,
+        identityConfirmed: false,
         previewUrls: Object.fromEntries(rows.map((row, index) => ({ question: index + 1, row })).filter(({ row }) => row.marks.status !== "marked" && row.marks.status !== "blank").map(({ question, row }) => [question, row.previewUrl])),
         sourceLabel: safeSourceLabel(`${file.name}${groups.length > 1 ? ` · página ${groupIndex + 1}` : ""}`),
-        studentName: `Aluno ${groupIndex + 1}`,
+        studentId: identityCandidates[0]?.student.id,
+        studentName: identityCandidates[0]?.student.nome ?? `Aluno ${groupIndex + 1}`,
       } satisfies BatchResult;
     });
     return { quality: quality ?? measureCaptureQuality(document.createElement("canvas")), results };
   };
 
   const resolveQuestion = (batchIndex: number, question: number, answer: string) => {
+    const item = batch[batchIndex];
+    if (!item || !structure) return;
+    const edit = applyReviewEdit(item.answers, question, answer);
+    setBatch((current) => current.map((value, index) => index === batchIndex
+      ? { ...value, answers: edit.answers, grade: gradeWithRules({ answerKey, answers: edit.answers, rules: gradingRules, structure }) }
+      : value));
+    setReviewAudit((audit) => [...audit, { ...edit.audit, batchIndex }]);
+  };
+
+  const undoLastReview = () => {
+    const last = reviewAudit.at(-1);
+    if (!last || !structure) return;
     setBatch((current) => current.map((item, index) => {
-      if (index !== batchIndex) return item;
-      const answers = item.answers.map((row) => row.question === question
-        ? { ...row, confidence: 1, detectedAnswers: answer ? [answer] : [], status: answer ? "marked" as const : "blank" as const }
-        : row);
-      return { ...item, answers, grade: gradeObjectiveAnswers({ answerKey, answers, maxScore: 10 }) };
+      if (index !== last.batchIndex) return item;
+      const answers = undoReviewEdit(item.answers, last);
+      return { ...item, answers, grade: gradeWithRules({ answerKey, answers, rules: gradingRules, structure }) };
     }));
+    setReviewAudit((current) => current.slice(0, -1));
+    setMessage("Última alteração desfeita.");
   };
 
   const finishBatch = async () => {
@@ -439,6 +491,14 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       setError("Informe o nome de cada aluno antes de salvar.");
       return;
     }
+    if (unresolvedIdentityCount) {
+      setError(`Confirme a identidade de ${unresolvedIdentityCount} ${unresolvedIdentityCount === 1 ? "aluno" : "alunos"} antes de salvar.`);
+      return;
+    }
+    if (duplicateStudentNames.size) {
+      setError("Há nomes repetidos no lote. Confirme se nenhuma folha foi associada duas vezes ao mesmo aluno.");
+      return;
+    }
     beginProcessing("Salvando resultados...", 10);
     try {
       const response = await fetch("/api/external-corrections", {
@@ -446,6 +506,8 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
           corrections: batch.map((item) => ({
             answerKey,
             answers: item.answers,
+            gradingRules,
+            reviewAudit: reviewAudit.filter((entry) => entry.batchIndex === batch.indexOf(item)).map(stripBatchIndex),
             sourceLabel: item.sourceLabel,
             studentName: item.studentName.trim(),
             structure,
@@ -511,6 +573,18 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       {stage === "key" && structure ? <Card className="p-5 sm:p-6">
         <h3 className="text-xl font-semibold text-[var(--foreground)]">Defina o gabarito externo</h3><p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">Digite uma resposta por linha ou fotografe/importe uma folha preenchida corretamente.</p>
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.7fr)]"><Field label="Gabarito manual"><Textarea rows={14} placeholder={"1 A\n2 B\n3 D\n4 C"} value={answerKeyText} onChange={(event) => setAnswerKeyText(event.target.value.toUpperCase())} /></Field><div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><h4 className="font-semibold text-[var(--foreground)]">Importar gabarito</h4><p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">A mesma pipeline lê foto, imagem e PDF. Marcações ambíguas ficam vazias para você corrigir.</p><Button className="mt-4 w-full" variant="secondary" onClick={() => keyFileRef.current?.click()}><Upload className="size-4" />Usar esta folha como gabarito</Button><p className="mt-3 text-xs text-[var(--muted-foreground)]">Aceita JPG, PNG, WebP e PDF.</p></div></div>
+        <details className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+          <summary className="cursor-pointer font-semibold text-[var(--foreground)]">Regras de nota (opcional)</summary>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)]">O padrão é nota de 0 a 10, todas as questões com o mesmo peso e múltiplas marcações enviadas para revisão.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Nota máxima"><Input inputMode="decimal" value={gradingRules.maxScore} onChange={(event) => setGradingRules((current) => ({ ...current, maxScore: positiveNumber(event.target.value, 10) }))} /></Field>
+            <Field label="Peso padrão"><Input inputMode="decimal" value={gradingRules.defaultWeight} onChange={(event) => setGradingRules((current) => ({ ...current, defaultWeight: positiveNumber(event.target.value, 1) }))} /></Field>
+            <Field label="Múltiplas marcações"><select className="min-h-12 rounded-xl border border-[var(--border-strong)] bg-[var(--card-solid)] px-3 text-[var(--foreground)]" value={gradingRules.multipleMarksPolicy} onChange={(event) => setGradingRules((current) => ({ ...current, multipleMarksPolicy: event.target.value as UniversalGradingRules["multipleMarksPolicy"] }))}><option value="review">Revisar uma a uma</option><option value="incorrect">Contar como errada</option><option value="blank">Contar como em branco</option></select></Field>
+            <Field label="Questões anuladas"><Input placeholder="Ex.: 3, 8, 12" value={annulledText} onChange={(event) => setAnnulledText(event.target.value)} onBlur={() => setGradingRules((current) => ({ ...current, annulledQuestions: parseQuestionList(annulledText, structure.totalQuestions) }))} /></Field>
+            <Field label="Como tratar anuladas"><select className="min-h-12 rounded-xl border border-[var(--border-strong)] bg-[var(--card-solid)] px-3 text-[var(--foreground)]" value={gradingRules.annulledPolicy} onChange={(event) => setGradingRules((current) => ({ ...current, annulledPolicy: event.target.value as UniversalGradingRules["annulledPolicy"] }))}><option value="full_credit">Dar o ponto a todos</option><option value="ignore">Ignorar no cálculo</option></select></Field>
+            <Field label="Pesos diferentes"><Input placeholder="Ex.: 1:2, 5:1.5" value={weightsText} onChange={(event) => setWeightsText(event.target.value)} onBlur={() => setGradingRules((current) => ({ ...current, questionWeights: parseQuestionWeights(weightsText, structure.totalQuestions) }))} /></Field>
+          </div>
+        </details>
         <div className="mt-5 flex flex-wrap gap-3"><Button size="lg" onClick={confirmManualKey}><Check className="size-4" />Confirmar gabarito</Button><Button size="lg" variant="ghost" onClick={() => setStage("structure")}>Voltar à estrutura</Button></div>
       </Card> : null}
 
@@ -529,9 +603,16 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       </Card> : null}
 
       {stage === "review" ? <Card className="p-5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Revisar dúvidas</h3><p className="mt-2 text-sm text-[var(--muted-foreground)]">Somente branco duvidoso, múltiplas marcações, baixa confiança ou possível rasura aparecem aqui.</p></div><Badge tone={issueCount ? "warning" : "success"}>{issueCount} para revisar</Badge></div>
-        <div className="mt-5 grid gap-4">{batch.map((item, batchIndex) => <section key={`${item.sourceLabel}-${batchIndex}`} className="rounded-2xl border border-[var(--border)] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><Input aria-label={`Nome do aluno ${batchIndex + 1}`} value={item.studentName} onChange={(event) => setBatch((current) => current.map((value, index) => index === batchIndex ? { ...value, studentName: event.target.value } : value))} /><div className="flex gap-2"><Badge tone="success">{item.grade.summary.correct} acertos</Badge><Badge tone="neutral">Nota {item.grade.summary.score.toFixed(1)}</Badge></div></div><p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.sourceLabel}</p><div className="mt-4 grid gap-3">{item.answers.filter((answer) => item.grade.reviewQuestions.includes(answer.question)).map((answer) => <div key={answer.question} className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-[var(--foreground)]">Questão {answer.question}</strong><span className="text-xs font-semibold text-[var(--muted-foreground)]">{STATUS_LABEL[answer.status]} · {Math.round(answer.confidence * 100)}%</span></div>{item.previewUrls[answer.question] ? <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)] bg-white p-2"><p className="mb-2 text-xs font-semibold text-slate-700">Recorte original</p><Image unoptimized width={720} height={180} src={item.previewUrls[answer.question]} alt={`Recorte original da questão ${answer.question}`} className="h-auto max-h-32 w-full object-contain" /></div> : null}{answer.status === "multiple_marks" ? <p className="mt-2 text-sm text-[var(--muted-foreground)]">Detectadas: {answer.detectedAnswers.join(" e ")}. Não escolhemos uma delas automaticamente.</p> : null}<div className="mt-3 flex flex-wrap gap-2">{structure?.alternatives.map((alternative) => <Button key={alternative} variant="secondary" onClick={() => resolveQuestion(batchIndex, answer.question, alternative)}>{alternative}</Button>)}<Button variant="ghost" onClick={() => resolveQuestion(batchIndex, answer.question, "")}>Em branco</Button></div></div>)}{!item.grade.reviewQuestions.length ? <p className="rounded-xl bg-[var(--success-soft)] px-4 py-3 text-sm text-[var(--foreground)]">Nenhuma questão ambígua nesta folha.</p> : null}</div></section>)}</div>
-        <div className="mt-5 flex flex-wrap gap-3"><Button size="lg" disabled={processing || issueCount > 0} onClick={() => void finishBatch()}>{processing ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}Confirmar revisão e salvar</Button><Button size="lg" variant="secondary" onClick={() => setStage("students")}>Adicionar outras folhas</Button></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Revisar dúvidas</h3><p className="mt-2 text-sm text-[var(--muted-foreground)]">Confirme primeiro os alunos e depois resolva somente as marcações indicadas.</p></div><div className="flex flex-wrap gap-2"><Badge tone={unresolvedIdentityCount ? "warning" : "success"}>{unresolvedIdentityCount} nomes</Badge><Badge tone={issueCount ? "warning" : "success"}>{issueCount} questões</Badge></div></div>
+        {duplicateStudentNames.size ? <p role="alert" className="mt-4 rounded-xl border border-[var(--error-border)] bg-[var(--error-soft)] px-4 py-3 text-sm text-[var(--foreground)]">Há nomes repetidos. Confira se duas folhas não foram associadas ao mesmo aluno.</p> : null}
+        <div className="mt-5 grid gap-4">{batch.map((item, batchIndex) => <section key={`${item.sourceLabel}-${batchIndex}`} className="rounded-2xl border border-[var(--border)] p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0 flex-1"><Input aria-label={`Nome do aluno ${batchIndex + 1}`} value={item.studentName} onChange={(event) => setBatch((current) => current.map((value, index) => index === batchIndex ? { ...value, identityConfirmed: false, studentId: undefined, studentName: event.target.value } : value))} /><p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.sourceLabel}</p></div><div className="flex flex-wrap gap-2"><Badge tone={item.identityConfirmed ? "success" : "warning"}>{item.identityConfirmed ? "Aluno confirmado" : "Confirme o aluno"}</Badge><Badge tone="success">{item.grade.summary.correct} acertos</Badge><Badge tone="neutral">Nota {item.grade.summary.score.toFixed(1)}</Badge></div></div>
+          {!item.identityConfirmed ? <div className="mt-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-3"><p className="text-sm font-semibold text-[var(--foreground)]">Quem fez esta prova?</p>{item.identityCandidates?.length ? <div className="mt-2 flex flex-wrap gap-2">{item.identityCandidates.map((candidate) => <Button key={candidate.student.id} variant="secondary" onClick={() => setBatch((current) => current.map((value, index) => index === batchIndex ? { ...value, identityConfirmed: true, studentId: candidate.student.id, studentName: candidate.student.nome } : value))}>{candidate.student.nome} · {candidate.student.turma}</Button>)}</div> : <p className="mt-1 text-sm text-[var(--muted-foreground)]">Não encontramos um nome seguro no cadastro. Digite acima e confirme manualmente.</p>}<Button className="mt-3" variant="ghost" onClick={() => setBatch((current) => current.map((value, index) => index === batchIndex ? { ...value, identityConfirmed: Boolean(value.studentName.trim()) } : value))}>Confirmar nome digitado</Button></div> : null}
+          {item.grade.subjects?.length && item.grade.subjects.length > 1 ? <div className="mt-3 flex flex-wrap gap-2">{item.grade.subjects.map((subject) => <Badge key={subject.name} tone="neutral">{subject.name}: {subject.score.toFixed(1)}</Badge>)}</div> : null}
+          <div className="mt-4 grid gap-3">{item.answers.filter((answer) => item.grade.reviewQuestions.includes(answer.question)).map((answer) => <div key={answer.question} className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-[var(--foreground)]">Questão {answer.question}</strong><span className="text-xs font-semibold text-[var(--muted-foreground)]">{STATUS_LABEL[answer.status]} · {Math.round(answer.confidence * 100)}%</span></div>{item.previewUrls[answer.question] ? <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)] bg-white p-2"><p className="mb-2 text-xs font-semibold text-slate-700">Recorte original</p><Image unoptimized width={720} height={180} src={item.previewUrls[answer.question]} alt={`Recorte original da questão ${answer.question}`} className="h-auto max-h-32 w-full object-contain" /></div> : null}{answer.status === "multiple_marks" ? <p className="mt-2 text-sm text-[var(--muted-foreground)]">Detectadas: {answer.detectedAnswers.join(" e ")}. Não escolhemos uma delas automaticamente.</p> : null}<div className="mt-3 flex flex-wrap gap-2">{structure?.alternatives.map((alternative) => <Button key={alternative} variant="secondary" onClick={() => resolveQuestion(batchIndex, answer.question, alternative)}>{alternative}</Button>)}<Button variant="ghost" onClick={() => resolveQuestion(batchIndex, answer.question, "")}>Em branco</Button></div></div>)}{!item.grade.reviewQuestions.length ? <p className="rounded-xl bg-[var(--success-soft)] px-4 py-3 text-sm text-[var(--foreground)]">Nenhuma questão ambígua nesta folha.</p> : null}</div>
+        </section>)}</div>
+        <div className="mt-5 flex flex-wrap gap-3"><Button size="lg" disabled={processing || issueCount > 0} onClick={() => void finishBatch()}>{processing ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}Confirmar revisão e salvar</Button>{reviewAudit.length ? <Button size="lg" variant="secondary" onClick={undoLastReview}><RefreshCw className="size-4" />Desfazer última alteração</Button> : null}<Button size="lg" variant="ghost" onClick={() => setStage("students")}>Adicionar outras folhas</Button></div>
+        {reviewAudit.length ? <details className="mt-4 rounded-xl border border-[var(--border)] p-3"><summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Histórico de alterações ({reviewAudit.length})</summary><ol className="mt-3 grid gap-2 text-sm text-[var(--muted-foreground)]">{reviewAudit.map((entry, index) => <li key={`${entry.at}-${entry.question}-${index}`}>Questão {entry.question}: {entry.from} → {entry.to}</li>)}</ol></details> : null}
       </Card> : null}
 
       {stage === "results" ? <Card className="p-5 sm:p-6"><div className="rounded-2xl border border-[var(--success-border)] bg-[var(--success-soft)] p-5"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-[var(--success)] text-white"><Check className="size-5" /></span><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Lote concluído</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">As correções externas foram registradas sem armazenar as imagens originais.</p></div></div></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{batch.map((item) => <div key={item.sourceLabel} className="rounded-2xl border border-[var(--border)] p-4"><strong className="text-sm text-[var(--foreground)]">{item.studentName}</strong><p className="mt-2 text-3xl font-semibold tabular-nums text-[var(--foreground)]">{item.grade.summary.score.toFixed(1)}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.grade.summary.correct} acertos · {item.grade.summary.blank} em branco · {item.elapsedMs} ms</p></div>)}</div><Button className="mt-5" size="lg" onClick={() => resetFlow()}><WandSparkles className="size-4" />Corrigir outro lote</Button></Card> : null}
@@ -562,7 +643,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
   function resetFlow() {
     window.localStorage.removeItem(EXTERNAL_CORRECTION_DRAFT_KEY);
     pendingFilesRef.current = [];
-    setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setBatchQueue([]); setPilotReady(false); setPilotQuality(null); setTemplateId(null); setTemplateName(""); setPreviewUrl(""); setMessage(""); setError("");
+    setStage("source"); setStructure(null); setAnswerKey([]); setAnswerKeyText(""); setBatch([]); setBatchQueue([]); setPilotReady(false); setPilotQuality(null); setTemplateId(null); setTemplateName(""); setGradingRules(DEFAULT_UNIVERSAL_GRADING_RULES); setAnnulledText(""); setWeightsText(""); setReviewAudit([]); setPreviewUrl(""); setMessage(""); setError("");
   }
 }
 
@@ -625,4 +706,33 @@ function safeSourceLabel(value: string) {
 function readError(error: unknown, fallback: string) {
   if (error instanceof DOMException && error.name === "AbortError") return "Processamento cancelado. Nenhum resultado foi salvo.";
   return error instanceof Error ? error.message : fallback;
+}
+
+function positiveNumber(value: string, fallback: number) {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseQuestionList(value: string, total: number) {
+  return [...new Set(value.split(/[,;\s]+/).map(Number).filter((question) => Number.isInteger(question) && question >= 1 && question <= total))].sort((left, right) => left - right);
+}
+
+function parseQuestionWeights(value: string, total: number) {
+  const weights: Record<number, number> = {};
+  value.split(/[,;\n]+/).forEach((item) => {
+    const match = item.trim().match(/^(\d{1,3})\s*:\s*(\d+(?:[.,]\d+)?)$/);
+    if (!match) return;
+    const question = Number(match[1]);
+    const weight = positiveNumber(match[2], 0);
+    if (question >= 1 && question <= total && weight > 0) weights[question] = weight;
+  });
+  return weights;
+}
+
+function formatQuestionWeights(weights: Record<number, number>) {
+  return Object.entries(weights).map(([question, weight]) => `${question}:${weight}`).join(", ");
+}
+
+function stripBatchIndex(entry: ReviewAuditEntry & { batchIndex: number }): ReviewAuditEntry {
+  return { at: entry.at, from: entry.from, previous: entry.previous, question: entry.question, to: entry.to };
 }

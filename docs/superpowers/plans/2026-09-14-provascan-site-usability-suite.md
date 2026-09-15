@@ -46,12 +46,12 @@
 
 **Files:** `types/universal-exams.ts`, `services/universal-grading-rules.ts`, `lib/student-matching.ts`, `lib/correction-review.ts`, `scripts/verify-universal-grading-rules.ts`, `scripts/verify-student-matching.ts`, `scripts/verify-correction-review.ts`, `components/external-correction-workspace.tsx`, API routes, migration, `package.json`
 
-- [ ] Add failing tests for weights, annulments, multiple-mark policy, subject totals, candidate ranking, duplicate detection, review queue, undo, and audit entries.
-- [ ] Implement grading, matching, review, and audit domain modules.
-- [ ] Add simple grading-rule controls and subject results.
-- [ ] Require confirmation for uncertain identity candidates and surface duplicates in roster order.
-- [ ] Persist grading snapshots and review audit data through owner-scoped APIs.
-- [ ] Run focused and regression tests; commit the slice.
+- [x] Add failing tests for weights, annulments, multiple-mark policy, subject totals, candidate ranking, duplicate detection, review queue, undo, and audit entries.
+- [x] Implement grading, matching, review, and audit domain modules.
+- [x] Add simple grading-rule controls and subject results.
+- [x] Require confirmation for uncertain identity candidates and surface duplicates in roster order.
+- [x] Persist grading snapshots and review audit data through owner-scoped APIs.
+- [x] Run focused and regression tests; commit the slice.
 
 ## Task 4: Template library management
 

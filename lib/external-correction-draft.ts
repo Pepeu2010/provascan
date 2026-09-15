@@ -1,8 +1,9 @@
 import type {
   UniversalDetectedAnswer,
   UniversalExamStructure,
-  gradeObjectiveAnswers,
 } from "@/services/universal-exam-core";
+import { DEFAULT_UNIVERSAL_GRADING_RULES, type UniversalGradingRules } from "@/services/universal-grading-rules";
+import type { ReviewAuditEntry } from "@/lib/correction-review";
 
 export const EXTERNAL_CORRECTION_DRAFT_KEY = "provascan:external-correction-draft:v1";
 export const DRAFT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1_000;
@@ -12,9 +13,17 @@ export type ExternalCorrectionStage = "source" | "structure" | "key" | "students
 export type DraftBatchItem = {
   answers: UniversalDetectedAnswer[];
   elapsedMs: number;
-  grade: ReturnType<typeof gradeObjectiveAnswers>;
+  grade: {
+    reviewQuestions: number[];
+    rows: unknown[];
+    subjects?: Array<{ correct: number; name: string; score: number }>;
+    summary: { annulled?: number; blank: number; correct: number; incorrect: number; multipleMarks: number; review: number; score: number };
+  };
+  identityConfirmed?: boolean;
+  identityCandidates?: Array<{ score: number; student: { id: string; nome: string; status: "Ativo" | "Transferido" | "Inativo"; turma: string } }>;
   previewUrls: Record<number, string>;
   sourceLabel: string;
+  studentId?: string;
   studentName: string;
 };
 
@@ -24,6 +33,8 @@ export type ExternalCorrectionDraftInput = {
   answerKeyText: string;
   batch: DraftBatchItem[];
   columnCount: string;
+  gradingRules?: UniversalGradingRules;
+  reviewAudit?: Array<ReviewAuditEntry & { batchIndex: number }>;
   stage: ExternalCorrectionStage;
   structure: UniversalExamStructure | null;
   subjectsText: string;
@@ -70,6 +81,8 @@ export function parseExternalCorrectionDraft(raw: string | null, now = Date.now(
       answerKeyText: String(value.answerKeyText ?? ""),
       batch: value.batch.filter(isDraftBatchItem).map((item) => ({ ...item, previewUrls: {} })),
       columnCount: String(value.columnCount ?? "1"),
+      gradingRules: value.gradingRules ?? DEFAULT_UNIVERSAL_GRADING_RULES,
+      reviewAudit: Array.isArray(value.reviewAudit) ? value.reviewAudit : [],
       stage: value.stage,
       structure: value.structure ?? null,
       subjectsText: String(value.subjectsText ?? ""),
