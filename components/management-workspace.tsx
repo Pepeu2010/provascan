@@ -31,6 +31,7 @@ import {
 import type { StudentStatus } from "@/types/domain";
 import type { ExternalCorrectionRecord } from "@/types/universal-exams";
 import { parseStudentCsv, type StudentImportResult } from "@/lib/student-import";
+import { buildExternalCorrectionCsv, buildExternalReport, filterExternalCorrections } from "@/lib/external-reporting";
 
 type AdminUserRow = {
   id: string;
@@ -996,6 +997,10 @@ export function ReportsWorkspace() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [externalCorrections, setExternalCorrections] = useState<ExternalCorrectionRecord[]>([]);
   const [externalHistoryError, setExternalHistoryError] = useState("");
+  const [externalQuery, setExternalQuery] = useState("");
+  const [externalTemplateFilter, setExternalTemplateFilter] = useState("all");
+  const [externalDateFrom, setExternalDateFrom] = useState("");
+  const [externalDateTo, setExternalDateTo] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -1025,6 +1030,9 @@ export function ReportsWorkspace() {
   const filteredAverage = filteredCorrections.length
     ? Math.round(filteredCorrections.reduce((sum, item) => sum + item.correction.percentual, 0) / filteredCorrections.length)
     : 0;
+  const filteredExternalCorrections = useMemo(() => filterExternalCorrections(externalCorrections, { dateFrom: externalDateFrom, dateTo: externalDateTo, query: externalQuery, templateId: externalTemplateFilter }), [externalCorrections, externalDateFrom, externalDateTo, externalQuery, externalTemplateFilter]);
+  const externalReport = useMemo(() => buildExternalReport(filteredExternalCorrections), [filteredExternalCorrections]);
+  const externalTemplateIds = [...new Set(externalCorrections.map((item) => item.templateId).filter((id): id is string => Boolean(id)))];
 
   return (
     <div className="grid gap-5">
@@ -1080,12 +1088,17 @@ export function ReportsWorkspace() {
       <Card className="p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div><h3 className="text-lg font-semibold text-[var(--foreground)]">Histórico de correções externas</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">Snapshots do formato, gabarito e respostas salvas pelo corretor universal.</p></div>
-          <Badge tone="accent">{externalCorrections.length} registros</Badge>
+          <Badge tone="accent">{filteredExternalCorrections.length} registros</Badge>
         </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Input className="lg:col-span-2" aria-label="Buscar no histórico externo" placeholder="Buscar aluno ou arquivo" value={externalQuery} onChange={(event) => setExternalQuery(event.target.value)} /><FieldSelect value={externalTemplateFilter} onChange={setExternalTemplateFilter}><option value="all">Todos os modelos</option><option value="none">Sem modelo salvo</option>{externalTemplateIds.map((id, index) => <option key={id} value={id}>Modelo {index + 1}</option>)}</FieldSelect><Input aria-label="Data inicial" type="date" value={externalDateFrom} onChange={(event) => setExternalDateFrom(event.target.value)} /><Input aria-label="Data final" type="date" value={externalDateTo} onChange={(event) => setExternalDateTo(event.target.value)} /></div>
+        <div className="mt-3 flex flex-wrap gap-3"><Button variant="secondary" disabled={!filteredExternalCorrections.length} onClick={() => downloadTextFile("correcoes-externas.csv", buildExternalCorrectionCsv(filteredExternalCorrections), "text/csv;charset=utf-8")}><Download className="size-4" />Exportar CSV filtrado</Button></div>
         {externalHistoryError ? <p role="alert" className="mt-4 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--foreground)]">{externalHistoryError}</p> : null}
         {!externalHistoryError && !externalCorrections.length ? <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-sm text-[var(--muted-foreground)]">As correções de provas externas aparecerão aqui.</p> : null}
+        {!externalHistoryError && externalCorrections.length > 0 && !filteredExternalCorrections.length ? <p className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 text-sm text-[var(--muted-foreground)]">Nenhum registro corresponde aos filtros escolhidos.</p> : null}
+        {filteredExternalCorrections.length ? <div className="mt-4 grid gap-3 md:grid-cols-3"><div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Média</p><strong className="mt-1 block text-2xl text-[var(--foreground)]">{externalReport.averageScore.toFixed(1)}</strong></div><div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Questão com mais dificuldade</p><strong className="mt-1 block text-2xl text-[var(--foreground)]">{externalReport.questions.slice().sort((left, right) => left.correctRate - right.correctRate)[0]?.question ?? "—"}</strong></div><div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Alunos comparados</p><strong className="mt-1 block text-2xl text-[var(--foreground)]">{externalReport.comparisons.length}</strong></div></div> : null}
+        {externalReport.subjects.length > 1 ? <div className="mt-4 flex flex-wrap gap-2">{externalReport.subjects.map((subject) => <Badge key={subject.name} tone="neutral">{subject.name}: média {subject.averageScore.toFixed(1)}</Badge>)}</div> : null}
         <div className="mt-4 grid gap-3">
-          {externalCorrections.map((item) => <details key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><summary className="cursor-pointer list-none"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[var(--foreground)]">{item.studentName}</strong><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.sourceLabel} · {formatDate(item.correctedAt)}</p></div><div className="flex flex-wrap gap-2"><Badge tone="success">{item.summary.correct} acertos</Badge><Badge tone="neutral">Nota {item.summary.score.toFixed(1)}</Badge></div></div></summary><div className="mt-4 border-t border-[var(--border)] pt-4"><p className="text-xs font-semibold uppercase tracking-[.12em] text-[var(--muted-foreground)]">Snapshot auditável · {item.structure.totalQuestions} questões · {item.structure.subjects.length} matérias</p><div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-10">{item.answers.map((answer, index) => <div key={answer.question} className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-2 text-center"><span className="block text-[10px] text-[var(--muted-foreground)]">{answer.question}</span><strong className="text-xs text-[var(--foreground)]">{answer.detectedAnswers.join("/") || "—"}</strong><span className="mt-1 block text-[10px] text-[var(--muted-foreground)]">G: {item.answerKey[index] ?? "—"}</span></div>)}</div></div></details>)}
+          {filteredExternalCorrections.map((item) => <details key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><summary className="cursor-pointer list-none"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[var(--foreground)]">{item.studentName}</strong><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.sourceLabel} · {formatDate(item.correctedAt)}</p></div><div className="flex flex-wrap gap-2"><Badge tone="success">{item.summary.correct} acertos</Badge><Badge tone="neutral">Nota {item.summary.score.toFixed(1)}</Badge></div></div></summary><div className="mt-4 border-t border-[var(--border)] pt-4"><p className="text-xs font-semibold uppercase tracking-[.12em] text-[var(--muted-foreground)]">Snapshot auditável · {item.structure.totalQuestions} questões · {item.structure.subjects.length} matérias · {item.reviewAudit.length} ajustes manuais</p><div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-8 lg:grid-cols-10">{item.answers.map((answer, index) => <div key={answer.question} className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-2 text-center"><span className="block text-[10px] text-[var(--muted-foreground)]">{answer.question}</span><strong className="text-xs text-[var(--foreground)]">{answer.detectedAnswers.join("/") || "—"}</strong><span className="mt-1 block text-[10px] text-[var(--muted-foreground)]">G: {item.answerKey[index] ?? "—"}</span></div>)}</div></div></details>)}
         </div>
       </Card>
       <AnalyticsPanels analytics={analytics} />

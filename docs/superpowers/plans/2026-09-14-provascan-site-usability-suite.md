@@ -76,10 +76,10 @@
 
 **Files:** `lib/external-reporting.ts`, `scripts/verify-external-reporting.ts`, `components/management-workspace.tsx`, `components/external-correction-workspace.tsx`, `package.json`
 
-- [ ] Add failing tests for filters, CSV escaping, question statistics, subject summaries, and comparisons.
-- [ ] Implement pure report transforms and safe CSV generation.
-- [ ] Add history filters/export and report summaries with honest empty states.
-- [ ] Run focused tests and commit the slice.
+- [x] Add failing tests for filters, CSV escaping, question statistics, subject summaries, and comparisons.
+- [x] Implement pure report transforms and safe CSV generation.
+- [x] Add history filters/export and report summaries with honest empty states.
+- [x] Run focused tests and commit the slice.
 
 ## Task 7: Print preflight and calibration
 
