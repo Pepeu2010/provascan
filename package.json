@@ -37,6 +37,7 @@
     "test:settings-simplicity": "npx --no-install tsx scripts/verify-settings-simplicity.ts",
     "test:select-experience": "npx --no-install tsx scripts/verify-select-experience.ts",
     "test:security-hardening": "npx --no-install tsx scripts/verify-security-hardening.ts",
+    "test:supabase-schema-compat": "npx --no-install tsx scripts/verify-supabase-schema-compat.ts",
     "test:teacher-exam-flow": "npx --no-install tsx scripts/verify-teacher-exam-flow.ts",
     "test:fresh-schema-migrations": "npx --no-install tsx scripts/verify-fresh-schema-migrations.ts",
     "test:webgl-fallback": "npx --no-install tsx scripts/verify-webgl-fallback.ts"

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
 import { getStudentsForExam, normalizeClasses } from "@/lib/exam-audience";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
+import { withTeacherExamSchemaFallback } from "@/lib/supabase-schema-compat";
 import type { ClassRoom, CorrectionSession, Exam, ExamCorrectionRule, Student, TeacherProfile } from "@/types/domain";
 import type { UserRecord } from "@/types/auth";
 
@@ -222,10 +223,14 @@ function teacherProfile(rows: Array<{ key: string; value: string }>): TeacherPro
 
 export async function getOperationalAppData(): Promise<AppDataState> {
   const db = client();
+  const examQuery = withTeacherExamSchemaFallback(
+    async () => db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at,status,creator_id"),
+    async () => db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at"),
+  );
   const [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult] = await Promise.all([
     db.from("classes").select("id,name,academic_year,audience_id,audience_label,group_type,year_segment"),
     db.from("students").select("id,name,class_id,status"),
-    db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at,status,creator_id"),
+    examQuery,
     db.from("answer_keys").select("exam_id,question_number,correct_answer"),
     db.from("correction_rules").select("exam_id,max_score,rounding_places,default_weight,weights_by_question,voided_questions,voided_question_mode"),
     db.from("corrections").select("id,exam_id,student_id,detected_name,score,correct_count,incorrect_count,blank_count,multiple_marks_count,voided_count,percentage,corrected_at,source_image,correction_time,identification_method,student_snapshot,exam_snapshot,class_snapshot,answers,ocr_confidence,processed_image,observations,identification"),
@@ -251,11 +256,14 @@ export async function getOperationalSnapshot() { const [data, revision] = await 
 export async function getTeacherCorrectionSnapshot(teacherId: string) {
   const database = client();
   const [{ data: ownedRows, error: ownedError }, snapshot] = await Promise.all([
-    database.from("exams").select("id").eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]),
+    withTeacherExamSchemaFallback(
+      async () => database.from("exams").select("id").eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]),
+      async () => database.from("exam_sections").select("exam_id").eq("teacher_id", teacherId),
+    ),
     getOperationalSnapshot(),
   ]);
   dbError(ownedError);
-  const ownedExamIds = new Set((ownedRows ?? []).map((item) => String(item.id)));
+  const ownedExamIds = new Set((ownedRows ?? []).map((item) => String("id" in item ? item.id : item.exam_id)));
   const exams = snapshot.data.exams.filter((exam) => ownedExamIds.has(exam.id) && (exam.status === "publicada" || exam.status === "aplicada"));
   const examIds = new Set(exams.map((exam) => exam.id));
   const studentIds = new Set(exams.flatMap((exam) => getStudentsForExam(exam, snapshot.data.students, snapshot.data.classes).map((student) => student.id)));
@@ -274,7 +282,17 @@ export async function getTeacherCorrectionSnapshot(teacherId: string) {
 }
 
 export async function teacherCanCorrectExam(teacherId: string, examId: string) {
-  const { data: exam, error } = await client().from("exams").select("id,status").eq("id", examId).eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]).maybeSingle();
+  const database = client();
+  const { data: exam, error } = await withTeacherExamSchemaFallback(
+    async () => database.from("exams").select("id,status").eq("id", examId).eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]).maybeSingle(),
+    async () => {
+      const [{ count, error: sectionError }, { data: legacyExam, error: examError }] = await Promise.all([
+        database.from("exam_sections").select("id", { count: "exact", head: true }).eq("teacher_id", teacherId).eq("exam_id", examId),
+        database.from("exams").select("released_at").eq("id", examId).maybeSingle(),
+      ]);
+      return { data: count && legacyExam?.released_at ? { id: examId } : null, error: sectionError ?? examError };
+    },
+  );
   dbError(error);
   return Boolean(exam);
 }
@@ -307,7 +325,10 @@ export async function saveCorrectionSession(session: CorrectionSession) {
     identification: item.identificacao,
   });
   dbError(error);
-  const { error: examError } = await client().from("exams").update({ applied_at: new Date().toISOString(), status: "aplicada" }).eq("id", item.correction.provaId).in("status", ["publicada", "aplicada"]);
+  const { error: examError } = await withTeacherExamSchemaFallback(
+    async () => client().from("exams").update({ applied_at: new Date().toISOString(), status: "aplicada" }).eq("id", item.correction.provaId).in("status", ["publicada", "aplicada"]),
+    async () => ({ data: null, error: null }),
+  );
   dbError(examError);
 }
 export async function saveOperationalAppData(data: AppDataState, metadata?: { actorId: string; revision: string }) {
