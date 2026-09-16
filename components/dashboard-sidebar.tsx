@@ -102,8 +102,11 @@ export function DashboardSidebar({
       <nav className="dashboard-sidebar__navigation" aria-label="Navegação principal">
         {(session?.role === "professor"
           ? [
-              { href: "/dashboard/minhas-provas", label: "Minhas provas", icon: ClipboardCheck },
+              { href: "/dashboard", label: "Início", icon: LayoutDashboard },
+              { href: "/dashboard/provas", label: "Provas", icon: BookCheck },
+              { href: "/dashboard/gabaritos", label: "Gabaritos", icon: ClipboardCheck },
               { href: "/dashboard/correcao", label: "Corrigir provas", icon: ScanLine },
+              { href: "/dashboard/relatorios", label: "Resultados", icon: BarChart3 },
             ]
           : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor")))
           .map((item, index) => {

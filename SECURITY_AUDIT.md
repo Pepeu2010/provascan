@@ -39,15 +39,16 @@ há cliente Supabase no navegador.
 
 | Recurso | Professor | Coordenador | Vice-diretor | Admin |
 | --- | --- | --- | --- | --- |
-| Seção própria de prova colaborativa | Sim | Não | Não | Não |
-| Seção de outro professor | Não | Revisão apenas | Revisão apenas | Revisão apenas |
-| Criar/revisar/liberar prova colaborativa | Não | Sim | Sim | Sim |
+| Criar, editar, publicar e arquivar prova própria | Sim | Não | Não | Não |
+| Prova de outro professor | Não | Visão institucional | Visão institucional | Visão institucional |
+| Revisar ou liberar prova de professor | Não se aplica | Não se aplica | Não se aplica | Não se aplica |
 | Dados operacionais e dashboard | Não | Sim | Sim | Sim |
 | Roster completo e usuários | Não | Não | Sim | Sim |
 
-IDs enviados pelo cliente não bastam: a seção do professor é consultada com
-`exam_id`, `section_id` e `teacher_id` da sessão. As rotas administrativas
-recalculam papel a partir do cookie assinado e do registro atual do usuário.
+IDs enviados pelo cliente não bastam: toda alteração de prova do professor é
+consultada com `exam_id` e `creator_id` derivados da sessão. As rotas
+institucionais são somente leitura nesse fluxo e recalculam o papel a partir do
+cookie assinado e do registro atual do usuário.
 
 ## Demais testes
 
