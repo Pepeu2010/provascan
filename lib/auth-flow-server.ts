@@ -4,6 +4,7 @@ import { AUTH_COOKIE_NAME, PRE_AUTH_COOKIE_NAME, applyAuthCookie, clearPreAuthCo
 import { createPasswordStamp } from "@/lib/passwords";
 import { parsePreAuthToken } from "@/lib/pre-auth";
 import { getUserByAccess, isActiveUser, updateLastLogin } from "@/services/supabase-data";
+import type { UserRecord } from "@/types/auth";
 
 export async function requirePreAuth() {
   const store = await cookies();
@@ -20,10 +21,14 @@ export async function createFinalSession(response: NextResponse, input: Awaited<
   // Releitura obrigatória: a etapa MFA pode ter revogado sessões na mesma requisição.
   const user = await getUserByAccess(preAuth.access);
   if (!user || user.id !== preAuth.sub || !isActiveUser(user.ativo)) throw new Error("Conta indisponível para criar sessão.");
+  return createUserSession(response, user, preAuth.remember);
+}
+
+export async function createUserSession(response: NextResponse, user: UserRecord, remember: boolean) {
   const loggedInAt = new Date().toISOString();
   const safeUser = { id: user.id, nome: user.nome, email: user.email, role: user.perfil, forcePasswordChange: false };
-  const token = await createSessionToken({ user: safeUser, remember: preAuth.remember, loggedInAt, passwordStamp: createPasswordStamp(`${user.senha}|${user.sessao_revogada_em ?? ""}`) });
-  applyAuthCookie(response, token, preAuth.remember);
+  const token = await createSessionToken({ user: safeUser, remember, loggedInAt, passwordStamp: createPasswordStamp(`${user.senha}|${user.sessao_revogada_em ?? ""}`) });
+  applyAuthCookie(response, token, remember);
   clearPreAuthCookie(response);
   await updateLastLogin(user.id);
   return safeUser;

@@ -9,6 +9,10 @@ const teacherOwnedExamMigration = readFileSync(
   join(migrationsDirectory, "20260915170000_teacher_owned_exam_flow.sql"),
   "utf8",
 );
+const mfaExemptionMigration = readFileSync(
+  join(migrationsDirectory, "20260916205903_add_per_user_mfa_exemption.sql"),
+  "utf8",
+);
 
 assert.match(rlsMigration, /to_regclass\(format\('public\.%I', target_table\)\) is null/);
 assert.match(subjectMigration, /to_regclass\('public\.grades'\) is not null/);
@@ -16,5 +20,7 @@ assert.match(
   teacherOwnedExamMigration,
   /add column if not exists subject text not null default ''[\s\S]*update public\.exams exam\s+set subject/,
 );
+assert.match(mfaExemptionMigration, /add column if not exists mfa_exempt boolean not null default false/);
+assert.doesNotMatch(mfaExemptionMigration, /default true/);
 
 console.log("Fresh Supabase schema migrations: OK");

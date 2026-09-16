@@ -10,6 +10,7 @@ export type UserRecord = {
   ativo: string;
   trocar_senha: string;
   mfa_ativo?: string;
+  mfa_isento?: string;
   mfa_metodo?: "TOTP" | "";
   mfa_secret_encrypted?: string;
   recovery_codes_configurados?: string;

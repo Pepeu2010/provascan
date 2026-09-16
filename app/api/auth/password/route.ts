@@ -2,10 +2,11 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { applyPreAuthCookie } from "@/lib/auth";
+import { getMfaPolicy } from "@/lib/auth-flow";
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/passwords";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
-import { requirePreAuth } from "@/lib/auth-flow-server";
+import { createFinalSession, requirePreAuth } from "@/lib/auth-flow-server";
 import {
   SupabaseConnectionError,
   SupabaseSchemaError,
@@ -82,6 +83,11 @@ export async function POST(request: Request) {
     if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 });
     const nextStoredPassword = await hashPassword(payload.newPassword);
     await updateUserPassword(user.id, nextStoredPassword, { clearPasswordChangeFlag: true });
+    if (!getMfaPolicy(user).required) {
+      const response = NextResponse.json({ message: "Senha alterada com segurança.", redirectTo: "/dashboard" });
+      await createFinalSession(response, validation);
+      return response;
+    }
     const step = "MFA_METHOD";
     const token = await createPreAuthToken({ userId: user.id, access: user.email, remember: validation.preAuth.remember, step });
     const response = NextResponse.json({ message: "Senha alterada com segurança.", step });
