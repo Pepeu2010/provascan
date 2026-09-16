@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
-import { canManageAcademicExams, isTeacherRole } from "@/lib/collaborative-access";
+import { isAcademicManagementRole } from "@/lib/access-control";
 import { getStudentsForExam } from "@/lib/exam-audience";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -32,7 +32,8 @@ export async function POST(request: Request) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const validation = await validateSessionToken((await cookies()).get(AUTH_COOKIE_NAME)?.value);
   if (!validation.ok) return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
-  if (!isTeacherRole(validation.session.role) && !canManageAcademicExams(validation.session.role)) {
+  const teacher = validation.session.role === "professor";
+  if (!teacher && !isAcademicManagementRole(validation.session.role)) {
     return NextResponse.json({ error: "Seu perfil não pode salvar correções." }, { status: 403 });
   }
 
@@ -46,13 +47,13 @@ export async function POST(request: Request) {
 
   try {
     const input = schema.parse(await request.json());
-    if (isTeacherRole(validation.session.role) && !(await teacherCanCorrectExam(validation.session.id, input.examId))) {
-      return NextResponse.json({ error: "Esta prova não está liberada ou não foi atribuída a você." }, { status: 403 });
+    if (teacher && !(await teacherCanCorrectExam(validation.session.id, input.examId))) {
+      return NextResponse.json({ error: "Esta prova não está publicada ou não pertence a você." }, { status: 403 });
     }
 
     const data = await getOperationalAppData();
     const exam = data.exams.find((item) => item.id === input.examId);
-    if (!exam || !exam.releasedAt) return NextResponse.json({ error: "A prova precisa estar liberada antes da correção." }, { status: 400 });
+    if (!exam || (exam.status !== "publicada" && exam.status !== "aplicada")) return NextResponse.json({ error: "Publique a prova antes de iniciar a correção." }, { status: 400 });
     const student = data.students.find((item) => item.id === input.studentId);
     if (!student || !getStudentsForExam(exam, data.students, data.classes).some((item) => item.id === student.id)) {
       return NextResponse.json({ error: "O aluno selecionado não pertence ao público desta prova." }, { status: 400 });

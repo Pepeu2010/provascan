@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
-import { canManageAcademicExams, isTeacherRole } from "@/lib/collaborative-access";
+import { isAcademicManagementRole } from "@/lib/access-control";
 import { externalTemplateSchema } from "@/lib/universal-exam-validation";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 async function authorizedSession() {
   const validation = await validateSessionToken((await cookies()).get(AUTH_COOKIE_NAME)?.value);
   if (!validation.ok) return null;
-  return isTeacherRole(validation.session.role) || canManageAcademicExams(validation.session.role) ? validation : null;
+  return validation.session.role === "professor" || isAcademicManagementRole(validation.session.role) ? validation : null;
 }
 
 export async function GET() {

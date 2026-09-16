@@ -13,13 +13,13 @@ operações de banco ocorrem somente em módulos marcados com `server-only`.
 - As políticas para `anon` e `authenticated` negam acesso direto; o backend
   usa exclusivamente a service role no servidor.
 - O Security Advisor não retornou alertas ativos.
-- Não há bucket nem objeto em Supabase Storage. Não existe upload de OCR para
-  proteger nesta versão.
+- O bucket `exam-imports` é privado, limita arquivos a 15 MB e aceita somente
+  formatos de prova declarados. O backend também valida assinatura e MIME.
 
 ## Regras permanentes
 
 - Nunca prefixar `SUPABASE_SERVICE_ROLE_KEY` com `NEXT_PUBLIC_`.
-- Nunca importar `services/supabase-data.ts` ou `services/collaborative-exams.ts`
+- Nunca importar `services/supabase-data.ts`, `services/teacher-exams.ts` ou `services/exam-import.ts`
   em componentes cliente.
 - Toda rota que recebe um identificador deve validar a sessão e a autorização
   no servidor, antes de consultar ou alterar qualquer registro.

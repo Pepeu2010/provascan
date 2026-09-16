@@ -16,9 +16,10 @@ admin em uma única camada auditável.
 
 ## Regras de autorização aplicadas
 
-- Professor só lê e salva a seção de prova cujo `teacher_id` é o seu id.
-- Coordenação/admin cria, revisa e libera provas colaborativas.
-- Uma prova só é liberada quando todas as seções estão aprovadas.
+- Professor cria, lê, edita, publica e arquiva somente provas cujo `creator_id` é o seu id.
+- O `creator_id` vem da sessão no servidor e um trigger impede sua troca posterior.
+- Coordenação/admin consulta provas institucionais, sem etapa de aprovação ou liberação.
+- Arquivos importados ficam em bucket privado e são entregues somente por URL assinada após autorização.
 - Professores não recebem nem gravam o snapshot operacional completo.
 - Endpoints administrativos exigem papel privilegiado no servidor.
 

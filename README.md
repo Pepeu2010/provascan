@@ -165,12 +165,11 @@ Revise e aplique as migrations de [`supabase/migrations`](./supabase/migrations)
 | Persistência externa | `npm run test:universal-persistence` |
 | Fluxo de correção externa | `npm run test:universal-correction-flow` |
 | Fluxo de autenticação | `npm run test:auth-flow` |
-| Acesso colaborativo | `npm run test:collaborative-access` |
-| Impressão colaborativa | `npm run test:collaborative-printing` |
+| Fluxo de provas do professor | `npm run test:teacher-exam-flow` |
+| Impressão de provas | `npm run test:exam-printing` |
 | Autorização de API | `npm run test:api-authorization` |
 | Estabilidade de carregamento | `npm run test:dashboard-loading-stability` |
 | Hardening de segurança | `npm run test:security-hardening` |
-| Rascunho de prova colaborativa | `npm run test:collaborative-exam-draft` |
 | Migrations em schema novo | `npm run test:fresh-schema-migrations` |
 | Fallback WebGL | `npm run test:webgl-fallback` |
 

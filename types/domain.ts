@@ -44,6 +44,8 @@ export type Exam = {
   codigo: string;
   templateVersion: string;
   releasedAt?: string | null;
+  status?: "rascunho" | "publicada" | "aplicada" | "arquivada";
+  creatorId?: string;
 };
 
 export type AnswerKey = {

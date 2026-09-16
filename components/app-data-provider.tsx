@@ -617,8 +617,8 @@ export function AppDataProvider({
 
     const saveCorrectionHandler = async (input: SaveCorrectionInput) => {
       const exam = data.exams.find((item) => item.id === input.examId);
-      if (exam && !exam.releasedAt) {
-        return { ok: false, message: "Esta prova ainda não foi liberada pela gestão após a aprovação dos blocos." };
+      if (exam && exam.status !== "publicada" && exam.status !== "aplicada") {
+        return { ok: false, message: "Publique a prova antes de iniciar a correção." };
       }
       const student = data.students.find((item) => item.id === input.studentId);
       const answerKey = data.answerKeys

@@ -225,7 +225,7 @@ export async function getOperationalAppData(): Promise<AppDataState> {
   const [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult] = await Promise.all([
     db.from("classes").select("id,name,academic_year,audience_id,audience_label,group_type,year_segment"),
     db.from("students").select("id,name,class_id,status"),
-    db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at"),
+    db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at,status,creator_id"),
     db.from("answer_keys").select("exam_id,question_number,correct_answer"),
     db.from("correction_rules").select("exam_id,max_score,rounding_places,default_weight,weights_by_question,voided_questions,voided_question_mode"),
     db.from("corrections").select("id,exam_id,student_id,detected_name,score,correct_count,incorrect_count,blank_count,multiple_marks_count,voided_count,percentage,corrected_at,source_image,correction_time,identification_method,student_snapshot,exam_snapshot,class_snapshot,answers,ocr_confidence,processed_image,observations,identification"),
@@ -237,7 +237,7 @@ export async function getOperationalAppData(): Promise<AppDataState> {
   return {
     classes: normalizedClasses,
     students: ((studentResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), turma: String(row.class_id ?? ""), status: mapStudentStatus(row.status) })) as Student[],
-    exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version), releasedAt: row.released_at ? String(row.released_at) : null })) as Exam[],
+    exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version), releasedAt: row.released_at ? String(row.released_at) : null, status: String(row.status || (row.released_at ? "publicada" : "rascunho")) as Exam["status"], creatorId: String(row.creator_id || "") })) as Exam[],
     answerKeys: ((keyResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), questao: Number(row.question_number), respostaCorreta: String(row.correct_answer) })),
     correctionRules: ((ruleResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), notaMaxima: Number(row.max_score), arredondamentoCasas: Number(row.rounding_places), pesoPadrao: Number(row.default_weight), pesosPorQuestao: Array.isArray(row.weights_by_question) ? row.weights_by_question : [], questoesAnuladas: Array.isArray(row.voided_questions) ? row.voided_questions.map(Number) : [], modoQuestaoAnulada: String(row.voided_question_mode) as ExamCorrectionRule["modoQuestaoAnulada"] })),
     corrections: ((correctionResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ correction: { id: String(row.id), provaId: String(row.exam_id), alunoId: String(row.student_id ?? ""), nomeDetectado: String(row.detected_name), nota: Number(row.score), acertos: Number(row.correct_count), erros: Number(row.incorrect_count), emBranco: Number(row.blank_count), multiplasMarcacoes: Number(row.multiple_marks_count), anuladas: Number(row.voided_count), percentual: Number(row.percentage), data: String(row.corrected_at), imagem: String(row.source_image), tempoCorrecao: String(row.correction_time), metodoIdentificacao: String(row.identification_method) as CorrectionSession["correction"]["metodoIdentificacao"] }, aluno: row.student_snapshot as Student, prova: row.exam_snapshot as Exam, turma: row.class_snapshot as ClassRoom, respostas: (row.answers as CorrectionSession["respostas"]) ?? [], confiancaOcr: Number(row.ocr_confidence), imagemProcessada: String(row.processed_image), observacoes: (row.observations as string[]) ?? [], identificacao: row.identification as CorrectionSession["identificacao"] })) as CorrectionSession[],
@@ -250,13 +250,13 @@ export async function getOperationalSnapshot() { const [data, revision] = await 
 
 export async function getTeacherCorrectionSnapshot(teacherId: string) {
   const database = client();
-  const [{ data: sectionRows, error: sectionsError }, snapshot] = await Promise.all([
-    database.from("exam_sections").select("exam_id").eq("teacher_id", teacherId),
+  const [{ data: ownedRows, error: ownedError }, snapshot] = await Promise.all([
+    database.from("exams").select("id").eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]),
     getOperationalSnapshot(),
   ]);
-  dbError(sectionsError);
-  const assignedExamIds = new Set((sectionRows ?? []).map((item) => String(item.exam_id)));
-  const exams = snapshot.data.exams.filter((exam) => assignedExamIds.has(exam.id) && Boolean(exam.releasedAt));
+  dbError(ownedError);
+  const ownedExamIds = new Set((ownedRows ?? []).map((item) => String(item.id)));
+  const exams = snapshot.data.exams.filter((exam) => ownedExamIds.has(exam.id) && (exam.status === "publicada" || exam.status === "aplicada"));
   const examIds = new Set(exams.map((exam) => exam.id));
   const studentIds = new Set(exams.flatMap((exam) => getStudentsForExam(exam, snapshot.data.students, snapshot.data.classes).map((student) => student.id)));
 
@@ -274,14 +274,9 @@ export async function getTeacherCorrectionSnapshot(teacherId: string) {
 }
 
 export async function teacherCanCorrectExam(teacherId: string, examId: string) {
-  const database = client();
-  const [{ count, error }, { data: exam, error: examError }] = await Promise.all([
-    database.from("exam_sections").select("id", { count: "exact", head: true }).eq("teacher_id", teacherId).eq("exam_id", examId),
-    database.from("exams").select("released_at").eq("id", examId).maybeSingle(),
-  ]);
+  const { data: exam, error } = await client().from("exams").select("id,status").eq("id", examId).eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]).maybeSingle();
   dbError(error);
-  dbError(examError);
-  return Boolean(count && exam?.released_at);
+  return Boolean(exam);
 }
 
 export async function saveCorrectionSession(session: CorrectionSession) {
@@ -312,6 +307,8 @@ export async function saveCorrectionSession(session: CorrectionSession) {
     identification: item.identificacao,
   });
   dbError(error);
+  const { error: examError } = await client().from("exams").update({ applied_at: new Date().toISOString(), status: "aplicada" }).eq("id", item.correction.provaId).in("status", ["publicada", "aplicada"]);
+  dbError(examError);
 }
 export async function saveOperationalAppData(data: AppDataState, metadata?: { actorId: string; revision: string }) {
   const { data: revision, error } = await client().rpc("replace_operational_state", { payload: data, actor_id: metadata?.actorId ?? "system", expected_revision: Number(metadata?.revision ?? 0) });
