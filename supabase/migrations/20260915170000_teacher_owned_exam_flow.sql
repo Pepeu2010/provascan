@@ -3,6 +3,7 @@
 -- antigo particionamento por professor, removendo somente o estado de aprovação.
 
 alter table public.exams
+  add column if not exists subject text not null default '',
   add column if not exists description text not null default '',
   add column if not exists instructions text not null default '',
   add column if not exists period text not null default '',
