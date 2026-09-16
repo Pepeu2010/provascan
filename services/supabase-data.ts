@@ -60,7 +60,7 @@ function mapStudentStatus(value: unknown): Student["status"] {
 
 type DbUser = {
   legacy_id: string; access_key: string; full_name: string; role: string; password_hash: string;
-  active: boolean; force_password_change: boolean; mfa_active: boolean; mfa_method: string; mfa_secret_encrypted: string;
+  active: boolean; force_password_change: boolean; mfa_active: boolean; mfa_exempt: boolean; mfa_method: string; mfa_secret_encrypted: string;
   recovery_codes_hashes: string[]; sessions_revoked_at: string | null;
 };
 
@@ -68,7 +68,7 @@ function mapUser(row: DbUser): UserRecord {
   return {
     id: row.legacy_id, nome: row.full_name, email: row.access_key, senha: row.password_hash, senha_formato: "BCRYPT",
     perfil: row.role, ativo: row.active ? "SIM" : "NAO", trocar_senha: row.force_password_change ? "SIM" : "NAO",
-    mfa_ativo: row.mfa_active ? "SIM" : "NAO", mfa_metodo: row.mfa_method === "TOTP" ? "TOTP" : "",
+    mfa_ativo: row.mfa_active ? "SIM" : "NAO", mfa_isento: row.mfa_exempt ? "SIM" : "NAO", mfa_metodo: row.mfa_method === "TOTP" ? "TOTP" : "",
     mfa_secret_encrypted: row.mfa_secret_encrypted, recovery_codes_configurados: row.recovery_codes_hashes.length ? "SIM" : "NAO",
     recovery_codes_hashes: JSON.stringify(row.recovery_codes_hashes), sessao_revogada_em: toDate(row.sessions_revoked_at),
   };

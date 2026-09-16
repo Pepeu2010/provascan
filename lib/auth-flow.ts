@@ -14,8 +14,8 @@ export function getNextAuthStep(user: UserRecord): Exclude<AuthStep, "LOGIN" | "
   return "TOTP_VERIFY";
 }
 
-export function getMfaPolicy() {
+export function getMfaPolicy(user?: UserRecord) {
   return {
-    required: process.env.MFA_REQUIRED?.trim().toLowerCase() !== "false",
+    required: process.env.MFA_REQUIRED?.trim().toLowerCase() !== "false" && !yes(user?.mfa_isento),
   };
 }
