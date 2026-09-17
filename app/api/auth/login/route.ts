@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth";
 import { burnPasswordVerification, verifyPassword } from "@/lib/passwords";
 import { getMfaPolicy, getNextAuthStep } from "@/lib/auth-flow";
-import { createUserSession } from "@/lib/auth-flow-server";
+import { buildAuthSessionUser, createUserSession } from "@/lib/auth-flow-server";
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
@@ -87,8 +87,9 @@ export async function POST(request: Request) {
 
     const policy = getMfaPolicy(user);
     if (!policy.required && !shouldForcePasswordChange(user.trocar_senha)) {
-      const response = NextResponse.json({ message: "Credenciais confirmadas.", redirectTo: "/dashboard" });
-      await createUserSession(response, user, payload.remember);
+      const sessionUser = buildAuthSessionUser(user, payload.remember);
+      const response = NextResponse.json({ message: "Credenciais confirmadas.", redirectTo: "/dashboard", user: sessionUser });
+      await createUserSession(response, user, payload.remember, sessionUser);
       return response;
     }
     const step = policy.required ? getNextAuthStep(user) : (shouldForcePasswordChange(user.trocar_senha) ? "PASSWORD_CHANGE" : "MFA_METHOD");
