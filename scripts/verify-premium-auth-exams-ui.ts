@@ -40,5 +40,16 @@ assert.match(exams, /creation-hub__option/);
 assert.match(exams, /accept="\.pdf,\.doc,\.docx,\.jpg,\.jpeg,\.png"/);
 assert.match(exams, /if \(file\) void onImport\(file\)/);
 assert.match(exams, /onManual/);
+for (const label of ["Informações", "Questões", "Gabarito", "Revisão"]) {
+  assert.match(exams, new RegExp(label));
+}
+assert.match(exams, /exam-studio__rail/);
+assert.match(exams, /exam-studio__canvas/);
+assert.match(exams, /question-block/);
+assert.match(exams, /publish-checklist/);
+assert.match(exams, /validateExamForPublication\(draft\)/);
+assert.match(exams, /window\.localStorage\.setItem\(LOCAL_DRAFT_KEY/);
+assert.match(exams, /onSave\("rascunho"\)/);
+assert.match(exams, /onSave\("publicar"\)/);
 
 console.log("Premium auth and exams UI contract passed.");
