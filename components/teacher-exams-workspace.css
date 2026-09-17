@@ -111,7 +111,28 @@
 .teacher-exams__empty h2 { font-size: 23px; font-weight: 750; letter-spacing: -.035em; }
 .teacher-exams__empty p { max-width: 520px; color: var(--muted-foreground); line-height: 1.6; }
 
+.creation-hub { display: grid; width: min(1040px, 100%); margin: 0 auto; gap: 25px; }
+.creation-hub__back { width: fit-content; }
+.creation-hub__header { position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border)); border-radius: 26px; background: linear-gradient(120deg, var(--card-solid), color-mix(in srgb, var(--accent-soft) 62%, var(--card-solid))); padding: 30px; text-align: center; }
+.creation-hub__header::after { position: absolute; top: -75px; right: 8%; width: 190px; height: 190px; border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: 50%; content: ""; box-shadow: 0 0 0 34px color-mix(in srgb, var(--accent) 5%, transparent); }
+.creation-hub__header > * { position: relative; z-index: 1; }
+.creation-hub__header h1 { margin-top: 11px; font-size: clamp(2.35rem, 5vw, 4rem); font-weight: 790; letter-spacing: -.064em; line-height: 1; }
+.creation-hub__header > p:last-child { max-width: 650px; margin: 14px auto 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
+.creation-hub__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.creation-hub__option { position: relative; display: grid; min-height: 330px; align-content: start; gap: 16px; overflow: hidden; border: 1px solid var(--border); border-radius: 25px; background: var(--card-solid); padding: 28px; text-align: left; transition: border-color var(--motion-normal) ease, transform var(--motion-normal) var(--motion-settle), box-shadow var(--motion-normal) ease; }
+.creation-hub__option::after { position: absolute; right: -58px; bottom: -72px; width: 180px; height: 180px; border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 50%; content: ""; }
+.creation-hub__option:hover, .creation-hub__option:focus-visible { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 28px 80px rgb(0 0 0 / 18%); }
+.creation-hub__option:disabled { cursor: wait; opacity: .72; }
+.creation-hub__icon { display: grid; width: 58px; height: 58px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border)); border-radius: 18px; background: var(--accent-soft); color: var(--accent); }
+.creation-hub__option > strong { margin-top: 7px; font-size: 25px; font-weight: 760; letter-spacing: -.035em; }
+.creation-hub__option > p { min-height: 76px; color: var(--muted-foreground); font-size: 14px; line-height: 1.65; }
+.creation-hub__option > span:last-child { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin-top: auto; border-top: 1px solid var(--border); padding-top: 18px; color: var(--accent); font-size: 12px; font-weight: 750; }
+.creation-hub__busy::before { position: absolute; top: 0; right: 0; left: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); content: ""; animation: creation-progress 1.2s ease-in-out infinite; }
+.creation-hub__notice { border: 1px solid var(--border); border-radius: 15px; background: var(--surface); padding: 15px 17px; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+.creation-hub__notice strong { color: var(--foreground); }
+
 @keyframes exam-skeleton { to { transform: translateX(100%); } }
+@keyframes creation-progress { 0%, 100% { opacity: .25; transform: scaleX(.25); } 50% { opacity: 1; transform: scaleX(1); } }
 
 @media (max-width: 1100px) {
   .teacher-exams__filters { grid-template-columns: 1fr 1fr; }
@@ -122,6 +143,7 @@
 @media (max-width: 900px) {
   .teacher-exams__command { min-height: 0; align-items: flex-start; flex-direction: column; }
   .teacher-exams__command > div:last-child { width: 100%; }
+  .creation-hub__options { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -143,6 +165,12 @@
   .exam-card__primary { min-width: 0; }
   .exam-card__actions > div:last-child { margin-left: 0; }
   .exam-card__menu { width: min(270px, calc(100vw - 52px)); }
+  .creation-hub { gap: 16px; }
+  .creation-hub__header { border-radius: 21px; padding: 25px 20px; }
+  .creation-hub__header::after { display: none; }
+  .creation-hub__header h1 { font-size: 2.35rem; }
+  .creation-hub__option { min-height: 0; border-radius: 20px; padding: 22px; }
+  .creation-hub__option > p { min-height: 0; }
 }
 
 @media (max-width: 390px) {
@@ -154,4 +182,7 @@
   .teacher-exams__resume, .exam-card { transition: none; }
   .teacher-exams__resume:hover, .exam-card:hover { transform: none; }
   .exam-card--skeleton::before { animation: none; }
+  .creation-hub__option { transition: none; }
+  .creation-hub__option:hover, .creation-hub__option:focus-visible { transform: none; }
+  .creation-hub__busy::before { animation: none; }
 }

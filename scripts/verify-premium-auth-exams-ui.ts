@@ -35,5 +35,10 @@ assert.match(exams, /exam-card__primary/);
 assert.match(exams, /ExamListSkeleton/);
 assert.match(exams, /Nenhuma prova corresponde aos filtros/);
 assert.match(exams, /Sua primeira prova começa aqui/);
+assert.match(exams, /creation-hub/);
+assert.match(exams, /creation-hub__option/);
+assert.match(exams, /accept="\.pdf,\.doc,\.docx,\.jpg,\.jpeg,\.png"/);
+assert.match(exams, /if \(file\) void onImport\(file\)/);
+assert.match(exams, /onManual/);
 
 console.log("Premium auth and exams UI contract passed.");
