@@ -308,3 +308,11 @@
   .question-block { transition: none; }
   .exam-studio__steps button, .exam-studio__steps button::after { transition: none; }
 }
+
+.application-groups { display: grid; gap: 12px; }
+.application-group { overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--card-solid); }
+.application-group > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.application-group > header strong { color: var(--foreground); }
+.application-group > header span { color: var(--muted-foreground); font-size: .8rem; }
+.application-group > div { display: grid; gap: 10px; padding: 14px 16px; }
+@media (max-width: 640px) { .application-group > header { align-items: flex-start; flex-direction: column; gap: 3px; } }

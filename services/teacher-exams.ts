@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
+import { validateNewExamAssignmentPairs } from "@/services/exam-assignments";
+import { resolveSubjectSnapshot } from "@/services/pedagogical-scopes";
 import type { TeacherExam, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
 
 function db() {
@@ -32,7 +34,7 @@ function mapQuestion(row: Record<string, unknown>): TeacherExamQuestion {
 }
 
 const examColumns = [
-  "id", "title", "description", "subject", "audience_id", "audience_label", "group_type", "year_segment", "period",
+  "id", "title", "description", "subject", "subject_id", "audience_id", "audience_label", "group_type", "year_segment", "period",
   "exam_date", "instructions", "estimated_duration", "creator_id", "source_type", "status", "original_file_name",
   "original_file_mime_type", "original_file_size", "imported_at", "import_processing_status", "import_processing_error",
   "needs_review", "version", "created_at", "updated_at", "published_at", "applied_at", "legacy_contributors",
@@ -94,6 +96,8 @@ async function hydrate(rows: Array<Record<string, unknown>>): Promise<TeacherExa
       sourceType: String(row.source_type) as TeacherExam["sourceType"],
       status: String(row.status) as TeacherExam["status"],
       subject: String(row.subject || ""),
+      subjectId: row.subject_id ? String(row.subject_id) : null,
+      assignmentGroups: [],
       title: String(row.title || ""),
       updatedAt: String(row.updated_at),
       version: Number(row.version),
@@ -141,6 +145,7 @@ function examRow(actorId: string, creatorName: string, examId: string, input: Te
     released_at: published ? now : null,
     status: published ? "publicada" : "rascunho",
     subject: input.subject,
+    subject_id: input.subjectId || null,
     template_version: "PS-CARD-4",
     title: input.title || "Prova sem título",
     year_segment: input.yearSegment || "OUTROS",
@@ -189,12 +194,17 @@ async function replaceExamContent(examId: string, input: TeacherExamInput) {
 }
 
 export async function createTeacherExam(input: {
+  actorRole?: import("@/types/auth").UserRole;
   actorId: string;
   creatorName: string;
   exam: TeacherExamInput;
   intent: "rascunho" | "publicar";
   source?: Partial<Record<string, unknown>>;
 }) {
+  if (input.intent === "publicar") {
+    if (!input.actorRole) throw new Error("Perfil de acesso ausente.");
+    return createPublishedTeacherExam({ ...input, actorRole: input.actorRole, intent: "publicar" });
+  }
   const client = db();
   const examId = crypto.randomUUID();
   const row = examRow(input.actorId, input.creatorName, examId, input.exam, input.intent, input.source);
@@ -217,6 +227,38 @@ export async function createTeacherExam(input: {
     await client.from("exams").delete().eq("id", examId).eq("creator_id", input.actorId);
     throw error;
   }
+}
+
+async function createPublishedTeacherExam(input: {
+  actorId: string; actorRole: import("@/types/auth").UserRole; creatorName: string; exam: TeacherExamInput; intent: "publicar"; source?: Partial<Record<string, unknown>>;
+}) {
+  if (!input.exam.subjectId) throw new Error("Selecione uma disciplina válida.");
+  const subject = await resolveSubjectSnapshot(input.exam.subjectId);
+  const pairs = await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups: input.exam.assignmentGroups ?? [], subjectId: subject.id });
+  if (!pairs.length) throw new Error("Defina pelo menos uma turma responsável.");
+  const examId = crypto.randomUUID();
+  const normalizedExam = { ...input.exam, subject: subject.name, subjectId: subject.id };
+  const row = examRow(input.actorId, input.creatorName, examId, normalizedExam, "publicar", input.source);
+  const { _creatorName, ...storedRow } = row;
+  const questions = normalizedExam.questions.map((question, index) => ({
+    alternatives: question.alternatives, annulled: question.annulled, correct_answers: question.correctAnswers,
+    correction_criteria: question.correctionCriteria, correction_notes: question.correctionNotes,
+    id: question.id?.trim() || crypto.randomUUID(), image_path: question.imagePath || null,
+    needs_review: question.needsReview, position: index + 1, prompt: question.prompt, type: question.type, weight: question.weight,
+  }));
+  const payload = {
+    audit_event: "teacher_exam_published", audit_id: crypto.randomUUID(),
+    assignments: pairs.map((pair) => ({ class_id: pair.classId, id: crypto.randomUUID(), teacher_id: pair.teacherId })),
+    audit_metadata: { questionCount: questions.length }, creator_name: _creatorName, exam: storedRow,
+    max_score: questions.reduce((sum, question) => sum + Number(question.weight), 0) || 10,
+    questions, section_id: crypto.randomUUID(),
+    voided_questions: questions.filter((question) => question.annulled).map((question) => question.position),
+    weights_by_question: questions.filter((question) => Number(question.weight) !== 1).map((question) => ({ peso: question.weight, questao: question.position })),
+  };
+  const { data, error } = await db().rpc("create_teacher_exam_transaction", { p_payload: payload });
+  ensure(error, "Não foi possível publicar a prova.");
+  if (String(data || "") !== examId) throw new Error("A publicação não foi confirmada.");
+  return examId;
 }
 
 function structuralFingerprint(exam: Pick<TeacherExam, "questions"> | TeacherExamInput) {
@@ -275,6 +317,8 @@ export async function duplicateTeacherExam(actorId: string, creatorName: string,
     period: source.period,
     questions: source.questions.map(({ id: _id, imagePath, ...question }) => ({ ...question, imagePath })),
     subject: source.subject,
+    subjectId: source.subjectId ?? null,
+    assignmentGroups: [],
     title: `Cópia de ${source.title}`,
     yearSegment: source.yearSegment,
   };

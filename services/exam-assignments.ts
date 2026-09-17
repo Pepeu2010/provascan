@@ -52,6 +52,58 @@ async function validatePairs(input: { actorId: string; actorRole: UserRole; exam
   return pairs;
 }
 
+/** Revalida o público de uma prova ainda não persistida; a criação usa a mesma
+ * política das alterações posteriores, antes da transação de publicação. */
+export async function validateNewExamAssignmentPairs(input: { actorId: string; actorRole: UserRole; groups: AssignmentGroup[]; justification?: string; subjectId: string }) {
+  const pairs = expandAssignmentGroups(input.groups);
+  if (!pairs.length) return [];
+  const client = db();
+  const [{ data: users, error: userError }, { data: classes, error: classError }] = await Promise.all([
+    client.from("app_users").select("legacy_id,active").in("legacy_id", [...new Set(pairs.map((pair) => pair.teacherId))]),
+    client.from("classes").select("id").in("id", [...new Set(pairs.map((pair) => pair.classId))]),
+  ]);
+  ensure(userError, "Não foi possível validar os professores.");
+  ensure(classError, "Não foi possível validar as turmas.");
+  const activeUsers = new Set((users ?? []).filter((user) => Boolean(user.active)).map((user) => String(user.legacy_id)));
+  const validClasses = new Set((classes ?? []).map((item) => String(item.id)));
+  for (const pair of pairs) {
+    if (!activeUsers.has(pair.teacherId)) throw new Error("O professor responsável precisa estar ativo.");
+    if (!validClasses.has(pair.classId)) throw new Error("A turma selecionada não existe.");
+    const hasScope = await canActOnExamScope({ classId: pair.classId, role: input.actorRole, subjectId: input.subjectId, userId: input.actorId });
+    const destinationHasScope = await canActOnExamScope({ classId: pair.classId, role: "professor", subjectId: input.subjectId, userId: pair.teacherId });
+    if (!canAssignPair({ actorId: input.actorId, actorRole: input.actorRole, destinationHasScope, destinationTeacherId: pair.teacherId, hasScope, scopeException: Boolean(input.justification?.trim()) })) {
+      throw new Error("Seu perfil não pode atribuir esta prova para esta turma.");
+    }
+  }
+  return pairs;
+}
+
+export type AssignableAudience = { classes: Array<{ id: string; name: string }>; teachers: Array<{ classIds: string[]; id: string; name: string }> };
+
+export async function getAssignableAudience(input: { actorId: string; actorRole: UserRole; subjectId: string }): Promise<AssignableAudience> {
+  const client = db();
+  const { data: scopeRows, error: scopeError } = await client.from("pedagogical_scopes").select("user_id,class_id").eq("subject_id", input.subjectId).eq("active", true).is("archived_at", null);
+  ensure(scopeError, "Não foi possível carregar os escopos pedagógicos.");
+  const rows = (scopeRows ?? []).map((row) => ({ classId: String(row.class_id), userId: String(row.user_id) }));
+  const actorClassIds = new Set(rows.filter((row) => row.userId === input.actorId).map((row) => row.classId));
+  const eligibleRows = input.actorRole === "admin" || input.actorRole === "vice_diretor" ? rows : rows.filter((row) => actorClassIds.has(row.classId));
+  const classIds = [...new Set(eligibleRows.map((row) => row.classId))];
+  const teacherIds = [...new Set(eligibleRows.map((row) => row.userId))];
+  const [{ data: classRows, error: classError }, { data: userRows, error: userError }] = await Promise.all([
+    classIds.length ? client.from("classes").select("id,name").in("id", classIds).order("name") : Promise.resolve({ data: [], error: null }),
+    teacherIds.length ? client.from("app_users").select("legacy_id,full_name,active").in("legacy_id", teacherIds).eq("active", true).order("full_name") : Promise.resolve({ data: [], error: null }),
+  ]);
+  ensure(classError, "Não foi possível carregar as turmas.");
+  ensure(userError, "Não foi possível carregar os professores.");
+  const classes = (classRows ?? []).map((row) => ({ id: String(row.id), name: String(row.name) }));
+  const allowedClassIds = new Set(classes.map((item) => item.id));
+  const teachers = (userRows ?? []).map((user) => ({
+    classIds: eligibleRows.filter((row) => row.userId === String(user.legacy_id) && allowedClassIds.has(row.classId)).map((row) => row.classId),
+    id: String(user.legacy_id), name: String(user.full_name),
+  }));
+  return { classes, teachers };
+}
+
 export async function syncExamAssignments(input: { actorId: string; actorRole: UserRole; examId: string; groups: AssignmentGroup[]; justification?: string }) {
   const desired = await validatePairs(input);
   const current = await listExamAssignments(input.examId, true);

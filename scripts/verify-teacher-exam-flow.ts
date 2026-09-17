@@ -32,6 +32,8 @@ const validExam = {
   period: "1º Bimestre",
   questions: [{ ...defaultQuestion(1), alternatives: ["Terra", "Marte"], correctAnswers: ["Marte"], prompt: "Qual é o planeta vermelho?" }],
   subject: "Ciências",
+  subjectId: "subject-ciencias",
+  assignmentGroups: [{ teacherId: "teacher-1", classIds: ["turma-1"] }],
   title: "Avaliação",
   yearSegment: "1",
 };
@@ -43,12 +45,20 @@ const collectionRoute = readFileSync(new URL("../app/api/teacher-exams/route.ts"
 const itemRoute = readFileSync(new URL("../app/api/teacher-exams/[examId]/route.ts", import.meta.url), "utf8");
 const service = readFileSync(new URL("../services/teacher-exams.ts", import.meta.url), "utf8");
 const workspace = readFileSync(new URL("../components/teacher-exams-workspace.tsx", import.meta.url), "utf8");
+const transaction = readFileSync(new URL("../supabase/migrations/20260917143000_teacher_exam_publication_transaction.sql", import.meta.url), "utf8");
 assert.match(collectionRoute, /actorId: session\.id/);
 assert.match(itemRoute, /actorId: session\.id/);
 assert.match(service, /\.eq\("creator_id", input\.actorId\)/);
 assert.match(service, /não pertence a você/);
 assert.match(workspace, /Salvar rascunho/);
 assert.match(workspace, /Publicar prova/);
+assert.match(workspace, /Aplicação da prova/);
+assert.match(workspace, /Cada seleção une um professor responsável a uma turma específica/);
 assert.match(workspace, /Duplicar prova/);
+assert.match(service, /resolveSubjectSnapshot/);
+assert.match(service, /validateNewExamAssignmentPairs/);
+assert.match(service, /create_teacher_exam_transaction/);
+assert.match(transaction, /insert into public\.exam_assignments/);
+assert.match(transaction, /insert into public\.audit_log_internal/);
 assert.doesNotMatch(workspace, /Enviar para (?:aprovação|conferência|gestão)/i);
 console.log("Teacher-owned exam flow checks passed.");

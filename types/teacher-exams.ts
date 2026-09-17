@@ -31,6 +31,8 @@ export type TeacherExam = {
   title: string;
   description: string;
   subject: string;
+  subjectId?: string | null;
+  assignmentGroups?: Array<{ teacherId: string; classIds: string[] }>;
   audienceId: string;
   audienceLabel: string;
   groupType: string;
@@ -64,6 +66,8 @@ export type TeacherExamInput = {
   title: string;
   description: string;
   subject: string;
+  subjectId?: string | null;
+  assignmentGroups?: Array<{ teacherId: string; classIds: string[] }>;
   audienceId: string;
   audienceLabel: string;
   groupType: string;

@@ -23,6 +23,8 @@ export const teacherExamInputSchema = z.object({
   title: z.string().trim().max(200),
   description: z.string().trim().max(4_000),
   subject: shortText,
+  subjectId: z.string().trim().max(120).nullable().optional(),
+  assignmentGroups: z.array(z.object({ teacherId: z.string().trim().max(120), classIds: z.array(z.string().trim().max(120)).max(200) }).strict()).max(200).optional(),
   audienceId: z.string().trim().max(120),
   audienceLabel: shortText,
   groupType: z.string().trim().max(40),
@@ -51,6 +53,8 @@ export function validateExamForPublication(exam: TeacherExamInput): string[] {
   const errors: string[] = [];
   if (!exam.title.trim()) errors.push("Informe o nome da prova.");
   if (!exam.subject.trim()) errors.push("Informe a disciplina.");
+  if (!exam.subjectId) errors.push("Selecione uma disciplina válida.");
+  if (!exam.assignmentGroups?.some((group) => group.teacherId && group.classIds.length)) errors.push("Defina pelo menos uma turma responsável.");
   if (!exam.audienceLabel.trim()) errors.push("Informe a turma ou o público da prova.");
   if (!exam.questions.length) errors.push("Adicione ao menos uma questão.");
   exam.questions.forEach((question, index) => {

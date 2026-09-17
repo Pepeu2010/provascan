@@ -40,8 +40,8 @@ export async function POST(request: Request) {
     if (errors.length) return NextResponse.json({ error: errors[0], details: errors }, { status: 400 });
   }
   try {
-    const examId = await createTeacherExam({ actorId: session.id, creatorName: session.name, exam: parsed.data.exam, intent: parsed.data.intent });
-    await appendAuditEvent({ actorId: session.id, event: parsed.data.intent === "publicar" ? "teacher_exam_published" : "teacher_exam_draft_created", targetId: examId, metadata: { questionCount: parsed.data.exam.questions.length } });
+    const examId = await createTeacherExam({ actorId: session.id, actorRole: session.role, creatorName: session.name, exam: parsed.data.exam, intent: parsed.data.intent });
+    if (parsed.data.intent !== "publicar") await appendAuditEvent({ actorId: session.id, event: "teacher_exam_draft_created", targetId: examId, metadata: { questionCount: parsed.data.exam.questions.length } });
     return NextResponse.json({ examId, message: parsed.data.intent === "publicar" ? "Prova publicada com sucesso." : "Rascunho salvo." }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível salvar a prova." }, { status: 400 });
