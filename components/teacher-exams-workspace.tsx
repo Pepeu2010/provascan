@@ -91,7 +91,7 @@ function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-function openPrint(exam: TeacherExam, answerSheet = false) {
+export function openPrint(exam: TeacherExam, answerSheet = false) {
   const printWindow = window.open("", "_blank", "width=950,height=760");
   if (!printWindow) return false;
   printWindow.opener = null;
