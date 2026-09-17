@@ -82,6 +82,7 @@
 }
 
 .exam-card:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); transform: translateY(-2px); box-shadow: var(--shadow-floating); }
+.exam-card.has-open-menu { z-index: 40; }
 .exam-card.is-archived { opacity: .76; }
 .exam-card__header { display: grid; min-width: 0; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: start; gap: 13px; }
 .exam-card__origin { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 15px; background: color-mix(in srgb, var(--accent-soft) 86%, var(--surface)); color: var(--accent); }

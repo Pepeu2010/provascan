@@ -346,7 +346,7 @@ function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: st
 function ExamRow({ exam, busy, readOnly, onAction, onEdit, onMessage }: { exam: TeacherExam; busy: boolean; readOnly: boolean; onAction: (exam: TeacherExam, action: "duplicar" | "arquivar" | "restaurar" | "excluir") => Promise<void>; onEdit: () => void; onMessage: (message: string) => void }) {
   const [menu, setMenu] = useState(false);
   const originIcon = exam.sourceType === "pdf" || exam.sourceType === "doc" || exam.sourceType === "docx" ? <FileText className="size-5" /> : exam.sourceType === "imagem" ? <ImageIcon className="size-5" /> : <Pencil className="size-5" />;
-  return <Card className={`exam-card ${exam.status === "arquivada" ? "is-archived" : ""}`}>
+  return <Card className={`exam-card ${exam.status === "arquivada" ? "is-archived" : ""} ${menu ? "has-open-menu" : ""}`}>
     <header className="exam-card__header">
       <div className="exam-card__origin" aria-hidden="true">{originIcon}</div>
       <div className="exam-card__title"><p>{exam.subject || "Sem disciplina"}</p><button type="button" onClick={onEdit}>{exam.title}</button></div>

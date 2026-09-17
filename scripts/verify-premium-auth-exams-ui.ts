@@ -51,5 +51,9 @@ assert.match(exams, /validateExamForPublication\(draft\)/);
 assert.match(exams, /window\.localStorage\.setItem\(LOCAL_DRAFT_KEY/);
 assert.match(exams, /onSave\("rascunho"\)/);
 assert.match(exams, /onSave\("publicar"\)/);
+assert.match(exams, /menu \? "has-open-menu" : ""/);
+
+const examsCss = read("components/teacher-exams-workspace.css");
+assert.match(examsCss, /\.exam-card\.has-open-menu\s*\{[^}]*z-index:\s*40/);
 
 console.log("Premium auth and exams UI contract passed.");
