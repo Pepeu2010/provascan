@@ -43,8 +43,12 @@
 .teacher-exams__command h1 { max-width: 790px; margin-top: 10px; font-size: clamp(2.25rem, 4.6vw, 3.8rem); font-weight: 790; letter-spacing: -.064em; line-height: .98; text-wrap: balance; }
 .teacher-exams__command p:not(.teacher-exams__eyebrow) { max-width: 720px; margin-top: 15px; color: var(--muted-foreground); font-size: 15px; line-height: 1.65; }
 .teacher-exams__eyebrow { color: var(--accent); font-family: var(--font-plex-mono), monospace; font-size: 9px; font-weight: 800; letter-spacing: .18em; }
-.teacher-exams__command > div:last-child { flex: none; }
-.teacher-exams__command > div:last-child .button, .teacher-exams__command > div:last-child button { min-height: 48px; border-radius: 13px; }
+.teacher-exams__command-actions { display: flex; min-height: 48px; flex: none; flex-direction: column; gap: 8px; }
+.teacher-exams__command-actions .button, .teacher-exams__command-actions > button { min-height: 48px; border-radius: 13px; }
+.teacher-exams__command-skeleton { display: flex; min-height: 48px; gap: 8px; }
+.teacher-exams__command-actions > button:first-child, .teacher-exams__command-skeleton span { width: 158px; }
+.teacher-exams__command-actions > button:nth-child(2), .teacher-exams__command-skeleton span:last-child { width: 132px; }
+.teacher-exams__command-skeleton span { display: block; min-height: 48px; border-radius: 13px; background: linear-gradient(100deg, var(--surface), var(--surface-strong), var(--surface)); background-size: 200% 100%; animation: command-skeleton 1.5s ease-in-out infinite; }
 
 .teacher-exams__message { border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--accent-soft) 56%, var(--card-solid)); padding: 14px 16px; color: var(--foreground); font-size: 13px; line-height: 1.55; }
 
@@ -213,7 +217,12 @@
 .exam-preview li span { display: block; color: #596579; font-size: 12px; }
 
 @keyframes exam-skeleton { to { transform: translateX(100%); } }
+@keyframes command-skeleton { to { background-position: -200% 0; } }
 @keyframes creation-progress { 0%, 100% { opacity: .25; transform: scaleX(.25); } 50% { opacity: 1; transform: scaleX(1); } }
+
+@media (min-width: 641px) {
+  .teacher-exams__command-actions { flex-direction: row; }
+}
 
 @media (max-width: 1100px) {
   .teacher-exams__filters { grid-template-columns: 1fr 1fr; }
@@ -226,7 +235,7 @@
 
 @media (max-width: 900px) {
   .teacher-exams__command { min-height: 0; align-items: flex-start; flex-direction: column; }
-  .teacher-exams__command > div:last-child { width: 100%; }
+  .teacher-exams__command-actions { width: 100%; }
   .creation-hub__options { grid-template-columns: 1fr; }
   .exam-studio__layout { grid-template-columns: 1fr; }
   .exam-studio__rail { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -236,8 +245,10 @@
   .teacher-exams__command { border-radius: 21px; padding: 24px 20px; }
   .teacher-exams__command::before, .teacher-exams__command::after { display: none; }
   .teacher-exams__command h1 { font-size: 2.3rem; }
-  .teacher-exams__command > div:last-child { display: grid; grid-template-columns: 1fr; }
-  .teacher-exams__command > div:last-child button { width: 100%; }
+  .teacher-exams__command-actions { display: grid; grid-template-columns: 1fr; }
+  .teacher-exams__command-actions > button { width: 100%; }
+  .teacher-exams__command-skeleton { display: grid; grid-template-columns: 1fr; }
+  .teacher-exams__command-skeleton span, .teacher-exams__command-skeleton span:last-child { width: 100%; }
   .teacher-exams__stats { grid-template-columns: repeat(2, 1fr); overflow: visible; border: 0; gap: 8px; background: transparent; }
   .teacher-exams__stats button { min-height: 72px; border: 1px solid var(--border) !important; border-radius: 13px; background: var(--card-solid); }
   .teacher-exams__stats button:first-child { grid-column: 1 / -1; }

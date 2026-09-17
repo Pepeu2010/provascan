@@ -11,7 +11,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const session = await getExamSession();
-  if (!session || session.role !== "professor") return NextResponse.json({ error: "A importação de provas é exclusiva de professores." }, { status: 403 });
+  if (!session?.canCreateExam) return NextResponse.json({ error: "Seu perfil não pode importar provas." }, { status: 403 });
   const rateLimit = await consumeRateLimit({ bucket: "teacher-exam-import", key: buildRateLimitKey(getClientIp(request.headers), session.id), limit: 10, windowMs: 30 * 60 * 1000 });
   if (!rateLimit.ok) return NextResponse.json({ error: "Muitas importações em sequência. Aguarde e tente novamente." }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
   let form: FormData;

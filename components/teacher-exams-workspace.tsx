@@ -110,8 +110,10 @@ export function openPrint(exam: TeacherExam, answerSheet = false) {
 
 export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: boolean }) {
   const [exams, setExams] = useState<TeacherExam[]>([]);
-  const [readOnly, setReadOnly] = useState(false);
+  const [canCreateExam, setCanCreateExam] = useState(false);
+  const [institutionalView, setInstitutionalView] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [permissionsResolved, setPermissionsResolved] = useState(false);
   const [mode, setMode] = useState<WorkspaceMode>("lista");
   const [step, setStep] = useState<EditorStep>("informacoes");
   const [active, setActive] = useState<TeacherExam | null>(null);
@@ -125,36 +127,82 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
   const [autoSavedAt, setAutoSavedAt] = useState("");
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [viewerId, setViewerId] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = async (selectId?: string) => {
     setLoading(true);
+    setPermissionsResolved(false);
     try {
-      const result = await jsonApi<{ exams: TeacherExam[]; readOnly: boolean }>("/api/teacher-exams?arquivadas=1");
+      const result = await jsonApi<{
+        capabilities: { canCreateExam: boolean };
+        exams: TeacherExam[];
+        institutionalView: boolean;
+        viewer: { id: string };
+      }>("/api/teacher-exams?arquivadas=1");
       setExams(result.exams);
-      setReadOnly(result.readOnly);
+      setCanCreateExam(result.capabilities.canCreateExam);
+      setInstitutionalView(result.institutionalView);
+      setViewerId(result.viewer.id);
       if (selectId) {
         const selected = result.exams.find((exam) => exam.id === selectId);
         if (selected) openEditor(selected);
       }
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível carregar as provas."); }
-    finally { setLoading(false); }
+    } catch (error) {
+      setCanCreateExam(false);
+      setViewerId("");
+      setMessage(error instanceof Error ? error.message : "Não foi possível carregar as provas.");
+    } finally {
+      setPermissionsResolved(true);
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, []);
   useEffect(() => {
-    const timer = window.setTimeout(() => setHasLocalDraft(Boolean(window.localStorage.getItem(LOCAL_DRAFT_KEY))), 0);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await jsonApi<{
+          capabilities: { canCreateExam: boolean };
+          exams: TeacherExam[];
+          institutionalView: boolean;
+          viewer: { id: string };
+        }>("/api/teacher-exams?arquivadas=1");
+        if (cancelled) return;
+        setExams(result.exams);
+        setCanCreateExam(result.capabilities.canCreateExam);
+        setInstitutionalView(result.institutionalView);
+        setViewerId(result.viewer.id);
+      } catch (error) {
+        if (cancelled) return;
+        setCanCreateExam(false);
+        setViewerId("");
+        setMessage(error instanceof Error ? error.message : "Não foi possível carregar as provas.");
+      } finally {
+        if (!cancelled) {
+          setPermissionsResolved(true);
+          setLoading(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => {
-    if (mode !== "editor" || readOnly) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setHasLocalDraft(Boolean(window.localStorage.getItem(LOCAL_DRAFT_KEY)));
+    });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    if (mode !== "editor" || !canCreateExam || (active && active.creatorId !== viewerId)) return;
     const timer = window.setTimeout(() => {
       window.localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify({ draft, examId: active?.id ?? null, savedAt: new Date().toISOString() }));
       setHasLocalDraft(true);
       setAutoSavedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
     }, 650);
     return () => window.clearTimeout(timer);
-  }, [active?.id, draft, mode, readOnly]);
+  }, [active, canCreateExam, draft, mode, viewerId]);
 
   const filtered = useMemo(() => exams.filter((exam) => {
     if (libraryOnly && exam.status !== "publicada" && exam.status !== "aplicada") return false;
@@ -221,7 +269,7 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
   }
 
   async function save(intent: "rascunho" | "publicar") {
-    if (busy || readOnly) return;
+    if (busy || !canCreateExam || (active && active.creatorId !== viewerId)) return;
     if (intent === "publicar") {
       const errors = validateExamForPublication(draft);
       if (errors.length) { setMessage(errors.join("\n")); setStep(errors.some((error) => error.startsWith("Questão")) ? "questoes" : "informacoes"); return; }
@@ -240,7 +288,7 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
   }
 
   async function action(exam: TeacherExam, actionName: "duplicar" | "arquivar" | "restaurar" | "excluir") {
-    if (busy || readOnly) return;
+    if (busy || !canCreateExam || exam.creatorId !== viewerId) return;
     if (actionName === "excluir" && !window.confirm(`Excluir “${exam.title}”? Provas com resultados são protegidas e não serão apagadas.`)) return;
     setBusy(true);
     try {
@@ -252,21 +300,21 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
   }
 
   if (mode === "escolha") return <CreationChoice busy={busy} fileInput={fileInput} onBack={() => setMode("lista")} onImport={importFile} onManual={startManual} />;
-  if (mode === "editor") return <ExamEditor active={active} autoSavedAt={autoSavedAt} busy={busy} draft={draft} message={message} readOnly={readOnly} step={step} setDraft={setDraft} setStep={setStep} onBack={() => { setMode("lista"); setMessage(""); }} onSave={save} dragIndex={dragIndex} setDragIndex={setDragIndex} />;
+  if (mode === "editor") return <ExamEditor active={active} autoSavedAt={autoSavedAt} busy={busy} draft={draft} message={message} readOnly={!canCreateExam || Boolean(active && active.creatorId !== viewerId)} step={step} setDraft={setDraft} setStep={setStep} onBack={() => { setMode("lista"); setMessage(""); }} onSave={save} dragIndex={dragIndex} setDragIndex={setDragIndex} />;
 
   return (
     <div className="teacher-exams mx-auto grid max-w-[1420px] gap-5">
       <section className="teacher-exams__command">
         <div>
           <p className="teacher-exams__eyebrow">SUA BIBLIOTECA DE AVALIAÇÕES</p>
-          <h1>{libraryOnly ? "Gabaritos das suas provas" : readOnly ? "Provas da instituição" : "Crie, publique e use. A prova é sua."}</h1>
-          <p>{libraryOnly ? "Confira respostas, imprima provas e gere cartões-resposta." : readOnly ? "Consulte as provas e os arquivos originais da instituição. A criação pertence ao professor." : "Monte do zero ou transforme PDF, Word e imagem em uma prova editável. Sem fila, sem burocracia."}</p>
+          <h1>{libraryOnly ? "Gabaritos das suas provas" : institutionalView ? "Provas da instituição" : "Crie, publique e use. A prova é sua."}</h1>
+          <p>{libraryOnly ? "Confira respostas, imprima provas e gere cartões-resposta." : institutionalView ? "Consulte a instituição e crie suas próprias provas quando necessário." : "Monte do zero ou transforme PDF, Word e imagem em uma prova editável. Sem fila, sem burocracia."}</p>
         </div>
-        {!libraryOnly && !readOnly ? <div className="flex flex-col gap-2 sm:flex-row"><Button size="lg" variant="secondary" onClick={() => fileInput.current?.click()} disabled={busy}><FileUp className="size-4" />Importar arquivo</Button><Button size="lg" onClick={() => setMode("escolha")}><Plus className="size-4" />Nova prova</Button><input ref={fileInput} className="sr-only" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} /></div> : null}
+        {!libraryOnly ? <div className="teacher-exams__command-actions">{!permissionsResolved ? <ExamCreationActionsSkeleton /> : canCreateExam ? <><Button size="lg" variant="secondary" onClick={() => fileInput.current?.click()} disabled={busy}><FileUp className="size-4" />Importar arquivo</Button><Button size="lg" onClick={() => setMode("escolha")}><Plus className="size-4" />Nova prova</Button><input ref={fileInput} className="sr-only" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} /></> : null}</div> : null}
       </section>
 
       {message ? <p className="teacher-exams__message whitespace-pre-line" role="status" aria-live="polite">{message}</p> : null}
-      {hasLocalDraft && !readOnly && !libraryOnly ? <button type="button" className="teacher-exams__resume" onClick={restoreLocalDraft}><Clock3 className="size-5" /><span><strong>Há uma edição salva neste aparelho</strong><small>Continue exatamente de onde parou.</small></span><ChevronRight className="size-5" /></button> : null}
+      {hasLocalDraft && canCreateExam && !libraryOnly ? <button type="button" className="teacher-exams__resume" onClick={restoreLocalDraft}><Clock3 className="size-5" /><span><strong>Há uma edição salva neste aparelho</strong><small>Continue exatamente de onde parou.</small></span><ChevronRight className="size-5" /></button> : null}
 
       <nav className="teacher-exams__stats" aria-label="Resumo das provas">
         {(["todas", "rascunho", "publicada", "aplicada", "arquivada"] as StatusFilter[]).map((status) => <button key={status} type="button" aria-pressed={statusFilter === status} className={statusFilter === status ? "is-active" : ""} onClick={() => setStatusFilter(status)}><strong>{counts[status]}</strong><span>{status === "todas" ? "Todas" : statusLabels[status]}</span></button>)}
@@ -278,7 +326,7 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
         <label><span className="sr-only">Filtrar por origem</span><Select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}><option value="todas">Todas as origens</option><option value="manual">Criação manual</option><option value="pdf">PDF</option><option value="doc">Word .doc</option><option value="docx">Word .docx</option><option value="imagem">Imagem</option></Select></label>
       </Card>
 
-      {loading ? <ExamListSkeleton /> : filtered.length ? <section className="teacher-exams__grid" aria-label="Provas encontradas">{filtered.map((exam) => <ExamRow key={exam.id} exam={exam} busy={busy} readOnly={readOnly} onAction={action} onEdit={() => openEditor(exam)} onMessage={setMessage} />)}</section> : <EmptyLibrary filtered={exams.length > 0} readOnly={readOnly} onCreate={() => setMode("escolha")} />}
+      {loading ? <ExamListSkeleton /> : filtered.length ? <section className="teacher-exams__grid" aria-label="Provas encontradas">{filtered.map((exam) => <ExamRow key={exam.id} exam={exam} busy={busy} readOnly={!canCreateExam || exam.creatorId !== viewerId} onAction={action} onEdit={() => openEditor(exam)} onMessage={setMessage} />)}</section> : <EmptyLibrary filtered={exams.length > 0} readOnly={!canCreateExam} onCreate={() => setMode("escolha")} />}
     </div>
   );
 }
@@ -294,6 +342,10 @@ function CreationChoice({ busy, fileInput, onBack, onImport, onManual }: { busy:
     <input ref={fileInput} className="sr-only" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImport(file); }} />
     <aside className="creation-hub__notice"><strong>Na importação:</strong> enviamos o original para armazenamento privado, validamos o formato real e preparamos uma revisão. Nada é publicado automaticamente.</aside>
   </div>;
+}
+
+function ExamCreationActionsSkeleton() {
+  return <div className="teacher-exams__command-skeleton" aria-busy="true" aria-label="Verificando permissões para criar prova"><span /><span /></div>;
 }
 
 function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step, setDraft, setStep, onBack, onSave, dragIndex, setDragIndex }: {

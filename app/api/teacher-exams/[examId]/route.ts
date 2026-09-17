@@ -24,7 +24,7 @@ export async function GET(_request: Request, context: { params: Promise<{ examId
 export async function PUT(request: Request, context: { params: Promise<{ examId: string }> }) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const session = await getExamSession();
-  if (!session || session.role !== "professor") return NextResponse.json({ error: "Somente o professor proprietário pode editar esta prova." }, { status: 403 });
+  if (!session?.canCreateExam) return NextResponse.json({ error: "Seu perfil não pode editar provas." }, { status: 403 });
   const rateLimit = await consumeRateLimit({ bucket: "teacher-exam-save", key: buildRateLimitKey(getClientIp(request.headers), session.id), limit: 60, windowMs: 10 * 60 * 1000 });
   if (!rateLimit.ok) return NextResponse.json({ error: "Muitos salvamentos em sequência. Aguarde alguns instantes." }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
   let payload: unknown;
@@ -49,7 +49,7 @@ export async function PUT(request: Request, context: { params: Promise<{ examId:
 export async function PATCH(request: Request, context: { params: Promise<{ examId: string }> }) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const session = await getExamSession();
-  if (!session || session.role !== "professor") return NextResponse.json({ error: "Somente o professor proprietário pode alterar esta prova." }, { status: 403 });
+  if (!session?.canCreateExam) return NextResponse.json({ error: "Seu perfil não pode alterar provas." }, { status: 403 });
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "A ação enviada não é válida." }, { status: 400 }); }
   const parsed = teacherExamActionSchema.safeParse(payload);

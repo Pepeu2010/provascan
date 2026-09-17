@@ -14,7 +14,12 @@ export async function GET(request: Request) {
   const includeArchived = new URL(request.url).searchParams.get("arquivadas") === "1";
   try {
     const exams = await listTeacherExams({ actorId: session.id, includeArchived, institutionalView: session.institutionalView });
-    return NextResponse.json({ exams, readOnly: session.institutionalView }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({
+      capabilities: { canCreateExam: session.canCreateExam },
+      exams,
+      institutionalView: session.institutionalView,
+      viewer: { id: session.id },
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Não foi possível carregar as provas." }, { status: 503 });
   }
@@ -23,7 +28,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!(await hasSameOriginRequest())) return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   const session = await getExamSession();
-  if (!session || session.role !== "professor") return NextResponse.json({ error: "A criação de provas é exclusiva do professor responsável." }, { status: 403 });
+  if (!session?.canCreateExam) return NextResponse.json({ error: "Seu perfil não pode criar provas." }, { status: 403 });
   const rateLimit = await consumeRateLimit({ bucket: "teacher-exam-create", key: buildRateLimitKey(getClientIp(request.headers), session.id), limit: 20, windowMs: 15 * 60 * 1000 });
   if (!rateLimit.ok) return NextResponse.json({ error: "Muitas criações em sequência. Aguarde e tente novamente." }, { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } });
   let payload: unknown;

@@ -18,6 +18,15 @@ export function isAcademicManagementRole(role: UserRole) {
   return ACADEMIC_MANAGEMENT_ROLES.has(role);
 }
 
+/**
+ * Fine-grained subject/class scope arrives with pedagogical_scopes. Until
+ * then, creation follows the system's existing academic roles and routes
+ * enforce this policy again before every write.
+ */
+export function canCreateExam(role: UserRole) {
+  return role === "professor" || isAcademicManagementRole(role);
+}
+
 /** Operational records include school-wide student and correction data. */
 export function canAccessOperationalData(role: UserRole) {
   return isAcademicManagementRole(role);
