@@ -109,3 +109,28 @@
   .answer-key-card { transition: none; }
   .answer-key-card:hover { transform: none; }
 }
+
+/* Gabaritos usam a mesma linguagem de operação da biblioteca de provas. */
+.answer-keys__hero { min-height: 0; align-items: center; border-color: var(--border); border-radius: var(--radius-md); background: var(--card-solid); padding: 24px; }
+.answer-keys__hero::after { display: none; }
+.answer-keys__hero-copy { gap: 14px; }
+.answer-keys__hero-icon { width: 42px; height: 42px; border-radius: 10px; background: var(--surface); box-shadow: none; }
+.answer-keys__hero-icon svg { width: 20px; height: 20px; }
+.answer-keys__eyebrow { display: none; }
+.answer-keys__hero h1 { margin-top: 0; font-size: clamp(1.75rem, 3vw, 2.45rem); letter-spacing: -.04em; line-height: 1.12; }
+.answer-keys__hero-copy > div > p:last-child { margin-top: 7px; font-size: 14px; line-height: 1.55; }
+.answer-keys__privacy { border-color: var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 11px 12px; box-shadow: none; backdrop-filter: none; }
+.answer-keys__stats, .answer-key-detail__summary { border-radius: var(--radius-md); }
+.answer-keys__stats button, .answer-key-detail__summary > div { min-height: 68px; }
+.answer-keys__toolbar { gap: 10px; padding: 10px; }
+.answer-keys__search { min-height: 44px; border-width: 1px; border-radius: var(--radius-sm); }
+.answer-key-card { gap: 14px; padding: 18px; }
+.answer-key-card:hover { transform: none; box-shadow: var(--shadow-soft); }
+.answer-key-card__mark { width: 38px; height: 38px; border-radius: 10px; }
+.answer-key-card h2 { font-size: 17px; }
+.answer-key-detail__actions { border-radius: var(--radius-md); box-shadow: var(--shadow-soft); backdrop-filter: none; }
+
+@media (max-width: 640px) {
+  .answer-keys__hero { padding: 20px; }
+  .answer-keys__hero-copy { gap: 12px; }
+}

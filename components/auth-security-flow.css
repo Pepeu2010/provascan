@@ -135,3 +135,17 @@
   .security-flow__method, .security-flow__otp-cell { transition: none; }
   .security-flow__method:hover, .security-flow__method:focus-visible, .security-flow__otp-cell.is-active { transform: none; }
 }
+
+/* MFA usa o mesmo padrão calmo e direto do acesso. */
+.security-flow { gap: 15px; margin-top: 22px; }
+.security-flow__header { gap: 6px; padding-bottom: 15px; }
+.security-flow__eyebrow { color: var(--muted-foreground); }
+.security-flow__header h2 { font-size: clamp(1.65rem, 3vw, 2.15rem); letter-spacing: -.04em; line-height: 1.12; }
+.security-flow__field input, .security-flow__primary { min-height: 46px; border-radius: var(--radius-sm); }
+.security-flow__method { border-color: var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 15px; }
+.security-flow__method::after { display: none; }
+.security-flow__method:hover, .security-flow__method:focus-visible { transform: none; box-shadow: var(--shadow-soft); }
+.security-flow__qr { border-radius: var(--radius-md); box-shadow: var(--shadow-soft); }
+.security-flow__manual, .security-flow__recovery, .security-flow__recovery-codes, .security-flow__message { border-radius: var(--radius-sm); }
+.security-flow__otp-cell { height: 46px; border-radius: var(--radius-sm); }
+.security-flow__message { margin-top: 18px; padding: 18px; }
