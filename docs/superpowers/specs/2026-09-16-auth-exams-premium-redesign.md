@@ -6,6 +6,8 @@ Transformar Login, MFA e Provas em uma experiência visual e operacional tão re
 
 O redesign preserva as APIs, o modelo de autenticação, as permissões por perfil, a criação e publicação de provas, a importação, a impressão e as regras de segurança existentes.
 
+O conteúdo informativo e funcional existente também será preservado. Textos, rótulos, dados exibidos e mensagens do servidor podem ser reposicionados ou receber nova hierarquia visual, mas não terão seu significado alterado neste ciclo.
+
 ## Princípios
 
 - Clareza antes de decoração: a ação principal de cada etapa deve ser óbvia em poucos segundos.
@@ -220,6 +222,7 @@ Nenhuma API pública, schema, payload ou regra de autorização será alterada p
 ## Fora do escopo
 
 - Alterar requisitos de MFA, autenticação ou duração da sessão.
+- Alterar textos funcionais, informações exibidas ou significado de mensagens existentes.
 - Modificar banco, RLS, papéis ou permissões.
 - Criar um novo formato de prova ou leitor OCR.
 - Redesenhar outras áreas do dashboard neste ciclo.
