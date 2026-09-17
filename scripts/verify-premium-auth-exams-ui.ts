@@ -27,4 +27,13 @@ for (const endpoint of ["/api/auth/flow", "/api/auth/password", "/api/auth/mfa/m
   assert.match(security, new RegExp(endpoint));
 }
 
+const exams = read("components/teacher-exams-workspace.tsx");
+assert.match(exams, /import "\.\/teacher-exams-workspace\.css"/);
+assert.match(exams, /teacher-exams__command/);
+assert.match(exams, /teacher-exams__filters/);
+assert.match(exams, /exam-card__primary/);
+assert.match(exams, /ExamListSkeleton/);
+assert.match(exams, /Nenhuma prova corresponde aos filtros/);
+assert.match(exams, /Sua primeira prova começa aqui/);
+
 console.log("Premium auth and exams UI contract passed.");

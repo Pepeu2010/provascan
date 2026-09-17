@@ -1,5 +1,7 @@
 "use client";
 
+import "./teacher-exams-workspace.css";
+
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -254,7 +256,7 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
 
   return (
     <div className="teacher-exams mx-auto grid max-w-[1420px] gap-5">
-      <section className="teacher-exams__hero">
+      <section className="teacher-exams__command">
         <div>
           <p className="teacher-exams__eyebrow">SUA BIBLIOTECA DE AVALIAÇÕES</p>
           <h1>{libraryOnly ? "Gabaritos das suas provas" : readOnly ? "Provas da instituição" : "Crie, publique e use. A prova é sua."}</h1>
@@ -266,17 +268,17 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
       {message ? <p className="teacher-exams__message whitespace-pre-line" role="status" aria-live="polite">{message}</p> : null}
       {hasLocalDraft && !readOnly && !libraryOnly ? <button type="button" className="teacher-exams__resume" onClick={restoreLocalDraft}><Clock3 className="size-5" /><span><strong>Há uma edição salva neste aparelho</strong><small>Continue exatamente de onde parou.</small></span><ChevronRight className="size-5" /></button> : null}
 
-      <section className="teacher-exams__stats" aria-label="Resumo das provas">
+      <nav className="teacher-exams__stats" aria-label="Resumo das provas">
         {(["todas", "rascunho", "publicada", "aplicada", "arquivada"] as StatusFilter[]).map((status) => <button key={status} type="button" aria-pressed={statusFilter === status} className={statusFilter === status ? "is-active" : ""} onClick={() => setStatusFilter(status)}><strong>{counts[status]}</strong><span>{status === "todas" ? "Todas" : statusLabels[status]}</span></button>)}
-      </section>
+      </nav>
 
-      <Card className="teacher-exams__toolbar">
+      <Card className="teacher-exams__filters">
         <label className="teacher-exams__search"><Search className="size-4" aria-hidden="true" /><span className="sr-only">Buscar provas</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por título, disciplina, turma ou professor" /></label>
         <label><span className="sr-only">Filtrar por disciplina</span><Select value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}><option value="todas">Todas as disciplinas</option>{subjects.map((subject) => <option key={subject} value={subject}>{subject}</option>)}</Select></label>
         <label><span className="sr-only">Filtrar por origem</span><Select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}><option value="todas">Todas as origens</option><option value="manual">Criação manual</option><option value="pdf">PDF</option><option value="doc">Word .doc</option><option value="docx">Word .docx</option><option value="imagem">Imagem</option></Select></label>
       </Card>
 
-      {loading ? <ExamListSkeleton /> : filtered.length ? <div className="teacher-exams__list">{filtered.map((exam) => <ExamRow key={exam.id} exam={exam} busy={busy} readOnly={readOnly} onAction={action} onEdit={() => openEditor(exam)} onMessage={setMessage} />)}</div> : <EmptyLibrary filtered={exams.length > 0} readOnly={readOnly} onCreate={() => setMode("escolha")} />}
+      {loading ? <ExamListSkeleton /> : filtered.length ? <section className="teacher-exams__grid" aria-label="Provas encontradas">{filtered.map((exam) => <ExamRow key={exam.id} exam={exam} busy={busy} readOnly={readOnly} onAction={action} onEdit={() => openEditor(exam)} onMessage={setMessage} />)}</section> : <EmptyLibrary filtered={exams.length > 0} readOnly={readOnly} onCreate={() => setMode("escolha")} />}
     </div>
   );
 }
@@ -335,19 +337,23 @@ function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: st
 function ExamRow({ exam, busy, readOnly, onAction, onEdit, onMessage }: { exam: TeacherExam; busy: boolean; readOnly: boolean; onAction: (exam: TeacherExam, action: "duplicar" | "arquivar" | "restaurar" | "excluir") => Promise<void>; onEdit: () => void; onMessage: (message: string) => void }) {
   const [menu, setMenu] = useState(false);
   const originIcon = exam.sourceType === "pdf" || exam.sourceType === "doc" || exam.sourceType === "docx" ? <FileText className="size-5" /> : exam.sourceType === "imagem" ? <ImageIcon className="size-5" /> : <Pencil className="size-5" />;
-  return <Card className="exam-row">
-    <div className="exam-row__origin" aria-hidden="true">{originIcon}</div>
-    <div className="exam-row__body">
-      <div className="exam-row__title"><button type="button" onClick={onEdit}>{exam.title}</button><Badge tone={statusTones[exam.status]}>{statusLabels[exam.status]}</Badge>{exam.needsReview ? <Badge tone="warning">Revisar importação</Badge> : null}</div>
+  return <Card className={`exam-card ${exam.status === "arquivada" ? "is-archived" : ""}`}>
+    <header className="exam-card__header">
+      <div className="exam-card__origin" aria-hidden="true">{originIcon}</div>
+      <div className="exam-card__title"><p>{exam.subject || "Sem disciplina"}</p><button type="button" onClick={onEdit}>{exam.title}</button></div>
+      <span className="exam-card__status"><Badge tone={statusTones[exam.status]}>{statusLabels[exam.status]}</Badge></span>
+    </header>
+    <div className="exam-card__body">
+      {exam.needsReview ? <div className="exam-card__review"><Sparkles className="size-4" /><Badge tone="warning">Revisar importação</Badge></div> : null}
       <p>{exam.subject || "Sem disciplina"} · {exam.audienceLabel || "Sem turma"} · {exam.questions.length} {exam.questions.length === 1 ? "questão" : "questões"}</p>
-      <div><span>Criada por {exam.creatorName}</span><span>Origem: {sourceLabels[exam.sourceType]}</span><span>Atualizada em {formatUpdatedAt(exam.updatedAt)}</span></div>
+      <div className="exam-card__facts"><span>Criada por {exam.creatorName}</span><span>Origem: {sourceLabels[exam.sourceType]}</span><span>Atualizada em {formatUpdatedAt(exam.updatedAt)}</span></div>
     </div>
-    <div className="exam-row__actions">
-      <Button variant="secondary" onClick={onEdit}>{readOnly ? <Eye className="size-4" /> : <Pencil className="size-4" />}{readOnly ? "Abrir" : "Editar"}</Button>
+    <footer className="exam-card__actions">
+      <Button className="exam-card__primary" variant="secondary" onClick={onEdit}>{readOnly ? <Eye className="size-4" /> : <Pencil className="size-4" />}{readOnly ? "Abrir" : "Editar"}</Button>
       {exam.status === "publicada" || exam.status === "aplicada" ? <Button asChild><Link href={`/dashboard/correcao?prova=${encodeURIComponent(exam.id)}`}>Corrigir</Link></Button> : null}
       <div className="relative">
-        <button type="button" className="exam-row__menu-button" aria-label={`Mais ações para ${exam.title}`} aria-expanded={menu} onClick={() => setMenu((value) => !value)}><MoreHorizontal className="size-5" /></button>
-        {menu ? <div className="exam-row__menu">
+        <button type="button" className="exam-card__menu-button" aria-label={`Mais ações para ${exam.title}`} aria-expanded={menu} onClick={() => setMenu((value) => !value)}><MoreHorizontal className="size-5" /></button>
+        {menu ? <div className="exam-card__menu">
           <button type="button" onClick={() => { setMenu(false); onMessage(openPrint(exam) ? "Prova aberta para impressão." : "Permita pop-ups para imprimir."); }}><Printer className="size-4" />Imprimir prova</button>
           <button type="button" onClick={() => { setMenu(false); onMessage(openPrint(exam, true) ? "Cartão-resposta aberto para impressão." : "Permita pop-ups para gerar o cartão."); }}><FileText className="size-4" />Gerar cartão-resposta</button>
           {exam.originalFileName ? <a href={`/api/teacher-exams/${exam.id}/original-file`} target="_blank" rel="noreferrer"><Download className="size-4" />Arquivo original</a> : null}
@@ -358,9 +364,9 @@ function ExamRow({ exam, busy, readOnly, onAction, onEdit, onMessage }: { exam: 
           </> : null}
         </div> : null}
       </div>
-    </div>
+    </footer>
   </Card>;
 }
 
 function EmptyLibrary({ filtered, readOnly, onCreate }: { filtered: boolean; readOnly: boolean; onCreate: () => void }) { return <Card className="teacher-exams__empty"><span><Filter className="size-6" /></span><h2>{filtered ? "Nenhuma prova corresponde aos filtros" : "Sua primeira prova começa aqui"}</h2><p>{filtered ? "Ajuste a busca, o status, a disciplina ou a origem." : readOnly ? "Ainda não há provas cadastradas na instituição." : "Crie manualmente ou importe um arquivo pronto para revisão."}</p>{!filtered && !readOnly ? <Button onClick={onCreate}><Plus className="size-4" />Criar prova</Button> : null}</Card>; }
-function ExamListSkeleton() { return <div className="grid gap-3" aria-label="Carregando provas">{[1, 2, 3].map((item) => <Card key={item} className="h-28 animate-pulse bg-[var(--surface)]" />)}</div>; }
+function ExamListSkeleton() { return <div className="teacher-exams__grid" aria-label="Carregando provas">{[1, 2, 3].map((item) => <Card key={item} className="exam-card exam-card--skeleton" />)}</div>; }
