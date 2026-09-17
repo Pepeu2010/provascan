@@ -27,5 +27,11 @@ else process.env.MFA_REQUIRED = previousMfaPolicy;
 const loginRoute = readFileSync(new URL("../app/api/auth/login/route.ts", import.meta.url), "utf8");
 assert.match(loginRoute, /const policy = getMfaPolicy\(user\)/);
 assert.match(loginRoute, /if \(!policy\.required && !shouldForcePasswordChange\(user\.trocar_senha\)\)[\s\S]*createUserSession/);
+assert.match(loginRoute, /const sessionUser = buildAuthSessionUser\(user, payload\.remember\)/);
+assert.match(loginRoute, /NextResponse\.json\(\{ message: "Credenciais confirmadas\.", redirectTo: "\/dashboard", user: sessionUser \}\)/);
 
-console.log("Auth flow regression passed: MFA remains enforced by default and allows an explicit server-side exemption.");
+const passwordRoute = readFileSync(new URL("../app/api/auth/password/route.ts", import.meta.url), "utf8");
+assert.match(passwordRoute, /const sessionUser = buildAuthSessionUser\(updatedUser, validation\.preAuth\.remember\)/);
+assert.match(passwordRoute, /NextResponse\.json\(\{ message: "Senha alterada com segurança\.", redirectTo: "\/dashboard", user: sessionUser \}\)/);
+
+console.log("Auth flow regression passed: MFA exemption returns the complete browser session after login and password change.");

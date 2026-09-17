@@ -6,7 +6,7 @@ import { getMfaPolicy } from "@/lib/auth-flow";
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/passwords";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
-import { createFinalSession, requirePreAuth } from "@/lib/auth-flow-server";
+import { buildAuthSessionUser, createFinalSession, requirePreAuth } from "@/lib/auth-flow-server";
 import {
   SupabaseConnectionError,
   SupabaseSchemaError,
@@ -84,8 +84,10 @@ export async function POST(request: Request) {
     const nextStoredPassword = await hashPassword(payload.newPassword);
     await updateUserPassword(user.id, nextStoredPassword, { clearPasswordChangeFlag: true });
     if (!getMfaPolicy(user).required) {
-      const response = NextResponse.json({ message: "Senha alterada com segurança.", redirectTo: "/dashboard" });
-      await createFinalSession(response, validation);
+      const updatedUser = { ...user, senha: nextStoredPassword, trocar_senha: "NAO" };
+      const sessionUser = buildAuthSessionUser(updatedUser, validation.preAuth.remember);
+      const response = NextResponse.json({ message: "Senha alterada com segurança.", redirectTo: "/dashboard", user: sessionUser });
+      await createFinalSession(response, validation, sessionUser);
       return response;
     }
     const step = "MFA_METHOD";
