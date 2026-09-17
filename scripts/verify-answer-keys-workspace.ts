@@ -76,6 +76,7 @@ const page = readFileSync(new URL("../app/dashboard/gabaritos/page.tsx", import.
 const workspace = readFileSync(workspaceUrl, "utf8");
 assert.match(page, /AnswerKeysWorkspace/);
 assert.match(workspace, /Central de gabaritos/);
+assert.match(workspace, /import "\.\/answer-keys-workspace\.css"/);
 assert.match(workspace, /Visualizar gabarito/);
 assert.match(workspace, /Gerar cartão-resposta/);
 assert.match(workspace, /Respostas protegidas/);
