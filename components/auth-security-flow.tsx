@@ -81,14 +81,21 @@ export function AuthSecurityFlow({ onComplete }: { onComplete: () => void }) {
   if (loading && !flow) return <FlowMessage icon={<RefreshCw className="size-5 animate-spin" />} title="Preparando sua segurança" text="Validando as próximas etapas permitidas." />;
   if (!flow) return <FlowMessage icon={<LockKeyhole className="size-5" />} title="Sessão expirada" text={error || "Faça login novamente para continuar."} />;
   const common = { loading, error, run, refresh, flow };
+  let content: React.ReactNode;
   switch (flow.step) {
-    case "PASSWORD_CHANGE": return <PasswordStep {...common} />;
+    case "PASSWORD_CHANGE": content = <PasswordStep {...common} />; break;
     case "MFA_METHOD":
-    case "TOTP_SETUP": return <MethodStep {...common} />;
-    case "TOTP_VERIFY": return <TotpStep {...common} configured={flow.mfaConfigured} totp={totp} />;
-    case "RECOVERY_CODES_SAVE": return <RecoveryCodesStep {...common} codes={recoveryCodes} />;
-    default: return <FlowMessage icon={<ShieldCheck className="size-5" />} title="Verificação necessária" text="Recarregue a página para continuar." />;
+    case "TOTP_SETUP": content = <MethodStep {...common} />; break;
+    case "TOTP_VERIFY": content = <TotpStep {...common} configured={flow.mfaConfigured} totp={totp} />; break;
+    case "RECOVERY_CODES_SAVE": content = <RecoveryCodesStep {...common} codes={recoveryCodes} />; break;
+    default: content = <FlowMessage icon={<ShieldCheck className="size-5" />} title="Verificação necessária" text="Recarregue a página para continuar." />;
   }
+  return <div className="security-flow__journey-shell"><SecurityJourney step={flow.step} />{content}</div>;
+}
+
+function SecurityJourney({ step }: { step: AuthStep }) {
+  const activeIndex = step === "PASSWORD_CHANGE" ? 0 : step === "MFA_METHOD" || step === "TOTP_SETUP" || step === "TOTP_VERIFY" ? 1 : 2;
+  return <ol className="security-flow__journey" aria-label="Etapas de proteção da conta">{["Senha", "Autenticador", "Recuperação"].map((label, index) => <li key={label} className={index <= activeIndex ? "is-current" : ""} aria-current={index === activeIndex ? "step" : undefined}><span>{index < activeIndex ? <Check className="size-3" aria-hidden="true" /> : index + 1}</span><strong>{label}</strong></li>)}</ol>;
 }
 
 function PasswordStep({ flow, loading, error, run }: Props) {
