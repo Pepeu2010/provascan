@@ -32,14 +32,15 @@ const validExam = {
   period: "1º Bimestre",
   questions: [{ ...defaultQuestion(1), alternatives: ["Terra", "Marte"], correctAnswers: ["Marte"], prompt: "Qual é o planeta vermelho?" }],
   subject: "Ciências",
-  subjectId: "subject-ciencias",
-  assignmentGroups: [{ teacherId: "teacher-1", classIds: ["turma-1"] }],
+  subjectId: null,
+  assignmentGroups: [],
   title: "Avaliação",
   yearSegment: "1",
 };
 assert.deepEqual(validateExamForPublication(validExam), []);
-assert.match(validateExamForPublication({ ...validExam, title: "" })[0], /nome da prova/i);
+assert.deepEqual(validateExamForPublication({ ...validExam, title: "" }), []);
 assert.match(validateExamForPublication({ ...validExam, questions: [{ ...validExam.questions[0], correctAnswers: [] }] })[0], /resposta correta/i);
+assert.deepEqual(validateExamForPublication({ ...validExam, subject: "", subjectId: null, audienceId: "", audienceLabel: "", assignmentGroups: [] }), []);
 
 const collectionRoute = readFileSync(new URL("../app/api/teacher-exams/route.ts", import.meta.url), "utf8");
 const itemRoute = readFileSync(new URL("../app/api/teacher-exams/[examId]/route.ts", import.meta.url), "utf8");
@@ -52,18 +53,22 @@ assert.match(service, /\.eq\("creator_id", input\.actorId\)/);
 assert.match(service, /não pertence a você/);
 assert.match(workspace, /Salvar rascunho/);
 assert.match(workspace, /Publicar prova/);
-assert.match(workspace, /Aplicação da prova/);
-assert.match(workspace, /Cada seleção une um professor responsável a uma turma específica/);
+assert.match(workspace, /Para quem é esta prova/);
+assert.match(workspace, /wholeYearLabel/);
 assert.match(workspace, /completeQuestionsUntil/);
 assert.match(workspace, /\[10, 20, 45, 90\]/);
 assert.match(workspace, /Completar até/);
 assert.match(workspace, /Colar prova completa com gabarito/);
 assert.match(workspace, /parseImportedExamText/);
-assert.match(workspace, /Colar gabarito em sequência/);
-assert.match(workspace, /Aplicar sequência/);
+assert.match(workspace, /Cole o gabarito de uma vez/);
+assert.match(workspace, /Preencher gabarito/);
+assert.match(workspace, /Isso fica somente nesta prova; não cria um cadastro novo/);
+assert.match(workspace, /wholeYearLabel/);
 assert.match(workspace, /Duplicar prova/);
 assert.match(service, /resolveSubjectSnapshot/);
 assert.match(service, /validateNewExamAssignmentPairs/);
+assert.doesNotMatch(service, /throw new Error\("Selecione uma disciplina válida\."\)/);
+assert.doesNotMatch(service, /Defina pelo menos uma turma responsável/);
 assert.match(service, /create_teacher_exam_transaction/);
 assert.match(transaction, /insert into public\.exam_assignments/);
 assert.match(transaction, /insert into public\.audit_log_internal/);
