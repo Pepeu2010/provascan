@@ -368,3 +368,50 @@
 .application-group > header span { color: var(--muted-foreground); font-size: .8rem; }
 .application-group > div { display: grid; gap: 10px; padding: 14px 16px; }
 @media (max-width: 640px) { .application-group > header { align-items: flex-start; flex-direction: column; gap: 3px; } }
+
+/* Editor de prova: ritmo de trabalho contínuo, com etapas e conteúdo em primeiro plano. */
+.exam-studio { scroll-padding-bottom: 112px; }
+.exam-studio__header { border-color: var(--border); background: var(--card-solid); box-shadow: var(--shadow-soft); }
+.exam-studio__header::after { display: none; }
+.exam-studio__steps { grid-template-columns: repeat(5, minmax(0, 1fr)); border-color: var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-soft); }
+.exam-studio__steps button { display: flex; min-height: 64px; align-items: center; justify-content: center; gap: 10px; padding: 10px 12px; color: var(--muted-foreground); text-align: left; }
+.exam-studio__steps button > span { display: grid; width: 24px; height: 24px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border-strong); border-radius: 999px; color: inherit; font-size: 11px; font-variant-numeric: tabular-nums; }
+.exam-studio__steps button > strong { overflow: hidden; font-size: 12px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.exam-studio__steps button:hover { background: var(--surface); color: var(--foreground); }
+.exam-studio__steps button.is-active { background: color-mix(in srgb, var(--accent-soft) 72%, var(--card-solid)); color: var(--accent-strong); }
+.exam-studio__steps button.is-active > span { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
+.exam-studio__steps button:focus-visible { z-index: 1; outline: 3px solid var(--focus-ring); outline-offset: -3px; }
+.exam-studio__canvas { border: 1px solid var(--border); background: var(--card-solid); box-shadow: var(--shadow-soft); }
+.exam-studio__rail > * { border: 1px solid var(--border); background: var(--card-solid); box-shadow: var(--shadow-soft); }
+.exam-studio__actions { border-color: var(--border); background: var(--card-elevated); box-shadow: var(--shadow-floating); backdrop-filter: none; }
+.exam-studio__canvas :is(input, textarea, select, button) { scroll-margin-bottom: 132px; }
+.section-heading { margin-bottom: 28px; padding-bottom: 16px; }
+.section-heading > p { display: none; }
+.section-heading h2 { margin-top: 0; font-size: clamp(1.5rem, 2.5vw, 2rem); }
+.section-heading span { max-width: 66ch; }
+.exam-form { gap: 20px; }
+.exam-form label > small { color: var(--muted-foreground); font-size: 11px; font-weight: 560; line-height: 1.45; }
+.question-batch { align-items: center; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 16px; }
+.question-batch__presets { gap: 6px; }
+.question-batch__presets button { min-width: 42px; min-height: 42px; border-radius: 9px; }
+.question-batch__controls input, .question-batch__controls .button { min-height: 42px; }
+.question-block { scroll-margin-top: 20px; border-radius: var(--radius-md); background: var(--card-solid); }
+.question-editor > header { min-height: 54px; background: var(--surface); }
+.question-editor > header button { min-width: 36px; min-height: 36px; border-radius: 8px; }
+.question-editor > header button:hover:not(:disabled), .question-editor > header button:focus-visible { background: var(--accent-soft); color: var(--accent-strong); outline: 0; }
+.answer-key-summary { border-radius: var(--radius-md); }
+.answer-key-row { border-radius: var(--radius-sm); }
+.application-group { box-shadow: var(--shadow-soft); }
+
+@media (max-width: 760px) {
+  .exam-studio__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; gap: 8px; border: 0; background: transparent; box-shadow: none; }
+  .exam-studio__steps button { min-height: 52px; justify-content: flex-start; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-solid); }
+  .exam-studio__steps button:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 420px) {
+  .exam-studio__steps button { padding-inline: 10px; gap: 8px; }
+  .exam-studio__steps button > strong { font-size: 11px; }
+  .question-batch { padding: 14px; }
+  .question-batch__presets { width: 100%; justify-content: space-between; }
+}

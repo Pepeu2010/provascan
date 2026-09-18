@@ -143,7 +143,7 @@ function AnswerKeyCard({ exam, onOpen, onMessage }: { exam: TeacherExam; onOpen:
         <Badge tone={ready ? "success" : exam.status === "arquivada" ? "neutral" : "warning"}>{ready ? "Gabarito pronto" : exam.status === "arquivada" ? "Arquivado" : "Precisa completar"}</Badge>
       </header>
       <div className="answer-key-card__meta"><span><UsersRound />{exam.audienceLabel || "Sem turma"}</span><span><ClipboardCheck />{summary.questionCount} {summary.questionCount === 1 ? "questão" : "questões"}</span><span><Target />{summary.totalWeight.toLocaleString("pt-BR")} pontos</span></div>
-      <div className="answer-key-card__progress"><div><span>{summary.answered} de {summary.questionCount} respostas definidas</span><strong>{progress}%</strong></div><span><i style={{ width: `${progress}%` }} /></span></div>
+      <div className="answer-key-card__progress"><div><span>{summary.answered} de {summary.questionCount} respostas definidas</span><strong>{progress}%</strong></div><span role="progressbar" aria-label={`Gabarito de ${exam.title}: ${progress}% completo`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><i style={{ width: `${progress}%` }} /></span></div>
       <div className="answer-key-card__facts"><span>{statusLabels[exam.status]}</span><span>Atualizado em {formatDate(exam.updatedAt)}</span>{summary.annulled ? <span>{summary.annulled} anulada{summary.annulled === 1 ? "" : "s"}</span> : null}</div>
       <footer>
         {summary.complete ? <Button className="flex-1" onClick={onOpen}><BookOpenCheck className="size-4" />Visualizar gabarito</Button> : <Button asChild className="flex-1"><Link href="/dashboard/provas"><Sparkles className="size-4" />Completar em Provas</Link></Button>}
@@ -173,7 +173,7 @@ function AnswerKeyDetail({ exam, onBack }: { exam: TeacherExam; onBack: () => vo
       </section>
       <Card className="answer-key-detail__sheet">
         <header><div><p>RESPOSTAS OFICIAIS</p><h2>Questão por questão</h2></div><LockKeyhole className="size-5" aria-label="Conteúdo protegido" /></header>
-        <ol>{exam.questions.map((question, index) => (
+        <ol aria-label="Respostas oficiais por questão">{exam.questions.map((question, index) => (
           <li key={question.id} className={question.annulled ? "is-annulled" : ""}>
             <span className="answer-key-detail__number">{index + 1}</span>
             <div><small>{question.type.replaceAll("_", " ")}</small><strong>{getAnswerLabel(question)}</strong>{question.prompt ? <p>{question.prompt}</p> : null}</div>
