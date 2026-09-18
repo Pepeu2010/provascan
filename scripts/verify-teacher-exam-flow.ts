@@ -57,6 +57,10 @@ assert.match(workspace, /Cada seleção une um professor responsável a uma turm
 assert.match(workspace, /completeQuestionsUntil/);
 assert.match(workspace, /\[10, 20, 45, 90\]/);
 assert.match(workspace, /Completar até/);
+assert.match(workspace, /Colar prova completa com gabarito/);
+assert.match(workspace, /parseImportedExamText/);
+assert.match(workspace, /Colar gabarito em sequência/);
+assert.match(workspace, /Aplicar sequência/);
 assert.match(workspace, /Duplicar prova/);
 assert.match(service, /resolveSubjectSnapshot/);
 assert.match(service, /validateNewExamAssignmentPairs/);
