@@ -8,6 +8,7 @@ import {
   ArrowLeft, BookOpenCheck, Check, ChevronRight, CircleAlert, ClipboardCheck, FileText,
   KeyRound, LockKeyhole, Printer, Search, ShieldCheck, Sparkles, Target, UsersRound,
 } from "lucide-react";
+import { PrintStudio } from "@/components/print-studio";
 import { openPrint } from "@/components/teacher-exams-workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,8 +43,16 @@ function getAnswerLabel(question: TeacherExamQuestion) {
   if (!question.correctAnswers.length) return "Resposta ainda não definida";
   return question.correctAnswers.map((answer) => {
     const index = question.alternatives.findIndex((alternative) => alternative === answer);
-    return index >= 0 ? `${String.fromCharCode(65 + index)} — ${answer}` : answer;
+    return index >= 0 ? String.fromCharCode(65 + index) : "Resposta definida";
   }).join(" · ");
+}
+
+function answerOptions(question: TeacherExamQuestion) {
+  if (question.type !== "multipla_escolha" && question.type !== "verdadeiro_falso") return [];
+  return ["A", "B", "C", "D", "E"].map((label, index) => ({
+    label,
+    selected: question.correctAnswers.some((answer) => answer === question.alternatives[index]),
+  }));
 }
 
 export function AnswerKeysWorkspace() {
@@ -155,7 +164,6 @@ function AnswerKeyCard({ exam, onOpen, onMessage }: { exam: TeacherExam; onOpen:
 }
 
 function AnswerKeyDetail({ exam, onBack }: { exam: TeacherExam; onBack: () => void }) {
-  const [message, setMessage] = useState("");
   const summary = buildAnswerKeySummary(exam);
   return (
     <div className="answer-key-detail mx-auto grid max-w-[1180px] gap-5">
@@ -164,7 +172,6 @@ function AnswerKeyDetail({ exam, onBack }: { exam: TeacherExam; onBack: () => vo
         <div><p className="answer-keys__eyebrow">GABARITO · VERSÃO {exam.version}</p><h1>{exam.title}</h1><span>{exam.subject || "Sem disciplina"} · {exam.audienceLabel || "Sem turma"} · {exam.creatorName}</span></div>
         <Badge tone={summary.complete ? "success" : "warning"}>{summary.complete ? "Completo" : `${summary.pending} pendente${summary.pending === 1 ? "" : "s"}`}</Badge>
       </header>
-      {message ? <p className="answer-key-detail__message" role="status" aria-live="polite">{message}</p> : null}
       <section className="answer-key-detail__summary" aria-label="Resumo do gabarito">
         <div><ClipboardCheck /><span><strong>{summary.questionCount}</strong> questões</span></div>
         <div><Target /><span><strong>{summary.totalWeight.toLocaleString("pt-BR")}</strong> pontos</span></div>
@@ -176,16 +183,13 @@ function AnswerKeyDetail({ exam, onBack }: { exam: TeacherExam; onBack: () => vo
         <ol aria-label="Respostas oficiais por questão">{exam.questions.map((question, index) => (
           <li key={question.id} className={question.annulled ? "is-annulled" : ""}>
             <span className="answer-key-detail__number">{index + 1}</span>
-            <div><small>{question.type.replaceAll("_", " ")}</small><strong>{getAnswerLabel(question)}</strong>{question.prompt ? <p>{question.prompt}</p> : null}</div>
+            <div><small>{question.type.replaceAll("_", " ")}</small><strong>{getAnswerLabel(question)}</strong>{answerOptions(question).length ? <span className="answer-key-detail__choices" aria-label={`Alternativas da questão ${index + 1}`}>{answerOptions(question).map((option) => <i key={option.label} className={option.selected ? "is-correct" : ""}>{option.label}</i>)}</span> : null}</div>
             <span className="answer-key-detail__weight">{question.weight.toLocaleString("pt-BR")} pt{question.weight === 1 ? "" : "s"}</span>
           </li>
         ))}</ol>
       </Card>
-      <div className="answer-key-detail__actions">
-        <Button variant="secondary" onClick={() => setMessage(openPrint(exam) ? "Prova aberta para impressão." : "Permita pop-ups para imprimir.")}><Printer className="size-4" />Imprimir prova</Button>
-        <Button variant="secondary" onClick={() => setMessage(openPrint(exam, true) ? "Cartão-resposta aberto para impressão." : "Permita pop-ups para gerar o cartão.")}><FileText className="size-4" />Gerar cartão-resposta</Button>
-        {(exam.status === "publicada" || exam.status === "aplicada") ? <Button asChild><Link href={`/dashboard/correcao?prova=${encodeURIComponent(exam.id)}`}>Corrigir agora<ChevronRight className="size-4" /></Link></Button> : <Button asChild><Link href="/dashboard/provas">Abrir em Provas<ChevronRight className="size-4" /></Link></Button>}
-      </div>
+      <PrintStudio exam={exam} initialKind="cartao" />
+      <div className="answer-key-detail__actions">{(exam.status === "publicada" || exam.status === "aplicada") ? <Button asChild><Link href={`/dashboard/correcao?prova=${encodeURIComponent(exam.id)}`}>Corrigir agora<ChevronRight className="size-4" /></Link></Button> : <Button asChild><Link href="/dashboard/provas">Abrir em Provas<ChevronRight className="size-4" /></Link></Button>}</div>
     </div>
   );
 }

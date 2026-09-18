@@ -80,7 +80,9 @@ assert.match(workspace, /import "\.\/answer-keys-workspace\.css"/);
 assert.match(workspace, /Visualizar gabarito/);
 assert.match(workspace, /Gerar cartão-resposta/);
 assert.match(workspace, /Respostas protegidas/);
-assert.match(workspace, /answer-key-detail__message/);
+assert.match(workspace, /answer-key-detail__choices/);
+assert.match(workspace, /PrintStudio/);
+assert.doesNotMatch(workspace, /\$\{String\.fromCharCode\(65 \+ index\)\} — \$\{answer\}/);
 assert.doesNotMatch(workspace, /Gabaritos das suas provas/);
 
 console.log("Answer-key workspace checks passed: dedicated library, protected answers, filters, and print actions are present.");

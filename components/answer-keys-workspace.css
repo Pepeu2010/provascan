@@ -71,6 +71,9 @@
 .answer-key-detail__sheet li > div { display: grid; gap: 5px; }
 .answer-key-detail__sheet small { color: var(--muted-foreground); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .answer-key-detail__sheet li strong { font-size: 16px; line-height: 1.45; }
+.answer-key-detail__choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.answer-key-detail__choices i { display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font-size: 11px; font-style: normal; font-weight: 760; }
+.answer-key-detail__choices i.is-correct { border-color: var(--accent); background: var(--accent); color: var(--accent-contrast); }
 .answer-key-detail__sheet li p { overflow: hidden; max-width: 820px; color: var(--muted-foreground); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .answer-key-detail__weight { border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; color: var(--muted-foreground); font-size: 11px; font-weight: 700; }
 .answer-key-detail__actions { position: sticky; z-index: 20; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; justify-content: flex-end; gap: 9px; border: 1px solid var(--border); border-radius: 16px; background: color-mix(in srgb, var(--card-solid) 90%, transparent); padding: 12px; box-shadow: 0 16px 45px rgb(15 23 42 / 12%); backdrop-filter: blur(14px); }
