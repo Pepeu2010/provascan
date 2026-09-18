@@ -317,6 +317,8 @@
 .login-page__heading span { max-width: 380px; }
 .login-page__auth-form { gap: 17px; }
 .auth-field__control { min-height: 52px; border-radius: 11px; }
+.auth-field__control input { font-size: 16px; }
+.auth-field__control:has(input[autofocus]) { border-color: color-mix(in srgb, var(--accent) 36%, var(--border)); }
 .auth-field__control:focus-within { border-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 45%, var(--input-bg)); box-shadow: 0 0 0 3px var(--focus-ring); }
 .auth-field__reveal { width: 38px; height: 38px; }
 .login-page__options { align-items: center; }
