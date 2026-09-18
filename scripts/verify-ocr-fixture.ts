@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { getQuestionLayout } from "../services/answer-sheet-template";
+import { assessScanQuality } from "../services/scan-quality";
 import { analyzeAnswerSheetCanvas } from "../services/scan-pipeline";
 
 const questionCounts = [45, 60];
@@ -22,6 +23,7 @@ async function main() {
     const image = await loadImage(path.resolve(`fixtures/ocr/ps-card-2-${questionCount}q-test.png`));
     const canvas = createCanvas(image.width, image.height);
     canvas.getContext("2d").drawImage(image, 0, 0);
+    assert.equal(assessScanQuality(canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height) as unknown as ImageData).requiresRecapture, false, "O fixture oficial deve passar na checagem de qualidade.");
     const analysis = await analyzeAnswerSheetCanvas({ answerKeyLength: questionCount, canvas: canvas as unknown as HTMLCanvasElement, expectedTemplateId: "PS-CARD-2" });
     assert.equal(analysis.totalQuestions, questionCount);
     assert.deepEqual(analysis.answers.map((answer) => answer.markedAnswers[0] ?? ""), expectedAnswers, `O leitor deve recuperar as ${questionCount} respostas controladas.`);
