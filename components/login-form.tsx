@@ -56,9 +56,15 @@ export function LoginForm() {
           <p>O ProvaScan identifica a leitura, marca as exceções e mantém a confirmação final nas suas mãos.</p>
           <div className="login-page__scan-card" aria-hidden="true">
             <span className="login-page__scan-grid" />
+            <span className="login-page__scan-sheet"><i /><i /><i /><i /></span>
             <span className="login-page__scan-line" />
-            <span className="login-page__scan-chip">OCR</span>
+            <span className="login-page__scan-chip">LEITURA ASSISTIDA</span>
           </div>
+          <ol className="login-page__workflow" aria-label="Fluxo do ProvaScan">
+            <li><span>01</span><div><strong>Organize</strong><small>Provas e turmas</small></div></li>
+            <li><span>02</span><div><strong>Confira</strong><small>Exceções em foco</small></div></li>
+            <li><span>03</span><div><strong>Decida</strong><small>Resultados claros</small></div></li>
+          </ol>
           <div className="login-page__assurances">
             <span><CheckCircle2 className="size-4" /> Revisão obrigatória</span>
             <span><CheckCircle2 className="size-4" /> Dados por turma</span>
@@ -68,7 +74,7 @@ export function LoginForm() {
           <Card className="login-page__form-card">
             <ProvaScanLogo size="md" />
             <div className="login-page__heading">
-              <p>Acesso do professor</p>
+              <p><ShieldCheck className="size-3.5" aria-hidden="true" />Acesso protegido</p>
               <h1>Entre no seu espaço de trabalho</h1>
               <span>Use suas credenciais para continuar de onde parou.</span>
             </div>
