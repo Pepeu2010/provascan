@@ -75,21 +75,21 @@ export function LoginForm() {
             <ProvaScanLogo size="md" />
             <div className="login-page__heading">
               <p><ShieldCheck className="size-3.5" aria-hidden="true" />Acesso protegido</p>
-              <h1>Entre no seu espaço de trabalho</h1>
-              <span>Use suas credenciais para continuar de onde parou.</span>
+              <h1>Entre para continuar</h1>
+              <span>Use seu usuário e sua senha. Leva só um instante.</span>
             </div>
 
             {securityFlow ? <AuthSecurityFlow onComplete={() => navigateAfterAuth("/dashboard")} /> : (
               <form className="login-page__auth-form" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
-                <AuthField icon={<Mail className="size-4" />} label="Nome de acesso" type="text" autoComplete="username" placeholder="Digite seu acesso" value={email} onChange={setEmail} />
+                <AuthField autoFocus icon={<Mail className="size-4" />} label="Usuário" type="text" autoComplete="username" placeholder="Digite seu usuário" value={email} onChange={setEmail} />
                 <AuthField icon={<KeyRound className="size-4" />} label="Senha" type="password" autoComplete="current-password" placeholder="Digite sua senha" value={password} onChange={setPassword} />
-                <div className="login-page__options"><Checkbox checked={remember} onChange={(event) => setRemember(event.target.checked)} label="Lembrar este dispositivo por 30 dias" /><button type="button" onClick={() => setShowRecovery((previous) => !previous)}>Ajuda com a senha</button></div>
+                <div className="login-page__options"><Checkbox checked={remember} onChange={(event) => setRemember(event.target.checked)} label="Lembrar neste aparelho" /><button type="button" onClick={() => setShowRecovery((previous) => !previous)}>Precisa de ajuda?</button></div>
                 <Button size="lg" className="login-page__submit" type="submit" loading={isSubmitting}>{isSubmitting ? "Entrando…" : "Entrar"}</Button>
               </form>
             )}
 
             {message ? <p role={messageTone === "error" ? "alert" : "status"} className={`login-page__message login-page__message--${messageTone}`}>{message}</p> : null}
-            {showRecovery && !securityFlow ? <div className="login-page__help"><ShieldCheck className="size-5" /><p>O código do autenticador é pedido no primeiro acesso. Em computador pessoal, marque a opção acima para não repetir o login por 30 dias. Não use em máquina compartilhada.</p></div> : null}
+            {showRecovery && !securityFlow ? <div className="login-page__help"><ShieldCheck className="size-5" /><p>Se sua conta pedir um código de confirmação, use o aplicativo autenticador no primeiro acesso. Marque “Lembrar neste aparelho” apenas em um computador pessoal.</p></div> : null}
           </Card>
           <CreatorCredit variant="inline" className="mt-4" />
         </section>
@@ -98,11 +98,11 @@ export function LoginForm() {
   );
 }
 
-function AuthField({ autoComplete, icon, label, onChange, placeholder, type, value }: { autoComplete: string; icon: React.ReactNode; label: string; onChange: (value: string) => void; placeholder: string; type: string; value: string }) {
+function AuthField({ autoComplete, autoFocus = false, icon, label, onChange, placeholder, type, value }: { autoComplete: string; autoFocus?: boolean; icon: React.ReactNode; label: string; onChange: (value: string) => void; placeholder: string; type: string; value: string }) {
   const inputId = useId();
   const [revealed, setRevealed] = useState(false);
   const isPassword = type === "password";
   const inputType = isPassword && revealed ? "text" : type;
 
-  return <div className="auth-field"><label htmlFor={inputId}>{label}</label><span className="auth-field__control"><span className="auth-field__icon">{icon}</span><input id={inputId} type={inputType} autoComplete={autoComplete} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />{isPassword ? <button type="button" className="auth-field__reveal" onClick={() => setRevealed((current) => !current)} aria-label={revealed ? "Ocultar senha" : "Mostrar senha"} aria-pressed={revealed}>{revealed ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}</button> : null}</span></div>;
+  return <div className="auth-field"><label htmlFor={inputId}>{label}</label><span className="auth-field__control"><span className="auth-field__icon">{icon}</span><input id={inputId} autoFocus={autoFocus} type={inputType} autoComplete={autoComplete} autoCapitalize="none" spellCheck={false} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />{isPassword ? <button type="button" className="auth-field__reveal" onClick={() => setRevealed((current) => !current)} aria-label={revealed ? "Ocultar senha" : "Mostrar senha"} aria-pressed={revealed}>{revealed ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}</button> : null}</span></div>;
 }

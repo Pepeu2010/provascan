@@ -157,6 +157,7 @@
 .exam-studio__canvas { min-width: 0; border-radius: 22px; padding: 28px; }
 .exam-studio__rail { position: sticky; top: 20px; display: grid; align-content: start; gap: 14px; }
 .exam-studio__rail > * { border-radius: 18px; }
+.exam-studio__summary-title { margin: 0; font-size: 15px; font-weight: 780; letter-spacing: -.02em; }
 .exam-studio__rail dl { display: grid; margin-top: 15px; }
 .exam-studio__rail dl > div { display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--border); padding: 12px 0; }
 .exam-studio__rail dt { color: var(--muted-foreground); font-size: 12px; }
