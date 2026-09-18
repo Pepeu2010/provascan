@@ -1,5 +1,6 @@
 "use client";
 
+import NextImage from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
@@ -23,12 +24,11 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   analyzeAnswerSheetCanvas,
-  decodeQrFromCanvas,
   detectIdentityWithOcr,
-  resolveIdentityFromQr,
 } from "@/services/scan-pipeline";
 import { rectifyMobilePhoto } from "@/services/mobile-photo-rectification";
-import { ANSWER_SHEET_TEMPLATE } from "@/services/answer-sheet-template";
+import { ANSWER_SHEET_TEMPLATE, getBubbleBounds } from "@/services/answer-sheet-template";
+import { assessScanQuality } from "@/services/scan-quality";
 import { getStudentsForExam } from "@/lib/exam-audience";
 import { compareClassrooms } from "@/lib/education-labels";
 import { cn } from "@/lib/utils";
@@ -62,13 +62,15 @@ type ScanReview = {
   notes: string[];
   pageType: string;
   processingLabel: string;
-  qrStatus: "success" | "invalid" | "not-found" | "unreadable";
+  qrStatus: "ignored" | "success" | "invalid" | "not-found" | "unreadable";
+  processedPreviewUrl: string;
   qualitySummary: {
     brightness: string;
     cropApplied: boolean;
     dimensions: string;
     lowLight: boolean;
     orientation: string;
+    blurRisk: boolean;
     shadowRisk: boolean;
   };
   templateId: string;
@@ -81,6 +83,7 @@ type PreprocessResult = {
   dimensions: string;
   height: number;
   lowLight: boolean;
+  blurRisk: boolean;
   orientation: string;
   perspectiveCorrected: boolean;
   processedCanvas: HTMLCanvasElement;
@@ -249,14 +252,6 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       setProgress(PROCESSING_STEPS[1].progress);
       await waitWithCancel(90, cancelProcessingRef);
 
-      const qrResult = await decodeQrFromCanvas(preprocessing.processedCanvas);
-      const qrIdentity = resolveIdentityFromQr({
-        dataExam: exam,
-        dataStudents: studentsForExam,
-        preferredStudentId: activePreferredStudentId,
-        qrResult,
-      });
-
       if (cancelProcessingRef.current) {
         throw new Error("Processamento cancelado.");
       }
@@ -265,24 +260,20 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       setProgress(PROCESSING_STEPS[2].progress);
       await waitWithCancel(90, cancelProcessingRef);
 
-      const ocrIdentity =
-        qrIdentity && !qrIdentity.invalidMessage
-          ? null
-          : await detectIdentityWithOcr({
-              canvas: preprocessing.processedCanvas,
-              preferredStudentId: activePreferredStudentId,
-              students: studentsForExam,
-            });
-
-      const identity = qrIdentity && !qrIdentity.invalidMessage
-        ? qrIdentity
-        : {
-            confidence: ocrIdentity?.confidence ?? 0,
-            detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome,
-            invalidMessage: qrIdentity?.invalidMessage ?? "",
-            method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual",
-            matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId,
-          };
+      // QR impresso continua compatível com os cartões existentes, mas não é
+      // mais lido nem usado para identificar o aluno ou decidir a correção.
+      const ocrIdentity = await detectIdentityWithOcr({
+        canvas: preprocessing.processedCanvas,
+        preferredStudentId: activePreferredStudentId,
+        students: studentsForExam,
+      });
+      const identity = {
+        confidence: ocrIdentity?.confidence ?? 0,
+        detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome,
+        invalidMessage: "",
+        method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual",
+        matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId,
+      };
 
       setProgressLabel(PROCESSING_STEPS[3].label);
       setProgress(PROCESSING_STEPS[3].progress);
@@ -331,14 +322,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             ? "O scanner priorizou o template esperado da prova antes da leitura do cabeçalho."
             : `Classificação do modelo pelo cabeçalho com confiança ${omrAnalysis.modelConfidence}%.`,
           omrAnalysis.headerText ? `Cabeçalho OCR: ${omrAnalysis.headerText.slice(0, 140)}` : "Cabeçalho OCR indisponível nesta imagem.",
-          qrResult.status === "success"
-            ? "QR Code lido com sucesso e validado contra a base local."
-            : qrResult.status === "invalid"
-              ? "QR Code encontrado, mas os dados não bateram com a prova atual."
-                : qrResult.status === "unreadable"
-                ? "QR Code ilegível nesta imagem."
-                : "QR Code não encontrado. O fluxo caiu para OCR/manual.",
-          identity.invalidMessage || "",
+          "QR individual ignorado: a identificação usa OCR e confirmação manual.",
           preprocessing.processedLabel,
           preprocessing.perspectiveCorrected
             ? "Perspectiva de foto de celular corrigida antes da leitura."
@@ -354,14 +338,12 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
         ].filter(Boolean),
         pageType: omrAnalysis.pageType,
         processingLabel:
-          identity.method === "qr"
-            ? "QR validado e leitura pronta para conferência"
-            : needsManualReview
-              ? "Revisão manual obrigatória"
-              : "Leitura pronta para conferência",
-        qrStatus: qrResult.status,
+          needsManualReview ? "Revisão manual obrigatória" : "Leitura pronta para conferência",
+        processedPreviewUrl: preprocessing.previewUrl,
+        qrStatus: "ignored",
         qualitySummary: {
           brightness: preprocessing.lowLight ? "Baixa" : "Boa",
+          blurRisk: preprocessing.blurRisk,
           cropApplied: preprocessing.cropApplied,
           dimensions: preprocessing.dimensions,
           lowLight: preprocessing.lowLight,
@@ -411,9 +393,11 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       ],
       pageType: "MANUAL",
       processingLabel: "Preenchimento manual",
+      processedPreviewUrl: rawPreviewUrl,
       qrStatus: "not-found",
       qualitySummary: {
         brightness: "Não avaliada",
+        blurRisk: false,
         cropApplied: false,
         dimensions: selectedFile ? `${selectedFile.name}` : "Sem imagem",
         lowLight: false,
@@ -891,6 +875,13 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
               <p className="mt-1 text-sm text-[var(--muted-foreground)]">{review.answers.length} questões detectadas. Cada cartão mostra uma questão e a resposta marcada.</p>
             </div>
 
+            <AnswerSheetReviewOverlay
+              alternatives={exam.alternativas}
+              answers={review.answers}
+              src={review.processedPreviewUrl}
+              templateId={review.templateId}
+            />
+
             <div className="flex flex-wrap items-center gap-2" aria-label="Filtros de questões">
               <span className="mr-1 text-sm font-semibold text-[var(--muted-foreground)]">Mostrar:</span>
               {([
@@ -1083,6 +1074,25 @@ function AnswerReviewGrid({
       })}
     </div>
   );
+}
+
+function AnswerSheetReviewOverlay({ alternatives, answers, src, templateId }: { alternatives: string[]; answers: ScanAnswer[]; src: string; templateId: string }) {
+  if (!templateId.toUpperCase().startsWith("PS-CARD")) return null;
+  const uncertain = answers.filter((answer) => answer.confidence < MIN_CONFIDENCE_REVIEW || answer.markedAnswers.length !== 1);
+  if (!uncertain.length) return null;
+  return <details className="rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
+    <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver pontos que exigem conferência sobre a folha</summary>
+    <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">A marcação aparece somente nas questões incertas. Ela não altera o cartão nem substitui sua conferência.</p>
+    <div className="relative mt-4 aspect-[794/1123] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-white">
+      <NextImage src={src} alt="Folha processada com questões que exigem conferência" fill unoptimized sizes="(max-width: 768px) 100vw, 720px" className="object-contain" />
+      {uncertain.flatMap((answer) => {
+        const bounds = getBubbleBounds({ alternatives, canvasHeight: ANSWER_SHEET_TEMPLATE.page.height, canvasWidth: ANSWER_SHEET_TEMPLATE.page.width, questionCount: answers.length, questionIndex: answer.question - 1 });
+        const marked = bounds.filter((bound) => answer.markedAnswers.includes(bound.alternative));
+        const targets = marked.length ? marked : [bounds[0]].filter(Boolean);
+        return targets.map((bound, index) => <span key={`${answer.question}-${bound.alternative}-${index}`} title={`Questão ${answer.question}: conferir`} className="absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[var(--warning)] text-[10px] font-black text-black shadow" style={{ left: `${(bound.cx / ANSWER_SHEET_TEMPLATE.page.width) * 100}%`, top: `${(bound.cy / ANSWER_SHEET_TEMPLATE.page.height) * 100}%` }}>{answer.question}</span>);
+      })}
+    </div>
+  </details>;
 }
 
 function ImagePreviewCard({
@@ -1397,6 +1407,14 @@ async function preprocessImage(
   }
 
   const finalImage = targetContext.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+  const scanQuality = assessScanQuality(finalImage);
+  if (scanQuality.requiresRecapture) {
+    throw new Error(
+      scanQuality.blurRisk
+        ? "A foto está desfocada demais para ler as bolhas com segurança. Tire outra foto com a folha inteira e a câmera parada."
+        : "A imagem está pequena demais para ler as bolhas com segurança. Aproxime a câmera sem cortar os quatro cantos da folha.",
+    );
+  }
   const binaryImage = binarizeImage(finalImage, preserveCardGeometry);
   targetContext.putImageData(binaryImage, 0, 0);
 
@@ -1410,8 +1428,8 @@ async function preprocessImage(
     }, "image/jpeg", 0.82);
   });
 
-  const lowLight = luminanceStats.average < 92;
-  const shadowRisk = luminanceStats.deviation > 68;
+  const lowLight = scanQuality.lowLight;
+  const shadowRisk = scanQuality.shadowRisk;
   const confidencePenalty = (lowLight ? 18 : 0) + (shadowRisk ? 10 : 0) + (cropApplied ? 0 : 4);
   const confidenceBase = Math.max(48, 95 - confidencePenalty);
   const processedLabel = preserveCardGeometry
@@ -1426,6 +1444,7 @@ async function preprocessImage(
     cropApplied,
     dimensions: `${targetCanvas.width}x${targetCanvas.height}`,
     height: targetCanvas.height,
+    blurRisk: scanQuality.blurRisk,
     lowLight,
     orientation: shouldRotate ? "Vertical corrigida" : targetCanvas.width >= targetCanvas.height ? "Horizontal" : "Vertical",
     perspectiveCorrected: rectification.applied,

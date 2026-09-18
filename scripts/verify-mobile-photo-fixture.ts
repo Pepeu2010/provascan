@@ -3,6 +3,7 @@ import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { analyzeAnswerSheetCanvas } from "../services/scan-pipeline";
 import { rectifyMobilePhoto } from "../services/mobile-photo-rectification";
+import { assessScanQuality } from "../services/scan-quality";
 
 const answers = Array.from({ length: 45 }, (_, index) => ["A", "C", "E", "B", "D"][index % 5]);
 
@@ -25,6 +26,8 @@ async function main() {
 
   const normalized = rectifyMobilePhoto(phonePhoto as unknown as HTMLCanvasElement, 794 / 1123);
   assert.equal(normalized.applied, true, "A folha fotografada deve ser identificada e retificada.");
+  const normalizedContext = normalized.canvas.getContext("2d")!;
+  assert.equal(assessScanQuality(normalizedContext.getImageData(0, 0, normalized.canvas.width, normalized.canvas.height) as unknown as ImageData).requiresRecapture, false, "Foto retificada do fixture deve passar na checagem de qualidade.");
   const analysis = await analyzeAnswerSheetCanvas({
     answerKeyLength: 45,
     canvas: normalized.canvas,

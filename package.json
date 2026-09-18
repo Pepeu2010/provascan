@@ -41,6 +41,8 @@
     "test:teacher-exam-flow": "npx --no-install tsx scripts/verify-teacher-exam-flow.ts",
     "test:answer-keys-workspace": "npx --no-install tsx scripts/verify-answer-keys-workspace.ts",
     "test:premium-auth-exams-ui": "npx --no-install tsx scripts/verify-premium-auth-exams-ui.ts",
+    "test:scan-quality": "npx --no-install tsx scripts/verify-scan-quality.ts",
+    "test:correction-ocr-safety": "npx --no-install tsx scripts/verify-correction-ocr-safety.ts",
     "test:fresh-schema-migrations": "npx --no-install tsx scripts/verify-fresh-schema-migrations.ts",
     "test:webgl-fallback": "npx --no-install tsx scripts/verify-webgl-fallback.ts"
   },
