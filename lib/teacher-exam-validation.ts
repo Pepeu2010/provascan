@@ -51,11 +51,9 @@ export const teacherExamActionSchema = z.discriminatedUnion("action", [
 
 export function validateExamForPublication(exam: TeacherExamInput): string[] {
   const errors: string[] = [];
-  if (!exam.title.trim()) errors.push("Informe o nome da prova.");
-  if (!exam.subject.trim()) errors.push("Informe a disciplina.");
-  if (!exam.subjectId) errors.push("Selecione uma disciplina válida.");
-  if (!exam.assignmentGroups?.some((group) => group.teacherId && group.classIds.length)) errors.push("Defina pelo menos uma turma responsável.");
-  if (!exam.audienceLabel.trim()) errors.push("Informe a turma ou o público da prova.");
+  // Nome, disciplina e público organizam a prova, mas não podem impedir um
+  // professor de montar e publicar uma avaliação. A disciplina é um retrato
+  // textual da prova — nunca exige cadastro prévio na tabela `subjects`.
   if (!exam.questions.length) errors.push("Adicione ao menos uma questão.");
   exam.questions.forEach((question, index) => {
     const label = `Questão ${index + 1}`;

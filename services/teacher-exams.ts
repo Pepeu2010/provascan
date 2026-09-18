@@ -232,12 +232,18 @@ export async function createTeacherExam(input: {
 async function createPublishedTeacherExam(input: {
   actorId: string; actorRole: import("@/types/auth").UserRole; creatorName: string; exam: TeacherExamInput; intent: "publicar"; source?: Partial<Record<string, unknown>>;
 }) {
-  if (!input.exam.subjectId) throw new Error("Selecione uma disciplina válida.");
-  const subject = await resolveSubjectSnapshot(input.exam.subjectId);
-  const pairs = await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups: input.exam.assignmentGroups ?? [], subjectId: subject.id });
-  if (!pairs.length) throw new Error("Defina pelo menos uma turma responsável.");
+  const groups = input.exam.assignmentGroups ?? [];
+  // A atribuição explícita continua protegida pelo mesmo serviço canônico.
+  // Ela só existe quando uma disciplina institucional foi escolhida de forma
+  // explícita; escrever uma disciplina livre não cria, altera ou consulta o
+  // catálogo da escola.
+  if (groups.length && !input.exam.subjectId) throw new Error("Para escolher responsáveis e turmas cadastradas, selecione uma disciplina da escola nessa opção avançada.");
+  const institutionalSubject = input.exam.subjectId ? await resolveSubjectSnapshot(input.exam.subjectId) : null;
+  const pairs = institutionalSubject
+    ? await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups, subjectId: institutionalSubject.id })
+    : [];
   const examId = crypto.randomUUID();
-  const normalizedExam = { ...input.exam, subject: subject.name, subjectId: subject.id };
+  const normalizedExam = { ...input.exam, subject: input.exam.subject.trim() || institutionalSubject?.name || "", subjectId: institutionalSubject?.id ?? null };
   const row = examRow(input.actorId, input.creatorName, examId, normalizedExam, "publicar", input.source);
   const { _creatorName, ...storedRow } = row;
   const questions = normalizedExam.questions.map((question, index) => ({
