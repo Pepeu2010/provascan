@@ -9,7 +9,7 @@ import {
   Copy, Download, Eye, FileText, FileUp, Filter, GripVertical, Image as ImageIcon, MoreHorizontal,
   Pencil, Plus, Printer, RotateCcw, Save, Search, Sparkles, Trash2, UploadCloud, X,
 } from "lucide-react";
-import { openExamPrint, PrintStudio } from "@/components/print-studio";
+import { ExamPresentationControls, openExamPrint, PrintStudio } from "@/components/print-studio";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { parseImportedExamText } from "@/lib/exam-import-parser";
+import { defaultExamPrintOptions } from "@/lib/exam-print-options";
 import { defaultQuestion, validateExamForPublication } from "@/lib/teacher-exam-validation";
 import type { ExamLifecycleStatus, ExamQuestionType, TeacherExam, TeacherExamInput } from "@/types/teacher-exams";
 
@@ -49,6 +50,7 @@ function emptyDraft(): TeacherExamInput {
     groupType: "GERAL",
     instructions: "",
     period: "",
+    printOptions: defaultExamPrintOptions,
     questions: [defaultQuestion(1)],
     subject: "",
     subjectId: null,
@@ -68,6 +70,7 @@ function toDraft(exam: TeacherExam): TeacherExamInput {
     groupType: exam.groupType,
     instructions: exam.instructions,
     period: exam.period,
+    printOptions: exam.printOptions,
     questions: exam.questions.map(({ id, imagePath, ...question }) => ({ ...question, id, imagePath })),
     subject: exam.subject,
     subjectId: exam.subjectId ?? null,
@@ -421,11 +424,7 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
 
 function BasicInformation({ draft, readOnly, setDraft }: { draft: TeacherExamInput; readOnly: boolean; setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>> }) {
   const set = (changes: Partial<TeacherExamInput>) => setDraft((current) => ({ ...current, ...changes }));
-  const typeSubject = (value: string) => set({
-    subject: value,
-    // Digitar aqui nunca cadastra nem vincula uma disciplina institucional.
-    subjectId: null,
-  });
+  const typeSubject = (value: string) => set({ subject: value, subjectId: null });
   const updateYear = (value: string) => set({
     assignmentGroups: [],
     audienceId: value.trim() ? `ANO-${normalizeYearSegment(value)}-GERAL` : "",
@@ -438,7 +437,16 @@ function BasicInformation({ draft, readOnly, setDraft }: { draft: TeacherExamInp
   const commonYears = ["1", "2", "3"];
   const selectedYear = commonYears.includes(normalizedYear) ? normalizedYear : yearInput;
 
-  return <section><SectionHeading eyebrow="ETAPA 1" title="Sobre esta prova" detail="Você decide o que preencher agora. Os campos abaixo não bloqueiam a criação da prova." /><div className="exam-form"><label className="sm:col-span-2">Nome da prova <small>Opcional — você pode escolher um nome depois.</small><Input disabled={readOnly} value={draft.title} onChange={(event) => set({ title: event.target.value })} placeholder="Ex.: Avaliação do 2º ano" /></label><label>Disciplina <small>Opcional — aparece somente nesta prova; não é um cadastro.</small><Input disabled={readOnly} value={draft.subject} onChange={(event) => typeSubject(event.target.value)} placeholder="Ex.: Língua Portuguesa" /></label><label>Para qual ano? <small>Opcional — escolha o ano para disponibilizar a prova a todas as turmas dele.</small><Select disabled={readOnly} value={selectedYear} onChange={(event) => updateYear(event.target.value)}><option value="">Não definir agora</option>{commonYears.map((year) => <option key={year} value={year}>{year}º ano</option>)}{selectedYear && !commonYears.includes(selectedYear) ? <option value={selectedYear}>{selectedYear}</option> : null}</Select></label><details className="exam-form__optional sm:col-span-2"><summary>Adicionar mais detalhes, se quiser</summary><div><label>Bimestre ou trimestre<Input disabled={readOnly} value={draft.period} onChange={(event) => set({ period: event.target.value })} placeholder="Ex.: 1º bimestre" /></label><label>Data prevista<Input disabled={readOnly} type="date" value={draft.examDate} onChange={(event) => set({ examDate: event.target.value })} /></label><label>Tempo estimado (minutos)<Input disabled={readOnly} type="number" min={1} max={600} value={draft.estimatedDuration ?? ""} onChange={(event) => set({ estimatedDuration: event.target.value ? Number(event.target.value) : null })} /></label><label className="sm:col-span-2">Descrição<Textarea disabled={readOnly} value={draft.description} onChange={(event) => set({ description: event.target.value })} placeholder="Uma anotação para sua organização" /></label><label className="sm:col-span-2">Instruções para os alunos<Textarea disabled={readOnly} value={draft.instructions} onChange={(event) => set({ instructions: event.target.value })} placeholder="Leia com atenção e marque apenas uma alternativa…" /></label></div></details></div></section>;
+  return <section>
+    <SectionHeading eyebrow="ETAPA 1" title="Sobre esta prova" detail="Você decide o que preencher agora. Os campos abaixo não bloqueiam a criação da prova." />
+    <div className="exam-form">
+      <label className="sm:col-span-2">Nome da prova <small>Opcional — você pode escolher um nome depois.</small><Input disabled={readOnly} value={draft.title} onChange={(event) => set({ title: event.target.value })} placeholder="Ex.: Avaliação do 2º ano" /></label>
+      <label>Disciplina <small>Opcional — aparece somente nesta prova; não é um cadastro.</small><Input disabled={readOnly} value={draft.subject} onChange={(event) => typeSubject(event.target.value)} placeholder="Ex.: Língua Portuguesa" /></label>
+      <label>Para qual ano? <small>Opcional — escolha o ano para disponibilizar a prova a todas as turmas dele.</small><Select disabled={readOnly} value={selectedYear} onChange={(event) => updateYear(event.target.value)}><option value="">Não definir agora</option>{commonYears.map((year) => <option key={year} value={year}>{year}º ano</option>)}{selectedYear && !commonYears.includes(selectedYear) ? <option value={selectedYear}>{selectedYear}</option> : null}</Select></label>
+      <div className="exam-form__presentation sm:col-span-2"><ExamPresentationControls disabled={readOnly} value={draft.printOptions ?? defaultExamPrintOptions} onChange={(printOptions) => set({ printOptions })} /></div>
+      <details className="exam-form__optional sm:col-span-2"><summary>Adicionar mais detalhes, se quiser</summary><div><label>Bimestre ou trimestre<Input disabled={readOnly} value={draft.period} onChange={(event) => set({ period: event.target.value })} placeholder="Ex.: 1º bimestre" /></label><label>Data prevista<Input disabled={readOnly} type="date" value={draft.examDate} onChange={(event) => set({ examDate: event.target.value })} /></label><label>Tempo estimado (minutos)<Input disabled={readOnly} type="number" min={1} max={600} value={draft.estimatedDuration ?? ""} onChange={(event) => set({ estimatedDuration: event.target.value ? Number(event.target.value) : null })} /></label><label className="sm:col-span-2">Descrição<Textarea disabled={readOnly} value={draft.description} onChange={(event) => set({ description: event.target.value })} placeholder="Uma anotação para sua organização" /></label><label className="sm:col-span-2">Instruções para os alunos<Textarea disabled={readOnly} value={draft.instructions} onChange={(event) => set({ instructions: event.target.value })} placeholder="Leia com atenção e marque apenas uma alternativa…" /></label></div></details>
+    </div>
+  </section>;
 }
 
 function QuestionEditor({ index, question, total, readOnly, onChange, onDelete, onDuplicate, onMove, onDragStart, onDrop }: { index: number; question: TeacherExamInput["questions"][number]; total: number; readOnly: boolean; onChange: (changes: Partial<TeacherExamInput["questions"][number]>) => void; onDelete: () => void; onDuplicate: () => void; onMove: (direction: -1 | 1) => void; onDragStart: () => void; onDrop: () => void }) {

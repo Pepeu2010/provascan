@@ -1,3 +1,5 @@
+import type { ExamPrintOptions } from "@/lib/exam-print-options";
+
 export type ExamLifecycleStatus = "rascunho" | "publicada" | "aplicada" | "arquivada";
 
 export type ExamSourceType = "manual" | "pdf" | "doc" | "docx" | "imagem";
@@ -38,6 +40,7 @@ export type TeacherExam = {
   groupType: string;
   yearSegment: string;
   period: string;
+  printOptions?: ExamPrintOptions;
   examDate: string;
   instructions: string;
   estimatedDuration: number | null;
@@ -73,6 +76,7 @@ export type TeacherExamInput = {
   groupType: string;
   yearSegment: string;
   period: string;
+  printOptions?: ExamPrintOptions;
   examDate: string;
   instructions: string;
   estimatedDuration: number | null;

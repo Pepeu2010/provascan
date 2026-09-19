@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
+import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
 import type { UserRole } from "@/types/auth";
 import type { TeacherExam, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
 
@@ -35,7 +36,7 @@ function mapQuestion(row: Record<string, unknown>): TeacherExamQuestion {
 
 const examColumns = [
   "id", "title", "description", "subject", "subject_id", "audience_id", "audience_label", "group_type", "year_segment", "period",
-  "exam_date", "instructions", "estimated_duration", "creator_id", "source_type", "status", "original_file_name",
+  "exam_date", "instructions", "estimated_duration", "print_options", "creator_id", "source_type", "status", "original_file_name",
   "original_file_mime_type", "original_file_size", "imported_at", "import_processing_status", "import_processing_error",
   "needs_review", "version", "created_at", "updated_at", "published_at", "applied_at", "legacy_contributors",
 ].join(",");
@@ -91,6 +92,7 @@ async function hydrate(rows: Array<Record<string, unknown>>): Promise<TeacherExa
       originalFileName: row.original_file_name ? String(row.original_file_name) : null,
       originalFileSize: row.original_file_size == null ? null : Number(row.original_file_size),
       period: String(row.period || ""),
+      printOptions: normalizeExamPrintOptions(row.print_options),
       publishedAt: row.published_at ? String(row.published_at) : null,
       questions: groupedQuestions.get(id) ?? [],
       sourceType: String(row.source_type) as TeacherExam["sourceType"],
@@ -140,6 +142,7 @@ function examRow(actorId: string, creatorName: string, examId: string, input: Te
     id: examId,
     instructions: input.instructions,
     period: input.period,
+    print_options: normalizeExamPrintOptions(input.printOptions),
     published_at: published ? now : null,
     question_count: input.questions.length,
     released_at: published ? now : null,
@@ -207,7 +210,7 @@ export async function createTeacherExam(input: {
   }
   const client = db();
   const examId = crypto.randomUUID();
-  const freeSubjectExam = { ...input.exam, subject: input.exam.subject.trim(), subjectId: null };
+  const freeSubjectExam = { ...input.exam, printOptions: normalizeExamPrintOptions(input.exam.printOptions), subject: input.exam.subject.trim(), subjectId: null };
   const row = examRow(input.actorId, input.creatorName, examId, freeSubjectExam, input.intent, input.source);
   const { _creatorName, ...storedRow } = row;
   ensure((await client.from("exams").insert(storedRow)).error);
@@ -239,7 +242,7 @@ async function createPublishedTeacherExam(input: {
   // revalidados no servidor pelo escopo ativo de cada pessoa.
   const pairs = await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups });
   const examId = crypto.randomUUID();
-  const normalizedExam = { ...input.exam, subject: input.exam.subject.trim(), subjectId: null };
+  const normalizedExam = { ...input.exam, printOptions: normalizeExamPrintOptions(input.exam.printOptions), subject: input.exam.subject.trim(), subjectId: null };
   const row = examRow(input.actorId, input.creatorName, examId, normalizedExam, "publicar", input.source);
   const { _creatorName, ...storedRow } = row;
   const questions = normalizedExam.questions.map((question, index) => ({
@@ -282,7 +285,7 @@ export async function updateTeacherExam(input: { actorId: string; actorRole?: Us
   if (current.hasResults && structuralFingerprint(current) !== structuralFingerprint(input.exam)) {
     throw new Error("Esta prova já possui resultados. Duplique-a para alterar questões sem afetar o histórico.");
   }
-  const freeSubjectExam = { ...input.exam, subject: input.exam.subject.trim(), subjectId: null };
+  const freeSubjectExam = { ...input.exam, printOptions: normalizeExamPrintOptions(input.exam.printOptions), subject: input.exam.subject.trim(), subjectId: null };
   if (input.intent === "publicar") {
     if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
     await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups: freeSubjectExam.assignmentGroups ?? [] });
@@ -326,6 +329,7 @@ export async function duplicateTeacherExam(actorId: string, creatorName: string,
     groupType: source.groupType,
     instructions: source.instructions,
     period: source.period,
+    printOptions: source.printOptions,
     questions: source.questions.map(({ id: _id, imagePath, ...question }) => ({ ...question, imagePath })),
     subject: source.subject,
     subjectId: source.subjectId ?? null,

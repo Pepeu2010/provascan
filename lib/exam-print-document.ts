@@ -1,22 +1,10 @@
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
+import { defaultExamPrintOptions, type ExamPrintOptions } from "@/lib/exam-print-options";
 import type { TeacherExam } from "@/types/teacher-exams";
 
-export type PrintTemplate = "institucional" | "classico" | "compacto";
-export type PrintTypeface = "limpa" | "serifada" | "didatica";
-export type PrintSize = "compacta" | "normal" | "ampliada";
+export type { ExamPrintOptions, PrintAlternativeLayout, PrintSize, PrintTemplate, PrintTypeface } from "@/lib/exam-print-options";
 export type ExamPrintKind = "prova" | "cartao";
-
-export type ExamPrintOptions = {
-  size: PrintSize;
-  template: PrintTemplate;
-  typeface: PrintTypeface;
-};
-
-export const defaultExamPrintOptions: ExamPrintOptions = {
-  size: "normal",
-  template: "institucional",
-  typeface: "limpa",
-};
+export { defaultExamPrintOptions } from "@/lib/exam-print-options";
 
 const answerLabels = ["A", "B", "C", "D", "E"];
 
@@ -46,7 +34,7 @@ function createExamSheet(exam: TeacherExam, options: ExamPrintOptions) {
   const questions = exam.questions.map((question, index) => {
     const alternatives = question.alternatives.filter((item) => item.trim());
     const answerOptions = alternatives.length
-      ? `<div class="exam-print__alternatives">${alternatives.map((alternative, alternativeIndex) => `<p><b>${answerLabels[alternativeIndex] ?? String.fromCharCode(65 + alternativeIndex)})</b>${escapeHtml(alternative)}</p>`).join("")}</div>`
+      ? `<div class="exam-print__alternatives exam-print__alternatives--${options.alternativeLayout}"${options.alternativeLayout === "duas_colunas" ? " style=\"grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px\"" : ""}>${alternatives.map((alternative, alternativeIndex) => `<p><b>${answerLabels[alternativeIndex] ?? String.fromCharCode(65 + alternativeIndex)})</b>${escapeHtml(alternative)}</p>`).join("")}</div>`
       : `<div class="exam-print__writing" aria-label="Espaço para resposta"></div>`;
     return `<li><div class="exam-print__question-number">${index + 1}</div><div><p class="exam-print__prompt">${escapeHtml(question.prompt || "Questão sem enunciado").replaceAll("\n", "<br>")}</p>${answerOptions}</div></li>`;
   }).join("");
