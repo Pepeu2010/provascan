@@ -45,6 +45,18 @@ type AdminUserRow = {
   trocar_senha: string;
 };
 
+type OperationalHealth = {
+  status: { configured: boolean; mode: string; studentsTab: string; usersTab: string };
+  totals: { alunos: number; correcoes: number; provas: number; turmas: number; usuarios: number };
+};
+
+async function requestSystemHealth() {
+  const response = await fetch("/api/dashboard", { cache: "no-store" });
+  const payload = await response.json() as { error?: string; storage?: OperationalHealth };
+  if (!response.ok || !payload.storage) throw new Error(payload.error || "Não foi possível consultar o sistema.");
+  return payload.storage;
+}
+
 function getRoleBadgeTone(role: string) {
   if (role === "admin") {
     return "accent" as const;
@@ -1269,6 +1281,7 @@ export function SettingsWorkspace() {
     <div className="grid gap-5">
       <UsabilityControls />
       {session ? <AdministrationCenter /> : null}
+      {session && canManagePasswordPolicy ? <SystemHealthPanel /> : null}
       {session && canManagePasswordPolicy ? <section id="equipe" className="scroll-mt-6"><UserManagementPanel currentUserId={session.id} currentRole={session.role} /></section> : null}
       {canManagePasswordPolicy ? (
         <Card id="seguranca" className="scroll-mt-6 p-6">
@@ -1355,6 +1368,53 @@ export function SettingsWorkspace() {
       </Card>
     </div>
   );
+}
+
+function SystemHealthPanel() {
+  const [health, setHealth] = useState<OperationalHealth | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  const load = async () => {
+    setState("loading");
+    try {
+      setHealth(await requestSystemHealth());
+      setState("ready");
+    } catch {
+      setState("error");
+    }
+  };
+
+  useEffect(() => {
+    let current = true;
+    void requestSystemHealth()
+      .then((result) => {
+        if (!current) return;
+        setHealth(result);
+        setState("ready");
+      })
+      .catch(() => {
+        if (current) setState("error");
+      });
+    return () => { current = false; };
+  }, []);
+
+  const counts = health ? [
+    ["Pessoas", health.totals.usuarios],
+    ["Alunos", health.totals.alunos],
+    ["Turmas", health.totals.turmas],
+    ["Provas", health.totals.provas],
+    ["Correções", health.totals.correcoes],
+  ] : [];
+
+  return <Card className="p-6" aria-labelledby="system-health-title">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div><div className="flex items-center gap-2"><ShieldCheck className="size-5 text-[var(--accent)]" aria-hidden="true" /><h2 id="system-health-title" className="text-xl font-semibold text-[var(--foreground)]">Estado do sistema</h2></div><p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Confira se os dados operacionais estão acessíveis antes de um período de provas ou correções.</p></div>
+      <Button variant="secondary" disabled={state === "loading"} onClick={() => void load()}>Atualizar</Button>
+    </div>
+    {state === "loading" ? <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5" aria-label="Carregando estado do sistema">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-2xl bg-[var(--surface-strong)] motion-reduce:animate-none" />)}</div> : null}
+    {state === "error" ? <div role="alert" className="mt-5 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--foreground)]">Não foi possível confirmar o estado do sistema agora. Tente atualizar; os dados existentes não foram alterados.</div> : null}
+    {state === "ready" && health ? <><div className="mt-5 flex flex-wrap gap-2"><Badge tone={health.status.configured ? "success" : "error"}>{health.status.configured ? "Banco conectado" : "Banco não configurado"}</Badge><Badge tone="neutral">Dados: {health.status.mode === "supabase" ? "Supabase" : health.status.mode}</Badge></div><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">{counts.map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><dt className="text-xs font-medium text-[var(--muted-foreground)]">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-[var(--foreground)]">{value}</dd></div>)}</dl></> : null}
+  </Card>;
 }
 
 
