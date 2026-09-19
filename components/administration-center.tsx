@@ -56,7 +56,7 @@ export function AdministrationCenter() {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-[-0.03em] text-[var(--foreground)]">Governança e continuidade</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Abaixo, gerencie pessoas, recuperação de acesso e segurança. Admin e Vice-direção têm o mesmo alcance institucional.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Aqui ficam pessoas, recuperação de acesso e segurança. Essas configurações críticas são exclusivas do Admin.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild variant="secondary"><a href="#equipe"><ShieldCheck className="size-4" />Equipe e acessos</a></Button>

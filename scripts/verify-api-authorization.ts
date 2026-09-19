@@ -11,15 +11,17 @@ assert.equal(canAccessOperationalData("aluno"), false);
 assert.equal(canAccessOperationalData("unknown-role"), false);
 
 assert.deepEqual(managedRolesFor("admin"), ["professor", "coordenador", "vice_diretor", "admin"]);
-assert.deepEqual(managedRolesFor("vice_diretor"), ["professor", "coordenador", "vice_diretor", "admin"]);
+assert.deepEqual(managedRolesFor("vice_diretor"), []);
 assert.equal(canAssignManagedRole("admin", "admin"), true);
-assert.equal(canAssignManagedRole("vice_diretor", "professor"), true);
-assert.equal(canAssignManagedRole("vice_diretor", "coordenador"), true);
-assert.equal(canAssignManagedRole("vice_diretor", "vice_diretor"), true);
-assert.equal(canAssignManagedRole("vice_diretor", "admin"), true);
-assert.equal(canManageTargetUser("vice_diretor", "admin"), true);
-assert.equal(canAccessPath("vice_diretor", "/admin"), true);
-assert.equal(canAccessPath("vice_diretor", "/painel"), true);
+assert.equal(canAssignManagedRole("vice_diretor", "professor"), false);
+assert.equal(canAssignManagedRole("vice_diretor", "coordenador"), false);
+assert.equal(canAssignManagedRole("vice_diretor", "vice_diretor"), false);
+assert.equal(canAssignManagedRole("vice_diretor", "admin"), false);
+assert.equal(canManageTargetUser("vice_diretor", "admin"), false);
+assert.equal(canAccessPath("vice_diretor", "/admin"), false);
+assert.equal(canAccessPath("vice_diretor", "/painel"), false);
+assert.equal(canAccessPath("vice_diretor", "/dashboard/configuracoes"), false);
+assert.equal(canAccessPath("admin", "/dashboard/configuracoes"), true);
 assert.equal(canAccessPath("professor", "/dashboard/correcao"), true);
 assert.equal(canAccessPath("professor", "/dashboard/alunos"), false);
 
