@@ -32,6 +32,7 @@ import type { StudentStatus } from "@/types/domain";
 import type { ExternalCorrectionRecord } from "@/types/universal-exams";
 import { parseStudentCsv, type StudentImportResult } from "@/lib/student-import";
 import { buildExternalCorrectionCsv, buildExternalReport, filterExternalCorrections } from "@/lib/external-reporting";
+import { buildCorrectionCsv, buildQuestionPerformance, buildQuestionPerformanceCsv } from "@/lib/internal-reporting";
 import { buildCalibrationSheetHtml, buildPrintInstructionSheetHtml, getPrintPreflight } from "@/lib/print-preflight";
 import { UsabilityControls } from "@/components/usability-controls";
 
@@ -80,6 +81,25 @@ function downloadTextFile(filename: string, content: string, type: string) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function openPedagogicalReport(title: string, total: number, average: number, rows: ReturnType<typeof buildQuestionPerformance>) {
+  const questions = rows.length
+    ? rows.map((row) => `<tr><td>${row.question}</td><td>${row.total}</td><td>${row.correct}</td><td>${row.wrong}</td><td>${row.blank}</td><td>${row.multiple}</td><td>${row.correctRate}%</td></tr>`).join("")
+    : '<tr><td colspan="7" class="empty">Ainda não há correções para os filtros escolhidos.</td></tr>';
+  const report = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeForHtml(title)}</title><style>@page{size:A4 portrait;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#172033;margin:0}.eyebrow{color:#5716b0;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.title{font-size:26px;line-height:1.15;margin:8px 0}.meta{color:#536078;font-size:12px}.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:24px 0}.metric{border:1px solid #d6d9e1;border-radius:12px;padding:14px}.metric b{display:block;font-size:24px;margin-top:4px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border-bottom:1px solid #d6d9e1;padding:8px;text-align:left}th{background:#f5f3ff;color:#42228d}.empty{text-align:center;color:#64748b;padding:26px}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><p class="eyebrow">ProvaScan · relatório pedagógico</p><h1 class="title">${escapeForHtml(title)}</h1><p class="meta">Gerado em ${escapeForHtml(new Date().toLocaleString("pt-BR"))}</p><section class="summary"><div class="metric"><span>Correções consideradas</span><b>${total}</b></div><div class="metric"><span>Média de aproveitamento</span><b>${average}%</b></div></section><h2>Desempenho por questão</h2><table><thead><tr><th>Questão</th><th>Respostas</th><th>Acertos</th><th>Erros</th><th>Em branco</th><th>Múltiplas</th><th>Aproveitamento</th></tr></thead><tbody>${questions}</tbody></table></body></html>`;
+  const blob = new Blob([report], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const reportWindow = window.open(url, "_blank", "noopener,noreferrer,width=960,height=760");
+  if (!reportWindow) {
+    URL.revokeObjectURL(url);
+    return;
+  }
+  reportWindow.addEventListener("load", () => {
+    reportWindow.focus();
+    reportWindow.print();
+    URL.revokeObjectURL(url);
+  }, { once: true });
 }
 
 function escapeForHtml(value: string) {
@@ -1038,25 +1058,7 @@ export function ReportsWorkspace() {
   const filteredAverage = filteredCorrections.length
     ? Math.round(filteredCorrections.reduce((sum, item) => sum + item.correction.percentual, 0) / filteredCorrections.length)
     : 0;
-  const questionPerformance = useMemo(() => {
-    const rows = new Map<number, { correct: number; blank: number; multiple: number; total: number; wrong: number }>();
-    for (const correction of filteredCorrections) {
-      for (const answer of correction.respostas) {
-        const row = rows.get(answer.questao) ?? { blank: 0, correct: 0, multiple: 0, total: 0, wrong: 0 };
-        row.total += 1;
-        if (answer.status === "acerto") row.correct += 1;
-        else if (answer.status === "em-branco") row.blank += 1;
-        else if (answer.status === "multipla-marcacao") row.multiple += 1;
-        else if (answer.status === "erro") row.wrong += 1;
-        rows.set(answer.questao, row);
-      }
-    }
-    return [...rows.entries()].map(([question, row]) => ({
-      ...row,
-      correctRate: row.total ? Math.round((row.correct / row.total) * 100) : 0,
-      question,
-    })).sort((left, right) => left.correctRate - right.correctRate || left.question - right.question);
-  }, [filteredCorrections]);
+  const questionPerformance = useMemo(() => buildQuestionPerformance(filteredCorrections), [filteredCorrections]);
   const filteredExternalCorrections = useMemo(() => filterExternalCorrections(externalCorrections, { dateFrom: externalDateFrom, dateTo: externalDateTo, query: externalQuery, templateId: externalTemplateFilter }), [externalCorrections, externalDateFrom, externalDateTo, externalQuery, externalTemplateFilter]);
   const externalReport = useMemo(() => buildExternalReport(filteredExternalCorrections), [filteredExternalCorrections]);
   const externalTemplateIds = [...new Set(externalCorrections.map((item) => item.templateId).filter((id): id is string => Boolean(id)))];
@@ -1110,6 +1112,17 @@ export function ReportsWorkspace() {
             <p className="text-sm text-[var(--muted-foreground)]">Ranking disponível</p>
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{analytics.studentRanking.length}</p>
           </Card>
+        </div>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <Button variant="secondary" disabled={!filteredCorrections.length} onClick={() => downloadTextFile("correcoes-filtradas.csv", buildCorrectionCsv(filteredCorrections), "text/csv;charset=utf-8")}>
+            <Download className="size-4" /> Baixar correções em CSV
+          </Button>
+          <Button variant="secondary" disabled={!filteredCorrections.length} onClick={() => downloadTextFile("desempenho-por-questao.csv", buildQuestionPerformanceCsv(questionPerformance), "text/csv;charset=utf-8")}>
+            <FileSpreadsheet className="size-4" /> Baixar desempenho por questão
+          </Button>
+          <Button variant="ghost" disabled={!filteredCorrections.length} onClick={() => openPedagogicalReport("Relatório pedagógico", filteredCorrections.length, filteredAverage, questionPerformance)}>
+            <Printer className="size-4" /> Imprimir ou salvar em PDF
+          </Button>
         </div>
       </Card>
       <Card className="p-6">
