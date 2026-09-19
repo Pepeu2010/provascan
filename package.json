@@ -27,6 +27,7 @@
     "test:external-reporting": "npx --no-install tsx scripts/verify-external-reporting.ts",
     "test:internal-reporting": "npx --no-install tsx scripts/verify-internal-reporting.ts",
     "test:exam-center-audit": "npx --no-install tsx scripts/verify-exam-center-audit.ts",
+    "test:system-health-panel": "npx --no-install tsx scripts/verify-system-health-panel.ts",
     "test:print-preflight": "npx --no-install tsx scripts/verify-print-preflight.ts",
     "test:usability-preferences": "npx --no-install tsx scripts/verify-usability-preferences.ts",
     "test:offline-sync-queue": "npx --no-install tsx scripts/verify-offline-sync-queue.ts",
