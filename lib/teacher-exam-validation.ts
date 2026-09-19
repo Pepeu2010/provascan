@@ -1,11 +1,13 @@
 import { z } from "zod";
-import { printAlternativeLayouts, printSizes, printTemplates, printTypefaces } from "@/lib/exam-print-options";
+import { answerSheetAreas, answerSheetModels, printAlternativeLayouts, printSizes, printTemplates, printTypefaces } from "@/lib/exam-print-options";
 import type { ExamQuestionType, TeacherExamInput } from "@/types/teacher-exams";
 
 const shortText = z.string().trim().max(200);
 const questionType = z.enum(["multipla_escolha", "verdadeiro_falso", "resposta_curta", "discursiva", "associacao"]);
 const printOptions = z.object({
   alternativeLayout: z.enum(printAlternativeLayouts),
+  answerSheetArea: z.enum(answerSheetAreas),
+  answerSheetModel: z.enum(answerSheetModels),
   size: z.enum(printSizes),
   template: z.enum(printTemplates),
   typeface: z.enum(printTypefaces),

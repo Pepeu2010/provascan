@@ -10,6 +10,7 @@ import {
   type NormalizedRect,
 } from "@/services/answer-sheet-models";
 import { ANSWER_SHEET_TEMPLATE, getBubbleBounds, getQuestionLayout } from "@/services/answer-sheet-template";
+import { FANUCCHI_ANSWER_SHEET_VERSION, getFanucchiBubbleBounds } from "@/services/fanucchi-answer-sheet";
 import { extractIdentityFromImage, extractTextFromImage } from "@/services/ocr";
 import { buildIdentificationCode } from "@/services/exam-correction";
 import type { Exam, Student } from "@/types/domain";
@@ -238,6 +239,10 @@ export async function analyzeAnswerSheetCanvas(params: {
     headerText,
   });
 
+  if (expectedTemplateId === FANUCCHI_ANSWER_SHEET_VERSION) {
+    return analyzeFanucchiCard({ alternatives, answerKeyLength, imageData });
+  }
+
   // A prova pode estar cadastrada como PS-CARD e, ainda assim, o professor
   // enviar uma folha externa da escola. Só substituímos a geometria linear
   // quando o cabeçalho identifica inequivocamente o modelo ProvaScan.
@@ -386,6 +391,38 @@ function analyzeProvaScanCard(params: {
     modelDisplayName: "Cartão-resposta padrão ProvaScan",
     pageType: "EXATAS_E_HUMANAS" as const,
     templateId: ANSWER_SHEET_TEMPLATE.version,
+    totalQuestions: answerKeyLength,
+    usedExpectedTemplate: true,
+  } satisfies AnswerSheetAnalysis;
+}
+
+function analyzeFanucchiCard(params: {
+  alternatives: string[];
+  answerKeyLength?: number;
+  imageData: ImageData;
+}) {
+  const { alternatives, answerKeyLength, imageData } = params;
+  if (!answerKeyLength || answerKeyLength < 1) {
+    throw new Error("Informe a quantidade de questões do gabarito antes de ler o cartão.");
+  }
+  if (alternatives.length !== 5) {
+    throw new Error("O cartão Fanucchi é compatível com questões objetivas de alternativas A a E.");
+  }
+  const answers = readProvaScanCardAnswers({
+    alternatives,
+    answerKeyLength,
+    getBounds: (questionIndex) => getFanucchiBubbleBounds({ canvasHeight: imageData.height, canvasWidth: imageData.width, questionCount: answerKeyLength, questionIndex }),
+    imageData,
+  });
+  return {
+    answers,
+    blockAudits: [{ averageConfidence: average(answers.map((item) => item.confidence)), questionCount: answerKeyLength, questionStart: 1, rect: { height: imageData.height, width: imageData.width, x: 0, y: 0 }, title: "CARTÃO FANUCCHI" }],
+    headerConfidence: 100,
+    headerText: FANUCCHI_ANSWER_SHEET_VERSION,
+    modelConfidence: 100,
+    modelDisplayName: "Cartão-resposta A4 Fanucchi",
+    pageType: "EXATAS_E_HUMANAS" as const,
+    templateId: FANUCCHI_ANSWER_SHEET_VERSION,
     totalQuestions: answerKeyLength,
     usedExpectedTemplate: true,
   } satisfies AnswerSheetAnalysis;

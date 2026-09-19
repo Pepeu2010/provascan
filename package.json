@@ -30,6 +30,7 @@
     "test:offline-sync-queue": "npx --no-install tsx scripts/verify-offline-sync-queue.ts",
     "test:auth-flow": "npx --no-install tsx scripts/verify-auth-flow.ts",
     "test:exam-printing": "npx --no-install tsx scripts/verify-exam-printing.ts",
+    "test:fanucchi-answer-sheet": "npx --no-install tsx scripts/verify-fanucchi-answer-sheet.ts",
     "test:api-authorization": "npx --no-install tsx scripts/verify-api-authorization.ts",
     "test:dashboard-loading-stability": "npx --no-install tsx scripts/verify-dashboard-loading-stability.ts",
     "test:dashboard-responsive-card": "npx --no-install tsx scripts/verify-dashboard-responsive-card.ts",
