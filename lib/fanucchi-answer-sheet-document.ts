@@ -13,7 +13,7 @@ export function createFanucchiAnswerSheetCard(params: { area: FanucchiArea; ques
   const icon = area === "EXATAS" ? "∑" : "◎";
   const rows = layout.questions.map((question) => {
     const columnLeft = layout.answerArea.x + question.column * (layout.columnWidth + layout.columnGap);
-    const top = layout.answerArea.y + question.row * layout.rowHeight;
+    const top = layout.answerArea.y - 164 + question.row * layout.rowHeight;
     return `<div class="fanucchi-card__row" style="left:${columnLeft}mm;top:${top}mm;width:${layout.columnWidth}mm;height:${layout.rowHeight}mm"><b>${question.number}</b>${question.bubbles.map((bubble) => `<span class="fanucchi-card__bubble" aria-label="Questão ${question.number}, alternativa ${bubble.alternative}" style="left:${bubble.cx - columnLeft - bubble.radius}mm;top:${layout.rowHeight / 2 - bubble.radius}mm;width:${bubble.radius * 2}mm;height:${bubble.radius * 2}mm">${bubble.alternative}</span>`).join("")}</div>`;
   }).join("");
   const legends = Array.from({ length: layout.columnCount }, (_, column) => {
