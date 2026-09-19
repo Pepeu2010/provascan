@@ -26,7 +26,9 @@ export const FANUCCHI_ANSWER_SHEET_GEOMETRY = {
   instructions: { x: 8, y: 67, width: 104, height: 48 },
   signature: { x: 58, y: 119, width: 94, height: 8 },
   markingGuide: { x: 5, y: 132, width: 200, height: 28 },
-  answerArea: { x: 8, y: 164, width: 194, height: 116 },
+  // The heading occupies the first 13 mm of the visible answer frame. Bubble
+  // coordinates start below it so the renderer and OMR share the same origin.
+  answerArea: { x: 8, y: 177, width: 194, height: 103 },
   bubbleDiameter: 5.2,
   bubbleSpacing: 3,
   // 5.4 mm keeps a 5.2 mm bubble readable while accommodating 90 objective

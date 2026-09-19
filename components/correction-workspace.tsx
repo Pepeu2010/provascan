@@ -24,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   analyzeAnswerSheetCanvas,
+  decodeOpaqueAnswerSheetToken,
   detectIdentityWithOcr,
 } from "@/services/scan-pipeline";
 import { rectifyMobilePhoto } from "@/services/mobile-photo-rectification";
@@ -261,20 +262,21 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       setProgress(PROCESSING_STEPS[2].progress);
       await waitWithCancel(90, cancelProcessingRef);
 
-      // QR impresso continua compatível com os cartões existentes, mas não é
-      // mais lido nem usado para identificar o aluno ou decidir a correção.
-      const ocrIdentity = await detectIdentityWithOcr({
-        canvas: preprocessing.processedCanvas,
-        preferredStudentId: activePreferredStudentId,
-        students: studentsForExam,
-      });
-      const identity = {
-        confidence: ocrIdentity?.confidence ?? 0,
-        detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome,
-        invalidMessage: "",
-        method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual",
-        matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId,
-      };
+      const isFanucchi = exam.templateVersion === FANUCCHI_ANSWER_SHEET_VERSION;
+      const token = isFanucchi ? await decodeOpaqueAnswerSheetToken(preprocessing.processedCanvas) : null;
+      let identity: { confidence: number; detectedName: string; invalidMessage: string; method: "ocr" | "manual" | "qr"; matchedStudentId: string };
+      if (isFanucchi) {
+        if (!token) throw new Error("Não foi possível ler o adesivo QR. Confira se o adesivo está colado e visível antes de corrigir.");
+        const response = await fetch("/api/answer-sheet-labels/resolve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+        const payload = await response.json() as { assignment?: { examId: string; studentId: string; templateVersion: string }; error?: string };
+        if (!response.ok || !payload.assignment || payload.assignment.examId !== exam.id || payload.assignment.templateVersion !== FANUCCHI_ANSWER_SHEET_VERSION) throw new Error(payload.error ?? "Este adesivo não pertence à prova selecionada.");
+        const student = studentsForExam.find((item) => item.id === payload.assignment?.studentId);
+        if (!student) throw new Error("O aluno deste adesivo não está autorizado para esta prova.");
+        identity = { confidence: 100, detectedName: student.nome, invalidMessage: "", matchedStudentId: student.id, method: "qr" };
+      } else {
+        const ocrIdentity = await detectIdentityWithOcr({ canvas: preprocessing.processedCanvas, preferredStudentId: activePreferredStudentId, students: studentsForExam });
+        identity = { confidence: ocrIdentity?.confidence ?? 0, detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome, invalidMessage: "", method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual", matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId };
+      }
 
       setProgressLabel(PROCESSING_STEPS[3].label);
       setProgress(PROCESSING_STEPS[3].progress);
@@ -323,7 +325,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             ? "O scanner priorizou o template esperado da prova antes da leitura do cabeçalho."
             : `Classificação do modelo pelo cabeçalho com confiança ${omrAnalysis.modelConfidence}%.`,
           omrAnalysis.headerText ? `Cabeçalho OCR: ${omrAnalysis.headerText.slice(0, 140)}` : "Cabeçalho OCR indisponível nesta imagem.",
-          "QR individual ignorado: a identificação usa OCR e confirmação manual.",
+          isFanucchi ? "Adesivo QR validado no servidor antes da leitura OMR." : "Identificação por OCR e confirmação manual.",
           preprocessing.processedLabel,
           preprocessing.perspectiveCorrected
             ? "Perspectiva de foto de celular corrigida antes da leitura."
@@ -331,7 +333,6 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
           preprocessing.cropApplied ? "Recorte automático da área útil aplicado." : "O recorte automático manteve a imagem inteira.",
           preprocessing.lowLight ? "Imagem com pouca luz: revise nome e respostas manualmente." : "Iluminação dentro do esperado.",
           preprocessing.shadowRisk ? "Sombra detectada: marcações foram sinalizadas para revisão." : "Sem sombra relevante no cartão.",
-          ocrIdentity?.rawText ? `OCR bruto: ${ocrIdentity.rawText.slice(0, 120)}` : "",
           needsManualReview ? "Fluxo marcado para revisão manual obrigatória." : "Leitura automática consistente, mas ainda exige conferência final.",
           omrAnalysis.totalQuestions !== answerKey.length
             ? `Atenção: a prova atual tem ${answerKey.length} respostas cadastradas, mas o template identificado possui ${omrAnalysis.totalQuestions} questões.`
