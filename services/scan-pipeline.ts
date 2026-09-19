@@ -396,6 +396,21 @@ function analyzeProvaScanCard(params: {
   } satisfies AnswerSheetAnalysis;
 }
 
+/** Fanucchi labels use an opaque server token instead of the legacy JSON QR. */
+export async function decodeOpaqueAnswerSheetToken(canvas: HTMLCanvasElement) {
+  try {
+    const jsqr = (await import("jsqr")).default;
+    for (const candidate of buildQrScanCandidates(canvas)) {
+      const context = candidate.getContext("2d", { willReadFrequently: true });
+      if (!context) continue;
+      const image = context.getImageData(0, 0, candidate.width, candidate.height);
+      const token = jsqr(image.data, image.width, image.height, { inversionAttempts: "attemptBoth" })?.data?.trim();
+      if (/^PSA1\.[A-Za-z0-9_-]{43}$/.test(token ?? "")) return token!;
+    }
+  } catch { /* QR is reported as absent and never trusted locally. */ }
+  return null;
+}
+
 function analyzeFanucchiCard(params: {
   alternatives: string[];
   answerKeyLength?: number;
