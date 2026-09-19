@@ -37,7 +37,7 @@ export async function PUT(request: Request, context: { params: Promise<{ examId:
   }
   const { examId } = await context.params;
   try {
-    const version = await updateTeacherExam({ actorId: session.id, examId, exam: parsed.data.exam, expectedVersion: parsed.data.expectedVersion, intent: parsed.data.intent });
+    const version = await updateTeacherExam({ actorId: session.id, actorRole: session.role, examId, exam: parsed.data.exam, expectedVersion: parsed.data.expectedVersion, intent: parsed.data.intent });
     await appendAuditEvent({ actorId: session.id, event: parsed.data.intent === "publicar" ? "teacher_exam_published" : "teacher_exam_draft_saved", targetId: examId, metadata: { version } });
     return NextResponse.json({ message: parsed.data.intent === "publicar" ? "Prova publicada com sucesso." : "Rascunho salvo.", version });
   } catch (error) {
