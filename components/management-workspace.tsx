@@ -1038,6 +1038,25 @@ export function ReportsWorkspace() {
   const filteredAverage = filteredCorrections.length
     ? Math.round(filteredCorrections.reduce((sum, item) => sum + item.correction.percentual, 0) / filteredCorrections.length)
     : 0;
+  const questionPerformance = useMemo(() => {
+    const rows = new Map<number, { correct: number; blank: number; multiple: number; total: number; wrong: number }>();
+    for (const correction of filteredCorrections) {
+      for (const answer of correction.respostas) {
+        const row = rows.get(answer.questao) ?? { blank: 0, correct: 0, multiple: 0, total: 0, wrong: 0 };
+        row.total += 1;
+        if (answer.status === "acerto") row.correct += 1;
+        else if (answer.status === "em-branco") row.blank += 1;
+        else if (answer.status === "multipla-marcacao") row.multiple += 1;
+        else if (answer.status === "erro") row.wrong += 1;
+        rows.set(answer.questao, row);
+      }
+    }
+    return [...rows.entries()].map(([question, row]) => ({
+      ...row,
+      correctRate: row.total ? Math.round((row.correct / row.total) * 100) : 0,
+      question,
+    })).sort((left, right) => left.correctRate - right.correctRate || left.question - right.question);
+  }, [filteredCorrections]);
   const filteredExternalCorrections = useMemo(() => filterExternalCorrections(externalCorrections, { dateFrom: externalDateFrom, dateTo: externalDateTo, query: externalQuery, templateId: externalTemplateFilter }), [externalCorrections, externalDateFrom, externalDateTo, externalQuery, externalTemplateFilter]);
   const externalReport = useMemo(() => buildExternalReport(filteredExternalCorrections), [filteredExternalCorrections]);
   const externalTemplateIds = [...new Set(externalCorrections.map((item) => item.templateId).filter((id): id is string => Boolean(id)))];
@@ -1092,6 +1111,13 @@ export function ReportsWorkspace() {
             <p className="mt-2 text-3xl font-semibold text-[var(--foreground)]">{analytics.studentRanking.length}</p>
           </Card>
         </div>
+      </Card>
+      <Card className="p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Leitura pedagógica</p><h3 className="mt-2 text-xl font-semibold text-[var(--foreground)]">Resultado por questão</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">As questões com menor aproveitamento aparecem primeiro. Use os filtros acima para olhar uma prova, turma ou aluno.</p></div>
+          <Badge tone="accent">{questionPerformance.length} {questionPerformance.length === 1 ? "questão" : "questões"} com dados</Badge>
+        </div>
+        {questionPerformance.length ? <div className="mt-5 grid gap-3">{questionPerformance.map((item) => <article key={item.question} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><strong className="text-sm text-[var(--foreground)]">Questão {item.question}</strong><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.correct} acertos em {item.total} respostas</p></div><Badge tone={item.correctRate >= 70 ? "success" : item.correctRate >= 50 ? "warning" : "error"}>{item.correctRate}% de aproveitamento</Badge></div><div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--surface-strong)]"><div className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-strong))]" style={{ width: `${item.correctRate}%` }} /></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]"><span>{item.wrong} erraram</span><span>{item.blank} em branco</span><span>{item.multiple} múltiplas marcações</span></div></article>)}</div> : <p className="mt-5 rounded-2xl border border-dashed border-[var(--border-strong)] px-5 py-8 text-center text-sm text-[var(--muted-foreground)]">Os dados por questão aparecem depois que houver correções para os filtros escolhidos.</p>}
       </Card>
       <Card className="p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
