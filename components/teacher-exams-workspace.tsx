@@ -27,6 +27,7 @@ type WorkspaceMode = "lista" | "escolha" | "editor";
 type EditorStep = "informacoes" | "questoes" | "gabarito" | "aplicacao" | "revisao";
 type StatusFilter = "todas" | ExamLifecycleStatus;
 type ExamAudience = { classes: Array<{ id: string; name: string }>; teachers: Array<{ id: string; name: string; classIds: string[] }> };
+type ExamAuditEvent = { at: string; actorName: string; event: string; metadata: Record<string, unknown> };
 
 const LOCAL_DRAFT_KEY = "provascan:teacher-exam-draft:v1";
 const typeLabels: Record<ExamQuestionType, string> = {
@@ -497,12 +498,45 @@ function ApplicationEditor({ audience, draft, loading, readOnly, setDraft, viewe
 
 function ExamReview({ draft, errors, active, audience }: { draft: TeacherExamInput; errors: string[]; active: TeacherExam | null; audience: ExamAudience }) {
   const assignmentText = (draft.assignmentGroups ?? []).flatMap((group) => group.classIds.map((classId) => `${audience.teachers.find((teacher) => teacher.id === group.teacherId)?.name ?? "Professor"} · ${audience.classes.find((item) => item.id === classId)?.name ?? "Turma"}`));
-  return <section><SectionHeading eyebrow="ETAPA 5" title="Revise e publique" detail="Conferimos sua conta e o conteúdo da prova antes de salvar." />{errors.length ? <div className="publish-checklist review-errors"><CircleAlert className="size-5" /><div><strong>Falta pouco</strong><ul>{errors.map((error) => <li key={error}>{error}</li>)}</ul></div></div> : <div className="publish-checklist review-success"><Check className="size-5" /><div><strong>Pronta para publicar</strong><p>A prova ficará disponível para impressão, cartão-resposta e correção.</p></div></div>}<article className="exam-preview"><header><div><p>PROVASCAN · PRÉ-VISUALIZAÇÃO</p><h2>{draft.title || "Prova sem título"}</h2><span>{draft.subject || "Sem disciplina"} · {formatDate(draft.examDate)}</span></div><span>{draft.questions.length} questões</span></header>{assignmentText.length ? <aside><strong>Aplicação</strong><p>{assignmentText.join(" · ")}</p></aside> : draft.audienceLabel ? <aside><strong>Aplicação</strong><p>{draft.audienceLabel}</p></aside> : null}{draft.instructions ? <aside><strong>Instruções</strong><p>{draft.instructions}</p></aside> : null}<ol>{draft.questions.map((question, index) => <li key={question.id ?? index}><strong>{index + 1}.</strong><div><p>{question.prompt || "Enunciado pendente"}</p>{question.alternatives.map((alternative, alternativeIndex) => <span key={alternativeIndex}>{String.fromCharCode(65 + alternativeIndex)}) {alternative || "Alternativa pendente"}</span>)}</div></li>)}</ol></article>{active ? <><ExamCenter exam={active} /><div className="mt-5"><PrintStudio exam={active} /></div></> : null}</section>;
+  return <section><SectionHeading eyebrow="ETAPA 5" title="Revise e publique" detail="Conferimos sua conta e o conteúdo da prova antes de salvar." />{errors.length ? <div className="publish-checklist review-errors"><CircleAlert className="size-5" /><div><strong>Falta pouco</strong><ul>{errors.map((error) => <li key={error}>{error}</li>)}</ul></div></div> : <div className="publish-checklist review-success"><Check className="size-5" /><div><strong>Pronta para publicar</strong><p>A prova ficará disponível para impressão, cartão-resposta e correção.</p></div></div>}<article className="exam-preview"><header><div><p>PROVASCAN · PRÉ-VISUALIZAÇÃO</p><h2>{draft.title || "Prova sem título"}</h2><span>{draft.subject || "Sem disciplina"} · {formatDate(draft.examDate)}</span></div><span>{draft.questions.length} questões</span></header>{assignmentText.length ? <aside><strong>Aplicação</strong><p>{assignmentText.join(" · ")}</p></aside> : draft.audienceLabel ? <aside><strong>Aplicação</strong><p>{draft.audienceLabel}</p></aside> : null}{draft.instructions ? <aside><strong>Instruções</strong><p>{draft.instructions}</p></aside> : null}<ol>{draft.questions.map((question, index) => <li key={question.id ?? index}><strong>{index + 1}.</strong><div><p>{question.prompt || "Enunciado pendente"}</p>{question.alternatives.map((alternative, alternativeIndex) => <span key={alternativeIndex}>{String.fromCharCode(65 + alternativeIndex)}) {alternative || "Alternativa pendente"}</span>)}</div></li>)}</ol></article>{active ? <><ExamCenter key={active.id} exam={active} /><div className="mt-5"><PrintStudio exam={active} /></div></> : null}</section>;
 }
 
 function ExamCenter({ exam }: { exam: TeacherExam }) {
+  const [events, setEvents] = useState<ExamAuditEvent[]>([]);
+  const [historyState, setHistoryState] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let current = true;
+    void jsonApi<{ events: ExamAuditEvent[] }>(`/api/teacher-exams/${encodeURIComponent(exam.id)}/audit`)
+      .then((payload) => {
+        if (!current) return;
+        setEvents(payload.events);
+        setHistoryState("ready");
+      })
+      .catch(() => {
+        if (current) setHistoryState("error");
+      });
+    return () => { current = false; };
+  }, [exam.id]);
+
   const stage = exam.status === "arquivada" ? "Arquivada" : exam.hasResults ? "Corrigida" : exam.status === "aplicada" ? "Aplicada" : exam.status === "publicada" ? "Publicada" : "Rascunho";
-  return <Card className="mt-5 p-5"><p className="teacher-exams__eyebrow">CENTRAL DA PROVA</p><div className="mt-2 flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-semibold">{stage}</h3><p className="text-sm text-[var(--muted-foreground)]">{exam.questions.length} questões · {exam.audienceLabel || "Aplicação ainda não definida"}</p></div><Badge tone={statusTones[exam.status]}>{statusLabels[exam.status]}</Badge></div><div className="mt-4 grid gap-2 sm:grid-cols-3"><Link className="button button--secondary" href={`/dashboard/correcao?prova=${encodeURIComponent(exam.id)}`}>Corrigir</Link><Link className="button button--secondary" href="/dashboard/gabaritos">Gabarito</Link><Link className="button button--secondary" href="/dashboard/relatorios">Relatórios</Link></div></Card>;
+  return <Card className="mt-5 p-5"><p className="teacher-exams__eyebrow">CENTRAL DA PROVA</p><div className="mt-2 flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-semibold">{stage}</h3><p className="text-sm text-[var(--muted-foreground)]">{exam.questions.length} questões · {exam.audienceLabel || "Aplicação ainda não definida"}</p></div><Badge tone={statusTones[exam.status]}>{statusLabels[exam.status]}</Badge></div><div className="mt-4 grid gap-2 sm:grid-cols-3"><Link className="button button--secondary" href={`/dashboard/correcao?prova=${encodeURIComponent(exam.id)}`}>Corrigir</Link><Link className="button button--secondary" href="/dashboard/gabaritos">Gabarito</Link><Link className="button button--secondary" href="/dashboard/relatorios">Relatórios</Link></div><section className="mt-5 border-t border-[var(--border)] pt-4" aria-labelledby="exam-history-title"><div className="flex items-center gap-2"><Clock3 className="size-4 text-[var(--accent)]" aria-hidden="true" /><h4 id="exam-history-title" className="text-sm font-semibold">Histórico da prova</h4></div><p className="mt-1 text-xs text-[var(--muted-foreground)]">Acompanhe as ações importantes registradas nesta prova.</p>{historyState === "loading" ? <div className="mt-3 h-16 animate-pulse rounded-xl bg-[var(--surface-strong)] motion-reduce:animate-none" aria-label="Carregando histórico" /> : null}{historyState === "error" ? <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted-foreground)]">O histórico não está disponível agora. Tente novamente mais tarde.</p> : null}{historyState === "ready" && !events.length ? <p className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted-foreground)]">As próximas ações desta prova aparecerão aqui.</p> : null}{historyState === "ready" && events.length ? <ol className="mt-3 grid gap-2">{events.slice(0, 5).map((entry, index) => <li key={`${entry.at}-${index}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2"><span className="text-xs text-[var(--foreground)]"><strong>{auditEventLabel(entry.event)}</strong><span className="text-[var(--muted-foreground)]"> · {entry.actorName}</span></span><time className="text-[11px] text-[var(--muted-foreground)]" dateTime={entry.at}>{formatUpdatedAt(entry.at)}</time></li>)}</ol> : null}</section></Card>;
+}
+
+function auditEventLabel(event: string) {
+  const labels: Record<string, string> = {
+    answer_sheet_labels_issued: "Cartões individuais preparados",
+    exam_assignments_synced: "Aplicação atualizada",
+    teacher_exam_duplicated: "Prova duplicada",
+    teacher_exam_archived: "Prova arquivada",
+    teacher_exam_draft_created: "Rascunho criado",
+    teacher_exam_draft_saved: "Rascunho salvo",
+    teacher_exam_import_duplicate: "Arquivo já estava vinculado a esta prova",
+    teacher_exam_imported: "Arquivo importado",
+    teacher_exam_published: "Prova publicada",
+    teacher_exam_restored: "Prova restaurada",
+  };
+  return labels[event] ?? "Atividade registrada";
 }
 
 function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) { return <header className="section-heading"><p>{eyebrow}</p><h2>{title}</h2><span>{detail}</span></header>; }
