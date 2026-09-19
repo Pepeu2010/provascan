@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createExamPrintDocument, getAnswerSheetLabels } from "../lib/exam-print-document";
+import { createExamPrintDocument, createStudentCardsPrintDocument, getAnswerSheetLabels } from "../lib/exam-print-document";
 import { defaultExamPrintOptions, normalizeExamPrintOptions } from "../lib/exam-print-options";
 import { getStudentCardPrintLayout, sortStudentsForPrinting } from "../services/exam-printing";
 import type { TeacherExam } from "../types/teacher-exams";
@@ -39,6 +39,24 @@ assert.match(cardDocument, /<span>A<\/span>/);
 assert.match(cardDocument, /<span>E<\/span>/);
 assert.doesNotMatch(cardDocument, /Texto longo A|Este enunciado não pode aparecer no cartão/);
 
+const officialKey = createExamPrintDocument({
+  ...printableExam,
+  questions: [{ ...printableExam.questions[0], correctAnswers: ["Texto longo B"], annulled: false }],
+} as TeacherExam, "gabarito");
+assert.match(officialKey, /GABARITO OFICIAL/);
+assert.match(officialKey, />B<\/span>/);
+assert.doesNotMatch(officialKey, /Este enunciado não pode aparecer no cartão|Texto longo A|Texto longo B/);
+
+const studentCards = createStudentCardsPrintDocument(printableExam, [
+  { id: "a", name: "Ana de Souza", className: "2º ano A" },
+  { id: "b", name: "Bruno Lima", className: "2º ano B" },
+]);
+assert.match(studentCards, /Ana de Souza/);
+assert.match(studentCards, /Bruno Lima/);
+assert.match(studentCards, /answer-card--batch/);
+assert.match(studentCards, /page-break-after:always/);
+assert.doesNotMatch(studentCards, /Texto longo A|Este enunciado não pode aparecer no cartão/);
+
 const twoColumns = createExamPrintDocument(printableExam, "prova", { ...defaultExamPrintOptions, alternativeLayout: "duas_colunas", template: "classico", typeface: "serifada" });
 assert.match(twoColumns, /exam-print__alternatives--duas_colunas/);
 assert.match(twoColumns, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
@@ -52,5 +70,8 @@ assert.match(workspace, /openExamPrint/);
 assert.match(workspace, /PrintStudio/);
 assert.match(workspace, /ExamPresentationControls/);
 assert.match(printStudio, /Visual da prova/);
+assert.match(printStudio, /Gabarito oficial/);
+assert.match(printStudio, /Cartões por aluno/);
+assert.match(printStudio, /print-roster/);
 assert.doesNotMatch(workspace, /Enviar para conferência/);
 console.log("Teacher-owned exam printing checks passed.");
