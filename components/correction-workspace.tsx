@@ -28,6 +28,7 @@ import {
 } from "@/services/scan-pipeline";
 import { rectifyMobilePhoto } from "@/services/mobile-photo-rectification";
 import { ANSWER_SHEET_TEMPLATE, getBubbleBounds } from "@/services/answer-sheet-template";
+import { FANUCCHI_ANSWER_SHEET_VERSION, getFanucchiBubbleBounds } from "@/services/fanucchi-answer-sheet";
 import { assessScanQuality } from "@/services/scan-quality";
 import { getStudentsForExam } from "@/lib/exam-audience";
 import { compareClassrooms } from "@/lib/education-labels";
@@ -1077,7 +1078,8 @@ function AnswerReviewGrid({
 }
 
 function AnswerSheetReviewOverlay({ alternatives, answers, src, templateId }: { alternatives: string[]; answers: ScanAnswer[]; src: string; templateId: string }) {
-  if (!templateId.toUpperCase().startsWith("PS-CARD")) return null;
+  const isFanucchi = templateId === FANUCCHI_ANSWER_SHEET_VERSION;
+  if (!templateId.toUpperCase().startsWith("PS-CARD") && !isFanucchi) return null;
   const uncertain = answers.filter((answer) => answer.confidence < MIN_CONFIDENCE_REVIEW || answer.markedAnswers.length !== 1);
   if (!uncertain.length) return null;
   return <details className="rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
@@ -1086,10 +1088,12 @@ function AnswerSheetReviewOverlay({ alternatives, answers, src, templateId }: { 
     <div className="relative mt-4 aspect-[794/1123] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-white">
       <NextImage src={src} alt="Folha processada com questões que exigem conferência" fill unoptimized sizes="(max-width: 768px) 100vw, 720px" className="object-contain" />
       {uncertain.flatMap((answer) => {
-        const bounds = getBubbleBounds({ alternatives, canvasHeight: ANSWER_SHEET_TEMPLATE.page.height, canvasWidth: ANSWER_SHEET_TEMPLATE.page.width, questionCount: answers.length, questionIndex: answer.question - 1 });
+        const bounds = isFanucchi ? getFanucchiBubbleBounds({ canvasHeight: 297, canvasWidth: 210, questionCount: answers.length, questionIndex: answer.question - 1 }) : getBubbleBounds({ alternatives, canvasHeight: ANSWER_SHEET_TEMPLATE.page.height, canvasWidth: ANSWER_SHEET_TEMPLATE.page.width, questionCount: answers.length, questionIndex: answer.question - 1 });
         const marked = bounds.filter((bound) => answer.markedAnswers.includes(bound.alternative));
         const targets = marked.length ? marked : [bounds[0]].filter(Boolean);
-        return targets.map((bound, index) => <span key={`${answer.question}-${bound.alternative}-${index}`} title={`Questão ${answer.question}: conferir`} className="absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[var(--warning)] text-[10px] font-black text-black shadow" style={{ left: `${(bound.cx / ANSWER_SHEET_TEMPLATE.page.width) * 100}%`, top: `${(bound.cy / ANSWER_SHEET_TEMPLATE.page.height) * 100}%` }}>{answer.question}</span>);
+        const width = isFanucchi ? 210 : ANSWER_SHEET_TEMPLATE.page.width;
+        const height = isFanucchi ? 297 : ANSWER_SHEET_TEMPLATE.page.height;
+        return targets.map((bound, index) => <span key={`${answer.question}-${bound.alternative}-${index}`} title={`Questão ${answer.question}: conferir`} className="absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[var(--warning)] text-[10px] font-black text-black shadow" style={{ left: `${(bound.cx / width) * 100}%`, top: `${(bound.cy / height) * 100}%` }}>{answer.question}</span>);
       })}
     </div>
   </details>;
@@ -1457,7 +1461,8 @@ async function preprocessImage(
 }
 
 function isProvaScanCardTemplate(templateVersion?: string) {
-  return (templateVersion ?? "").trim().toUpperCase().startsWith("PS-CARD");
+  const normalized = (templateVersion ?? "").trim().toUpperCase();
+  return normalized.startsWith("PS-CARD") || normalized === FANUCCHI_ANSWER_SHEET_VERSION;
 }
 
 async function loadRenderableSource(file: File) {

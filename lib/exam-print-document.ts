@@ -1,8 +1,9 @@
 import { ANSWER_SHEET_TEMPLATE, getQuestionLayout } from "@/services/answer-sheet-template";
+import { createFanucchiAnswerSheetCard, fanucchiAnswerSheetPrintCss } from "@/lib/fanucchi-answer-sheet-document";
 import { defaultExamPrintOptions, type ExamPrintOptions } from "@/lib/exam-print-options";
 import type { TeacherExam } from "@/types/teacher-exams";
 
-export type { ExamPrintOptions, PrintAlternativeLayout, PrintSize, PrintTemplate, PrintTypeface } from "@/lib/exam-print-options";
+export type { AnswerSheetArea, AnswerSheetModel, ExamPrintOptions, PrintAlternativeLayout, PrintSize, PrintTemplate, PrintTypeface } from "@/lib/exam-print-options";
 export type ExamPrintKind = "prova" | "cartao" | "gabarito";
 export type ExamPrintStudent = { id: string; name: string; className: string };
 export { defaultExamPrintOptions } from "@/lib/exam-print-options";
@@ -43,6 +44,11 @@ function createExamSheet(exam: TeacherExam, options: ExamPrintOptions) {
 }
 
 function createAnswerSheet(exam: TeacherExam, options: ExamPrintOptions, student?: ExamPrintStudent) {
+  if (options.answerSheetModel === "fanucchi") {
+    // The base card never exposes student data: the QR is issued on a
+    // separate individual label and validated by the backend before OMR.
+    return createFanucchiAnswerSheetCard({ area: resolveFanucchiArea(exam, options), questionCount: exam.questions.length });
+  }
   const labels = getAnswerSheetLabels();
   const layout = getQuestionLayout(exam.questions.length, labels);
   const questionGrid = `${Math.round(layout.numberColumnWidth)}px repeat(${labels.length}, 1fr)`;
@@ -57,6 +63,11 @@ function createAnswerSheet(exam: TeacherExam, options: ExamPrintOptions, student
     ? `<div><span>Aluno(a):</span><b>${escapeHtml(student.name)}</b><span>Turma:</span><b>${escapeHtml(student.className)}</b></div>`
     : `<div><span>Aluno(a):</span><i></i><span>Turma:</span><i></i></div>`;
   return `<main class="answer-card answer-card--${options.template}${student ? " answer-card--identified" : ""}" style="${printTokens(options)}"><header class="answer-card__header"><span class="answer-card__brand">PROVASCAN · CARTÃO-RESPOSTA</span><h1>${escapeHtml(exam.title || "Prova")}</h1>${details ? `<p>${details}</p>` : ""}${studentLine}</header><p class="answer-card__instruction">Marque uma única alternativa por questão.</p><div class="answer-card__caption">RESPOSTAS <span>Preencha completamente a bolha escolhida.</span></div><section class="answer-card__grid">${legends}${rows}</section><footer>Cartão de leitura ProvaScan · use caneta azul ou preta e não dobre esta folha.</footer></main>`;
+}
+
+function resolveFanucchiArea(exam: TeacherExam, options: ExamPrintOptions) {
+  if (options.answerSheetArea !== "automatica") return options.answerSheetArea;
+  return exam.groupType.trim().toUpperCase() === "EXATAS" ? "EXATAS" : "HUMANAS";
 }
 
 function answerLetter(question: TeacherExam["questions"][number]) {
@@ -77,12 +88,17 @@ function printHtml(title: string, content: string) {
 }
 
 export function createExamPrintDocument(exam: TeacherExam, kind: ExamPrintKind, options: ExamPrintOptions = defaultExamPrintOptions) {
-  const content = kind === "cartao" ? createAnswerSheet(exam, options) : kind === "gabarito" ? createOfficialAnswerKey(exam, options) : createExamSheet(exam, options);
+  const card = kind === "cartao" ? createAnswerSheet(exam, options) : null;
+  const content = card && options.answerSheetModel === "fanucchi" ? `<style>${fanucchiAnswerSheetPrintCss}</style>${card}` : card ?? (kind === "gabarito" ? createOfficialAnswerKey(exam, options) : createExamSheet(exam, options));
   const label = kind === "cartao" ? "Cartão-resposta" : kind === "gabarito" ? "Gabarito oficial" : "Prova";
   return printHtml(`${label} — ${exam.title || "Prova"}`, content);
 }
 
 export function createStudentCardsPrintDocument(exam: TeacherExam, students: ExamPrintStudent[], options: ExamPrintOptions = defaultExamPrintOptions) {
-  const cards = students.map((student) => createAnswerSheet(exam, options, student).replace("answer-card--", "answer-card--batch answer-card--")).join("");
-  return printHtml(`Cartões-resposta — ${exam.title || "Prova"}`, cards);
+  const cards = students.map((student) => {
+    const card = createAnswerSheet(exam, options, student);
+    return options.answerSheetModel === "fanucchi" ? card.replace("fanucchi-card fanucchi-card--", "fanucchi-card fanucchi-card--batch fanucchi-card--") : card.replace("answer-card--", "answer-card--batch answer-card--");
+  }).join("");
+  const content = options.answerSheetModel === "fanucchi" ? `<style>${fanucchiAnswerSheetPrintCss}</style>${cards}` : cards;
+  return printHtml(`Cartões-resposta — ${exam.title || "Prova"}`, content);
 }

@@ -12,7 +12,7 @@ import {
   type ExamPrintStudent,
   type ExamPrintKind,
 } from "@/lib/exam-print-document";
-import { defaultExamPrintOptions, normalizeExamPrintOptions, type ExamPrintOptions, type PrintSize, type PrintTemplate, type PrintTypeface } from "@/lib/exam-print-options";
+import { defaultExamPrintOptions, normalizeExamPrintOptions, type AnswerSheetArea, type AnswerSheetModel, type ExamPrintOptions, type PrintSize, type PrintTemplate, type PrintTypeface } from "@/lib/exam-print-options";
 import type { TeacherExam } from "@/types/teacher-exams";
 
 const templates: Array<{ value: PrintTemplate; title: string; detail: string }> = [
@@ -49,6 +49,8 @@ export function ExamPresentationControls({ disabled = false, value, onChange }: 
   const typefaceId = useId();
   const sizeId = useId();
   const alternativesId = useId();
+  const cardModelId = useId();
+  const cardAreaId = useId();
   const update = <T extends keyof ExamPrintOptions>(key: T, next: ExamPrintOptions[T]) => onChange({ ...value, [key]: next });
   return <section className="print-studio print-studio--editor" aria-label="Visual da prova">
     <header><div><h2><LayoutTemplate className="size-4" />Visual da prova</h2><p>Escolha um modelo agora. A prévia e a impressão usam estas escolhas.</p></div></header>
@@ -59,6 +61,10 @@ export function ExamPresentationControls({ disabled = false, value, onChange }: 
       <label htmlFor={typefaceId}><Type className="size-4" />Fonte<Select id={typefaceId} disabled={disabled} value={value.typeface} onChange={(event) => update("typeface", event.target.value as PrintTypeface)}><option value="limpa">Limpa e objetiva</option><option value="serifada">Clássica para leitura</option><option value="didatica">Didática e espaçada</option></Select></label>
       <label htmlFor={sizeId}>Tamanho<Select id={sizeId} disabled={disabled} value={value.size} onChange={(event) => update("size", event.target.value as PrintSize)}><option value="compacta">Compacto</option><option value="normal">Normal</option><option value="ampliada">Ampliado</option></Select></label>
       <label htmlFor={alternativesId}>Alternativas<Select id={alternativesId} disabled={disabled} value={value.alternativeLayout} onChange={(event) => update("alternativeLayout", event.target.value as ExamPrintOptions["alternativeLayout"])}><option value="lista">Uma por linha</option><option value="duas_colunas">Duas colunas</option></Select></label>
+    </div>
+    <div className="print-studio__controls print-studio__controls--two">
+      <label htmlFor={cardModelId}><ScanLine className="size-4" />Cartão-resposta<Select id={cardModelId} disabled={disabled} value={value.answerSheetModel} onChange={(event) => update("answerSheetModel", event.target.value as AnswerSheetModel)}><option value="provascan">Padrão ProvaScan</option><option value="fanucchi">Modelo A4 Fanucchi</option></Select></label>
+      <label htmlFor={cardAreaId}>Área do cartão<Select id={cardAreaId} disabled={disabled || value.answerSheetModel !== "fanucchi"} value={value.answerSheetArea} onChange={(event) => update("answerSheetArea", event.target.value as AnswerSheetArea)}><option value="automatica">Automática pela prova</option><option value="HUMANAS">Humanas</option><option value="EXATAS">Exatas</option></Select></label>
     </div>
     <p className="print-studio__notice">O visual afeta a prova impressa. O cartão-resposta preserva as bolhas e a geometria para continuar compatível com a correção automática.</p>
   </section>;

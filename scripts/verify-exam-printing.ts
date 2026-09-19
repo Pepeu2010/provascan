@@ -60,8 +60,14 @@ assert.doesNotMatch(studentCards, /Texto longo A|Este enunciado não pode aparec
 const twoColumns = createExamPrintDocument(printableExam, "prova", { ...defaultExamPrintOptions, alternativeLayout: "duas_colunas", template: "classico", typeface: "serifada" });
 assert.match(twoColumns, /exam-print__alternatives--duas_colunas/);
 assert.match(twoColumns, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-assert.deepEqual(normalizeExamPrintOptions({ template: "compacto", typeface: "didatica", size: "ampliada", alternativeLayout: "duas_colunas" }), { template: "compacto", typeface: "didatica", size: "ampliada", alternativeLayout: "duas_colunas" });
+assert.deepEqual(normalizeExamPrintOptions({ template: "compacto", typeface: "didatica", size: "ampliada", alternativeLayout: "duas_colunas" }), { template: "compacto", typeface: "didatica", size: "ampliada", alternativeLayout: "duas_colunas", answerSheetModel: "provascan", answerSheetArea: "automatica" });
 assert.deepEqual(normalizeExamPrintOptions({ template: "fora-do-padrao" }), defaultExamPrintOptions);
+
+const fanucchiCard = createExamPrintDocument({ ...printableExam, groupType: "EXATAS", questions: Array.from({ length: 45 }, () => printableExam.questions[0]) } as TeacherExam, "cartao", { ...defaultExamPrintOptions, answerSheetModel: "fanucchi", answerSheetArea: "automatica" });
+assert.match(fanucchiCard, /Colégio Fábio Fanucchi/);
+assert.match(fanucchiCard, /EXATAS/);
+assert.match(fanucchiCard, /Cole aqui seu adesivo/);
+assert.equal((fanucchiCard.match(/class="fanucchi-card__fiducial"/g) ?? []).length, 4);
 
 const workspace = readFileSync(new URL("../components/teacher-exams-workspace.tsx", import.meta.url), "utf8");
 const printStudio = readFileSync(new URL("../components/print-studio.tsx", import.meta.url), "utf8");

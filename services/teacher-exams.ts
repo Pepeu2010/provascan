@@ -149,7 +149,7 @@ function examRow(actorId: string, creatorName: string, examId: string, input: Te
     status: published ? "publicada" : "rascunho",
     subject: input.subject,
     subject_id: input.subjectId || null,
-    template_version: "PS-CARD-4",
+    template_version: normalizeExamPrintOptions(input.printOptions).answerSheetModel === "fanucchi" ? "FANUCCHI-OMR-V1" : "PS-CARD-4",
     title: input.title || "Prova sem título",
     year_segment: input.yearSegment || "OUTROS",
     ...source,
