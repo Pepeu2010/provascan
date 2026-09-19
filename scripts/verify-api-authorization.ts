@@ -34,11 +34,18 @@ assert.match(operationalRoute, /canAccessOperationalData\(validation\.session\.r
 const usersRoute = readFileSync(new URL("../app/api/admin/users/route.ts", import.meta.url), "utf8");
 const managedUserRoute = readFileSync(new URL("../app/api/admin/users/[userId]/route.ts", import.meta.url), "utf8");
 const correctionsRoute = readFileSync(new URL("../app/api/corrections/route.ts", import.meta.url), "utf8");
+const printRosterRoute = readFileSync(new URL("../app/api/teacher-exams/[examId]/print-roster/route.ts", import.meta.url), "utf8");
+const printRosterService = readFileSync(new URL("../services/exam-print-roster.ts", import.meta.url), "utf8");
 assert.match(usersRoute, /canAssignManagedRole/);
 assert.match(managedUserRoute, /canManageTargetUser/);
 assert.match(managedUserRoute, /export async function DELETE/);
 assert.match(managedUserRoute, /setManagedUserTemporaryPassword/);
 assert.match(correctionsRoute, /teacherCanCorrectExam/);
 assert.match(correctionsRoute, /getStudentsForExam/);
+assert.match(printRosterRoute, /getExamSession/);
+assert.match(printRosterRoute, /getExamPrintRoster/);
+assert.match(printRosterService, /getTeacherExam\(input\)/);
+assert.match(printRosterService, /exam_assignments/);
+assert.match(printRosterService, /IDs de\s+\* aluno enviados pelo navegador nunca definem/);
 
 console.log("API authorization regression passed: operational data is denied to teachers and unknown roles.");
