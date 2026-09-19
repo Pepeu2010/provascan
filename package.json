@@ -25,6 +25,7 @@
     "test:external-template-actions": "npx --no-install tsx scripts/verify-external-template-actions.ts",
     "test:student-import": "npx --no-install tsx scripts/verify-student-import.ts",
     "test:external-reporting": "npx --no-install tsx scripts/verify-external-reporting.ts",
+    "test:internal-reporting": "npx --no-install tsx scripts/verify-internal-reporting.ts",
     "test:print-preflight": "npx --no-install tsx scripts/verify-print-preflight.ts",
     "test:usability-preferences": "npx --no-install tsx scripts/verify-usability-preferences.ts",
     "test:offline-sync-queue": "npx --no-install tsx scripts/verify-offline-sync-queue.ts",
