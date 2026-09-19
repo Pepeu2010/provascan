@@ -89,5 +89,7 @@ assert.doesNotMatch(service, /Defina pelo menos uma turma responsável/);
 assert.match(service, /create_teacher_exam_transaction/);
 assert.match(transaction, /insert into public\.exam_assignments/);
 assert.match(transaction, /insert into public\.audit_log_internal/);
+assert.match(service, /print_options/);
+assert.match(workspace, /ExamPresentationControls/);
 assert.doesNotMatch(workspace, /Enviar para (?:aprovação|conferência|gestão)/i);
 console.log("Teacher-owned exam flow checks passed.");
