@@ -19,6 +19,9 @@ const templates: Array<{ value: PrintTemplate; title: string; detail: string }> 
   { value: "institucional", title: "Institucional", detail: "Direto e profissional" },
   { value: "classico", title: "Clássico", detail: "Destaque para a leitura" },
   { value: "compacto", title: "Compacto", detail: "Economiza espaço" },
+  { value: "simulado", title: "Simulado", detail: "Foco e ritmo de prova" },
+  { value: "recuperacao", title: "Recuperação", detail: "Leitura mais acolhedora" },
+  { value: "atividade", title: "Atividade curta", detail: "Leve para o dia a dia" },
 ];
 
 function openPrintWindow(exam: TeacherExam, kind: ExamPrintKind, options: ExamPrintOptions) {

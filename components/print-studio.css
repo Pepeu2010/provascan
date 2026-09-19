@@ -16,6 +16,9 @@
 .print-studio__template > span i:first-child { width: 54%; height: 6px; background: var(--accent); }
 .print-studio__template--classico > span i:first-child { background: #9a3412; }
 .print-studio__template--compacto > span i:first-child { background: #0f766e; }
+.print-studio__template--simulado > span i:first-child { background: #1d4ed8; }
+.print-studio__template--recuperacao > span i:first-child { background: #c2410c; }
+.print-studio__template--atividade > span i:first-child { background: #15803d; }
 .print-studio__template strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .print-studio__template small { overflow: hidden; color: var(--muted-foreground); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .print-studio__controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
