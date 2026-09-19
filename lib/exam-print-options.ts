@@ -1,4 +1,4 @@
-export const printTemplates = ["institucional", "classico", "compacto"] as const;
+export const printTemplates = ["institucional", "classico", "compacto", "simulado", "recuperacao", "atividade"] as const;
 export const printTypefaces = ["limpa", "serifada", "didatica"] as const;
 export const printSizes = ["compacta", "normal", "ampliada"] as const;
 export const printAlternativeLayouts = ["lista", "duas_colunas"] as const;

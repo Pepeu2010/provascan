@@ -63,6 +63,13 @@ assert.match(twoColumns, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 assert.deepEqual(normalizeExamPrintOptions({ template: "compacto", typeface: "didatica", size: "ampliada", alternativeLayout: "duas_colunas" }), { template: "compacto", typeface: "didatica", size: "ampliada", alternativeLayout: "duas_colunas", answerSheetModel: "provascan", answerSheetArea: "automatica" });
 assert.deepEqual(normalizeExamPrintOptions({ template: "fora-do-padrao" }), defaultExamPrintOptions);
 
+const simulated = createExamPrintDocument(printableExam, "prova", { ...defaultExamPrintOptions, template: "simulado" });
+const recovery = createExamPrintDocument(printableExam, "prova", { ...defaultExamPrintOptions, template: "recuperacao" });
+const activity = createExamPrintDocument(printableExam, "prova", { ...defaultExamPrintOptions, template: "atividade" });
+assert.match(simulated, /exam-print--simulado/);
+assert.match(recovery, /exam-print--recuperacao/);
+assert.match(activity, /exam-print--atividade/);
+
 const fanucchiCard = createExamPrintDocument({ ...printableExam, groupType: "EXATAS", questions: Array.from({ length: 45 }, () => printableExam.questions[0]) } as TeacherExam, "cartao", { ...defaultExamPrintOptions, answerSheetModel: "fanucchi", answerSheetArea: "automatica" });
 assert.match(fanucchiCard, /Colégio Fábio Fanucchi/);
 assert.match(fanucchiCard, /EXATAS/);
