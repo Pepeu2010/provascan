@@ -343,3 +343,40 @@
 @media (prefers-reduced-motion: reduce) {
   .login-page__scan-line { animation: none; top: 50%; }
 }
+
+/* The desktop composition is intentionally two-column. Reassert the single
+   column after the visual refinements above so a phone never inherits the
+   desktop's 400px minimum access column. */
+@media (max-width: 1023px) {
+  .login-page {
+    overflow: auto;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .login-page__shell {
+    width: 100%;
+    min-height: calc(100dvh - 40px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .login-page__story,
+  .login-page__access {
+    width: min(100%, 620px);
+    min-width: 0;
+    justify-self: center;
+  }
+
+  .login-page__story { padding: 16px 4px 4px; }
+  .login-page__workflow { max-width: 620px; }
+}
+
+@media (max-width: 640px) {
+  .login-page { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .login-page__shell { min-height: calc(100dvh - 32px); gap: 14px; }
+  .login-page__story { padding: 8px 2px 2px; }
+  .login-page__story h1 { font-size: clamp(1.8rem, 9.5vw, 2.5rem); line-height: 1; }
+  .login-page__workflow { margin-top: 12px; }
+  .login-page__workflow li { min-height: 42px; padding: 8px 6px; }
+  .login-page__form-card { width: 100%; padding: 20px 16px; }
+}

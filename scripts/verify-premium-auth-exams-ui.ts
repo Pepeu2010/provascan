@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const login = read("components/login-form.tsx");
+const loginCss = read("components/login-form.css");
 
 assert.match(login, /import "\.\/login-form\.css"/);
 assert.match(login, /login-page__story/);
@@ -15,6 +16,9 @@ assert.match(login, /loginTeacher\(\{ email, password, remember \}\)/);
 assert.match(login, /setSecurityFlow\(true\)/);
 assert.match(login, /<AuthSecurityFlow onComplete=/);
 assert.match(login, /type="submit"/);
+assert.match(loginCss, /@media \(max-width: 1023px\) \{\s*\.login-page \{/);
+assert.match(loginCss, /\.login-page__shell \{\s*width: 100%;\s*min-height: calc\(100dvh - 40px\);\s*grid-template-columns: minmax\(0, 1fr\)/);
+assert.match(loginCss, /\.login-page__access \{\s*width: min\(100%, 620px\);\s*min-width: 0;/);
 
 const security = read("components/auth-security-flow.tsx");
 assert.match(security, /import "\.\/auth-security-flow\.css"/);
