@@ -1,8 +1,8 @@
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
-import { validateNewExamAssignmentPairs } from "@/services/exam-assignments";
-import { resolveSubjectSnapshot } from "@/services/pedagogical-scopes";
+import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
+import type { UserRole } from "@/types/auth";
 import type { TeacherExam, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
 
 function db() {
@@ -207,7 +207,8 @@ export async function createTeacherExam(input: {
   }
   const client = db();
   const examId = crypto.randomUUID();
-  const row = examRow(input.actorId, input.creatorName, examId, input.exam, input.intent, input.source);
+  const freeSubjectExam = { ...input.exam, subject: input.exam.subject.trim(), subjectId: null };
+  const row = examRow(input.actorId, input.creatorName, examId, freeSubjectExam, input.intent, input.source);
   const { _creatorName, ...storedRow } = row;
   ensure((await client.from("exams").insert(storedRow)).error);
   try {
@@ -216,11 +217,11 @@ export async function createTeacherExam(input: {
       id: crypto.randomUUID(),
       question_count: Math.max(input.exam.questions.length, 1),
       question_start: 1,
-      subject: input.exam.subject || "Geral",
+      subject: freeSubjectExam.subject || "Geral",
       teacher_id: input.actorId,
       teacher_name: _creatorName,
     })).error);
-    await replaceExamContent(examId, input.exam);
+    await replaceExamContent(examId, freeSubjectExam);
     return examId;
   } catch (error) {
     await client.from("exam_sections").delete().eq("exam_id", examId);
@@ -233,17 +234,12 @@ async function createPublishedTeacherExam(input: {
   actorId: string; actorRole: import("@/types/auth").UserRole; creatorName: string; exam: TeacherExamInput; intent: "publicar"; source?: Partial<Record<string, unknown>>;
 }) {
   const groups = input.exam.assignmentGroups ?? [];
-  // A atribuição explícita continua protegida pelo mesmo serviço canônico.
-  // Ela só existe quando uma disciplina institucional foi escolhida de forma
-  // explícita; escrever uma disciplina livre não cria, altera ou consulta o
-  // catálogo da escola.
-  if (groups.length && !input.exam.subjectId) throw new Error("Para escolher responsáveis e turmas cadastradas, selecione uma disciplina da escola nessa opção avançada.");
-  const institutionalSubject = input.exam.subjectId ? await resolveSubjectSnapshot(input.exam.subjectId) : null;
-  const pairs = institutionalSubject
-    ? await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups, subjectId: institutionalSubject.id })
-    : [];
+  // O nome da disciplina é um retrato textual da prova. Ele não consulta nem
+  // cadastra nada no catálogo escolar; turmas e responsáveis continuam sendo
+  // revalidados no servidor pelo escopo ativo de cada pessoa.
+  const pairs = await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups });
   const examId = crypto.randomUUID();
-  const normalizedExam = { ...input.exam, subject: input.exam.subject.trim() || institutionalSubject?.name || "", subjectId: institutionalSubject?.id ?? null };
+  const normalizedExam = { ...input.exam, subject: input.exam.subject.trim(), subjectId: null };
   const row = examRow(input.actorId, input.creatorName, examId, normalizedExam, "publicar", input.source);
   const { _creatorName, ...storedRow } = row;
   const questions = normalizedExam.questions.map((question, index) => ({
@@ -279,14 +275,19 @@ function structuralFingerprint(exam: Pick<TeacherExam, "questions"> | TeacherExa
   })));
 }
 
-export async function updateTeacherExam(input: { actorId: string; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
+export async function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
   const current = await getTeacherExam({ actorId: input.actorId, examId: input.examId });
   if (!current) throw new Error("Prova não encontrada ou não pertence a você.");
   if (input.expectedVersion && current.version !== input.expectedVersion) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de salvar.");
   if (current.hasResults && structuralFingerprint(current) !== structuralFingerprint(input.exam)) {
     throw new Error("Esta prova já possui resultados. Duplique-a para alterar questões sem afetar o histórico.");
   }
-  const row = examRow(input.actorId, current.creatorName, input.examId, input.exam, input.intent, {
+  const freeSubjectExam = { ...input.exam, subject: input.exam.subject.trim(), subjectId: null };
+  if (input.intent === "publicar") {
+    if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
+    await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups: freeSubjectExam.assignmentGroups ?? [] });
+  }
+  const row = examRow(input.actorId, current.creatorName, input.examId, freeSubjectExam, input.intent, {
     applied_at: current.appliedAt,
     import_processing_error: current.importProcessingError,
     import_processing_status: current.importProcessingStatus,
@@ -304,8 +305,12 @@ export async function updateTeacherExam(input: { actorId: string; examId: string
   const { data, error } = await db().from("exams").update(changes).eq("id", input.examId).eq("creator_id", input.actorId).eq("version", current.version).select("id").maybeSingle();
   ensure(error);
   if (!data) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de salvar.");
-  if (!current.hasResults) await replaceExamContent(input.examId, input.exam);
-  await db().from("exam_sections").update({ question_count: Math.max(input.exam.questions.length, 1), subject: input.exam.subject || "Geral" }).eq("exam_id", input.examId).eq("teacher_id", input.actorId);
+  if (!current.hasResults) await replaceExamContent(input.examId, freeSubjectExam);
+  await db().from("exam_sections").update({ question_count: Math.max(freeSubjectExam.questions.length, 1), subject: freeSubjectExam.subject || "Geral" }).eq("exam_id", input.examId).eq("teacher_id", input.actorId);
+  if (input.intent === "publicar") {
+    if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
+    await syncExamAssignments({ actorId: input.actorId, actorRole: input.actorRole, examId: input.examId, groups: freeSubjectExam.assignmentGroups ?? [] });
+  }
   return current.version + 1;
 }
 

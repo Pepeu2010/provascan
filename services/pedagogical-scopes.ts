@@ -63,3 +63,22 @@ export async function canActOnExamScope(input: { classId: string; role: UserRole
   ensure(error, "Não foi possível validar o escopo pedagógico.");
   return Boolean(data);
 }
+
+/**
+ * A prova pode ter uma disciplina escrita livremente. Nesse caso, não existe
+ * uma chave de disciplina para consultar: a autorização continua sendo feita
+ * no servidor pelo vínculo ativo entre a pessoa e a turma.
+ */
+export async function canActOnClassScope(input: { classId: string; role: UserRole; userId: string }) {
+  if (canActInPedagogicalScope(input.role, false)) return true;
+  const { data, error } = await db()
+    .from("pedagogical_scopes")
+    .select("id")
+    .eq("user_id", input.userId)
+    .eq("class_id", input.classId)
+    .eq("active", true)
+    .is("archived_at", null)
+    .maybeSingle();
+  ensure(error, "Não foi possível validar o acesso à turma.");
+  return Boolean(data);
+}

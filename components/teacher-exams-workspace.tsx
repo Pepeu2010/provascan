@@ -25,7 +25,7 @@ type ApiError = { error?: string; details?: string[] };
 type WorkspaceMode = "lista" | "escolha" | "editor";
 type EditorStep = "informacoes" | "questoes" | "gabarito" | "aplicacao" | "revisao";
 type StatusFilter = "todas" | ExamLifecycleStatus;
-type ExamAudience = { subjects: Array<{ id: string; name: string }>; classes: Array<{ id: string; name: string }>; teachers: Array<{ id: string; name: string; classIds: string[] }> };
+type ExamAudience = { classes: Array<{ id: string; name: string }>; teachers: Array<{ id: string; name: string; classIds: string[] }> };
 
 const LOCAL_DRAFT_KEY = "provascan:teacher-exam-draft:v1";
 const typeLabels: Record<ExamQuestionType, string> = {
@@ -352,24 +352,22 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
   active: TeacherExam | null; autoSavedAt: string; busy: boolean; draft: TeacherExamInput; message: string; readOnly: boolean; step: EditorStep;
   setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>>; setStep: (value: EditorStep) => void; viewerId: string; onBack: () => void; onSave: (intent: "rascunho" | "publicar") => Promise<void>; dragIndex: number | null; setDragIndex: (index: number | null) => void;
 }) {
-  const [audience, setAudience] = useState<ExamAudience>({ subjects: [], classes: [], teachers: [] });
+  const [audience, setAudience] = useState<ExamAudience>({ classes: [], teachers: [] });
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [targetQuestionCount, setTargetQuestionCount] = useState(10);
   const [bulkExamText, setBulkExamText] = useState("");
-  const subjectId = draft.subjectId;
   useEffect(() => {
     let cancelled = false;
-    if (!subjectId) return () => { cancelled = true; };
     void (async () => {
       setAudienceLoading(true);
       try {
-        const result = await jsonApi<Partial<ExamAudience>>(`/api/teacher-exams/audience?subjectId=${encodeURIComponent(subjectId)}`);
-        if (!cancelled) setAudience({ classes: result.classes ?? [], subjects: result.subjects ?? [], teachers: result.teachers ?? [] });
-      } catch { if (!cancelled) setAudience({ classes: [], subjects: [], teachers: [] }); }
+        const result = await jsonApi<Partial<ExamAudience>>("/api/teacher-exams/audience");
+        if (!cancelled) setAudience({ classes: result.classes ?? [], teachers: result.teachers ?? [] });
+      } catch { if (!cancelled) setAudience({ classes: [], teachers: [] }); }
       finally { if (!cancelled) setAudienceLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [subjectId]);
+  }, []);
   const steps: Array<{ id: EditorStep; label: string }> = [{ id: "informacoes", label: "Informações" }, { id: "questoes", label: "Questões" }, { id: "gabarito", label: "Gabarito" }, { id: "aplicacao", label: "Aplicação" }, { id: "revisao", label: "Revisão" }];
   const publicationErrors = validateExamForPublication(draft);
   const totalWeight = draft.questions.reduce((sum, question) => sum + Number(question.weight || 0), 0);
@@ -394,13 +392,12 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
     if (hasCurrentContent && !window.confirm("Substituir as questões atuais pelo texto colado? Você pode voltar a editar tudo depois.")) return;
     setDraft((current) => {
       const subject = current.subject || parsed.subject;
-      const matchedSubject = audience.subjects.find((item) => item.name.trim().toLocaleLowerCase("pt-BR") === subject.trim().toLocaleLowerCase("pt-BR"));
       return {
         ...current,
         instructions: current.instructions || parsed.instructions,
         questions: parsed.questions,
         subject,
-        subjectId: current.subjectId ?? matchedSubject?.id ?? null,
+        subjectId: null,
         title: current.title || parsed.title,
       };
     });
@@ -425,7 +422,6 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
 function BasicInformation({ draft, readOnly, setDraft }: { draft: TeacherExamInput; readOnly: boolean; setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>> }) {
   const set = (changes: Partial<TeacherExamInput>) => setDraft((current) => ({ ...current, ...changes }));
   const typeSubject = (value: string) => set({
-    assignmentGroups: [],
     subject: value,
     // Digitar aqui nunca cadastra nem vincula uma disciplina institucional.
     subjectId: null,
@@ -439,7 +435,7 @@ function BasicInformation({ draft, readOnly, setDraft }: { draft: TeacherExamInp
   });
   const yearInput = draft.audienceLabel.startsWith("Todo o ") ? draft.audienceLabel.slice("Todo o ".length) : draft.yearSegment;
 
-  return <section><SectionHeading eyebrow="ETAPA 1" title="Sobre esta prova" detail="Você decide o que preencher agora. Os campos abaixo não bloqueiam a criação da prova." /><div className="exam-form"><label className="sm:col-span-2">Nome da prova <small>Opcional — você pode escolher um nome depois.</small><Input disabled={readOnly} value={draft.title} onChange={(event) => set({ title: event.target.value })} placeholder="Ex.: Avaliação do 2º ano" /></label><label>Disciplina <small>Opcional — escreva do seu jeito.</small><Input disabled={readOnly} value={draft.subject} onChange={(event) => typeSubject(event.target.value)} placeholder="Ex.: Língua Portuguesa" /></label><label>Para qual ano? <small>Opcional — ao informar, vale para todas as turmas desse ano.</small><Input disabled={readOnly} value={yearInput} onChange={(event) => updateYear(event.target.value)} placeholder="Ex.: 2º ano" /></label><details className="exam-form__optional sm:col-span-2"><summary>Adicionar mais detalhes, se quiser</summary><div><label>Bimestre ou trimestre<Input disabled={readOnly} value={draft.period} onChange={(event) => set({ period: event.target.value })} placeholder="Ex.: 1º bimestre" /></label><label>Data prevista<Input disabled={readOnly} type="date" value={draft.examDate} onChange={(event) => set({ examDate: event.target.value })} /></label><label>Tempo estimado (minutos)<Input disabled={readOnly} type="number" min={1} max={600} value={draft.estimatedDuration ?? ""} onChange={(event) => set({ estimatedDuration: event.target.value ? Number(event.target.value) : null })} /></label><label className="sm:col-span-2">Descrição<Textarea disabled={readOnly} value={draft.description} onChange={(event) => set({ description: event.target.value })} placeholder="Uma anotação para sua organização" /></label><label className="sm:col-span-2">Instruções para os alunos<Textarea disabled={readOnly} value={draft.instructions} onChange={(event) => set({ instructions: event.target.value })} placeholder="Leia com atenção e marque apenas uma alternativa…" /></label></div></details></div></section>;
+  return <section><SectionHeading eyebrow="ETAPA 1" title="Sobre esta prova" detail="Você decide o que preencher agora. Os campos abaixo não bloqueiam a criação da prova." /><div className="exam-form"><label className="sm:col-span-2">Nome da prova <small>Opcional — você pode escolher um nome depois.</small><Input disabled={readOnly} value={draft.title} onChange={(event) => set({ title: event.target.value })} placeholder="Ex.: Avaliação do 2º ano" /></label><label>Disciplina <small>Opcional — aparece somente nesta prova; não é um cadastro.</small><Input disabled={readOnly} value={draft.subject} onChange={(event) => typeSubject(event.target.value)} placeholder="Ex.: Língua Portuguesa" /></label><label>Para qual ano? <small>Opcional — ao informar, vale para todas as turmas desse ano.</small><Input disabled={readOnly} value={yearInput} onChange={(event) => updateYear(event.target.value)} placeholder="Ex.: 2º ano" /></label><details className="exam-form__optional sm:col-span-2"><summary>Adicionar mais detalhes, se quiser</summary><div><label>Bimestre ou trimestre<Input disabled={readOnly} value={draft.period} onChange={(event) => set({ period: event.target.value })} placeholder="Ex.: 1º bimestre" /></label><label>Data prevista<Input disabled={readOnly} type="date" value={draft.examDate} onChange={(event) => set({ examDate: event.target.value })} /></label><label>Tempo estimado (minutos)<Input disabled={readOnly} type="number" min={1} max={600} value={draft.estimatedDuration ?? ""} onChange={(event) => set({ estimatedDuration: event.target.value ? Number(event.target.value) : null })} /></label><label className="sm:col-span-2">Descrição<Textarea disabled={readOnly} value={draft.description} onChange={(event) => set({ description: event.target.value })} placeholder="Uma anotação para sua organização" /></label><label className="sm:col-span-2">Instruções para os alunos<Textarea disabled={readOnly} value={draft.instructions} onChange={(event) => set({ instructions: event.target.value })} placeholder="Leia com atenção e marque apenas uma alternativa…" /></label></div></details></div></section>;
 }
 
 function QuestionEditor({ index, question, total, readOnly, onChange, onDelete, onDuplicate, onMove, onDragStart, onDrop }: { index: number; question: TeacherExamInput["questions"][number]; total: number; readOnly: boolean; onChange: (changes: Partial<TeacherExamInput["questions"][number]>) => void; onDelete: () => void; onDuplicate: () => void; onMove: (direction: -1 | 1) => void; onDragStart: () => void; onDrop: () => void }) {
@@ -473,7 +469,6 @@ function AnswerKeyEditor({ draft, readOnly, setDraft, updateQuestion, totalWeigh
 
 function ApplicationEditor({ audience, draft, loading, readOnly, setDraft, viewerId }: { audience: ExamAudience; draft: TeacherExamInput; loading: boolean; readOnly: boolean; setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>>; viewerId: string }) {
   const groups = draft.assignmentGroups ?? [];
-  const hasSubject = Boolean(draft.subjectId);
   const change = (teacherId: string, classId: string, checked: boolean) => setDraft((current) => {
     const currentGroups = current.assignmentGroups ?? [];
     const group = currentGroups.find((item) => item.teacherId === teacherId);
@@ -485,7 +480,7 @@ function ApplicationEditor({ audience, draft, loading, readOnly, setDraft, viewe
   const useWholeYear = () => setDraft((current) => ({ ...current, assignmentGroups: [], audienceId: current.yearSegment.trim() ? `ANO-${current.yearSegment.trim()}-GERAL` : "", audienceLabel: current.yearSegment.trim() ? wholeYearLabel(current.yearSegment.trim()) : "", groupType: "GERAL" }));
   return <section><SectionHeading eyebrow="ETAPA 4" title="Para quem é esta prova?" detail="Se você informou uma série ou ano, ela já vale para todo esse ano. Esta etapa é opcional." />
     <div className="application-choice"><div><strong>{draft.audienceLabel || "Sem público definido"}</strong><span>{draft.yearSegment.trim() ? "A prova pode ser usada por todas as turmas desse ano." : "Você pode definir isso depois, sem impedir a publicação."}</span></div>{draft.yearSegment.trim() ? <Button variant="secondary" disabled={readOnly} onClick={useWholeYear}><Check className="size-4" />Usar {wholeYearLabel(draft.yearSegment.trim()).toLocaleLowerCase("pt-BR")}</Button> : null}</div>
-    {hasSubject ? <details className="application-advanced"><summary>Definir responsáveis e turmas cadastradas</summary>{loading ? <p>Carregando opções disponíveis…</p> : !audience.teachers.length ? <p>Nenhuma opção de turma está disponível para esta disciplina.</p> : <div className="application-groups">{audience.teachers.map((teacher) => <article className="application-group" key={teacher.id}><header><strong>{teacher.id === viewerId ? "Você" : teacher.name}</strong><span>{teacher.id === viewerId ? "Vai aplicar a prova" : "Pode aplicar esta prova"}</span></header><div>{teacher.classIds.map((classId) => { const classroom = audience.classes.find((item) => item.id === classId); if (!classroom) return null; const selected = groups.some((group) => group.teacherId === teacher.id && group.classIds.includes(classId)); return <Checkbox key={classId} disabled={readOnly} checked={selected} label={classroom.name} onChange={(event) => change(teacher.id, classId, event.target.checked)} />; })}</div></article>)}</div>}</details> : null}
+    <details className="application-advanced" open><summary>Escolher professor e turmas</summary>{loading ? <p>Carregando opções disponíveis…</p> : !audience.teachers.length ? <p>Não há professores ou turmas disponíveis para sua conta neste momento.</p> : <div className="application-groups">{audience.teachers.map((teacher) => <article className="application-group" key={teacher.id}><header><strong>{teacher.id === viewerId ? "Você" : teacher.name}</strong><span>{teacher.id === viewerId ? "Vai aplicar a prova" : "Pode aplicar esta prova"}</span></header><div>{teacher.classIds.map((classId) => { const classroom = audience.classes.find((item) => item.id === classId); if (!classroom) return null; const selected = groups.some((group) => group.teacherId === teacher.id && group.classIds.includes(classId)); return <Checkbox key={classId} disabled={readOnly} checked={selected} label={classroom.name} onChange={(event) => change(teacher.id, classId, event.target.checked)} />; })}</div></article>)}</div>}</details>
   </section>;
 }
 

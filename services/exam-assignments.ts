@@ -3,7 +3,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { canAssignPair, expandAssignmentGroups, type AssignmentGroup, type AssignmentPair } from "@/lib/exam-assignment-policy";
 import { isPrivilegedRole } from "@/lib/access-control";
-import { canActOnExamScope } from "@/services/pedagogical-scopes";
+import { canActOnClassScope, canActOnExamScope } from "@/services/pedagogical-scopes";
 import type { UserRole } from "@/types/auth";
 import type { ExamAssignment } from "@/types/exam-assignments";
 
@@ -44,8 +44,12 @@ async function validatePairs(input: { actorId: string; actorRole: UserRole; exam
   for (const pair of pairs) {
     if (!activeUsers.has(pair.teacherId)) throw new Error("O professor responsável precisa estar ativo.");
     if (!validClasses.has(pair.classId)) throw new Error("A turma selecionada não existe.");
-    const actorScope = subjectId ? await canActOnExamScope({ classId: pair.classId, role: input.actorRole, subjectId, userId: input.actorId }) : true;
-    const teacherScope = subjectId ? await canActOnExamScope({ classId: pair.classId, role: "professor", subjectId, userId: pair.teacherId }) : true;
+    const actorScope = subjectId
+      ? await canActOnExamScope({ classId: pair.classId, role: input.actorRole, subjectId, userId: input.actorId })
+      : await canActOnClassScope({ classId: pair.classId, role: input.actorRole, userId: input.actorId });
+    const teacherScope = subjectId
+      ? await canActOnExamScope({ classId: pair.classId, role: "professor", subjectId, userId: pair.teacherId })
+      : await canActOnClassScope({ classId: pair.classId, role: "professor", userId: pair.teacherId });
     const scopeException = Boolean(input.justification?.trim());
     if (!canAssignPair({ actorId: input.actorId, actorRole: input.actorRole, destinationHasScope: teacherScope, destinationTeacherId: pair.teacherId, hasScope: actorScope, scopeException })) throw new Error("Seu perfil não pode atribuir esta prova para esta turma.");
   }
@@ -54,7 +58,7 @@ async function validatePairs(input: { actorId: string; actorRole: UserRole; exam
 
 /** Revalida o público de uma prova ainda não persistida; a criação usa a mesma
  * política das alterações posteriores, antes da transação de publicação. */
-export async function validateNewExamAssignmentPairs(input: { actorId: string; actorRole: UserRole; groups: AssignmentGroup[]; justification?: string; subjectId: string }) {
+export async function validateNewExamAssignmentPairs(input: { actorId: string; actorRole: UserRole; groups: AssignmentGroup[]; justification?: string; subjectId?: string | null }) {
   const pairs = expandAssignmentGroups(input.groups);
   if (!pairs.length) return [];
   const client = db();
@@ -69,8 +73,12 @@ export async function validateNewExamAssignmentPairs(input: { actorId: string; a
   for (const pair of pairs) {
     if (!activeUsers.has(pair.teacherId)) throw new Error("O professor responsável precisa estar ativo.");
     if (!validClasses.has(pair.classId)) throw new Error("A turma selecionada não existe.");
-    const hasScope = await canActOnExamScope({ classId: pair.classId, role: input.actorRole, subjectId: input.subjectId, userId: input.actorId });
-    const destinationHasScope = await canActOnExamScope({ classId: pair.classId, role: "professor", subjectId: input.subjectId, userId: pair.teacherId });
+    const hasScope = input.subjectId
+      ? await canActOnExamScope({ classId: pair.classId, role: input.actorRole, subjectId: input.subjectId, userId: input.actorId })
+      : await canActOnClassScope({ classId: pair.classId, role: input.actorRole, userId: input.actorId });
+    const destinationHasScope = input.subjectId
+      ? await canActOnExamScope({ classId: pair.classId, role: "professor", subjectId: input.subjectId, userId: pair.teacherId })
+      : await canActOnClassScope({ classId: pair.classId, role: "professor", userId: pair.teacherId });
     if (!canAssignPair({ actorId: input.actorId, actorRole: input.actorRole, destinationHasScope, destinationTeacherId: pair.teacherId, hasScope, scopeException: Boolean(input.justification?.trim()) })) {
       throw new Error("Seu perfil não pode atribuir esta prova para esta turma.");
     }
@@ -80,9 +88,9 @@ export async function validateNewExamAssignmentPairs(input: { actorId: string; a
 
 export type AssignableAudience = { classes: Array<{ id: string; name: string }>; teachers: Array<{ classIds: string[]; id: string; name: string }> };
 
-export async function getAssignableAudience(input: { actorId: string; actorRole: UserRole; subjectId: string }): Promise<AssignableAudience> {
+export async function getAssignableAudience(input: { actorId: string; actorRole: UserRole }): Promise<AssignableAudience> {
   const client = db();
-  const { data: scopeRows, error: scopeError } = await client.from("pedagogical_scopes").select("user_id,class_id").eq("subject_id", input.subjectId).eq("active", true).is("archived_at", null);
+  const { data: scopeRows, error: scopeError } = await client.from("pedagogical_scopes").select("user_id,class_id").eq("active", true).is("archived_at", null);
   ensure(scopeError, "Não foi possível carregar os escopos pedagógicos.");
   const rows = (scopeRows ?? []).map((row) => ({ classId: String(row.class_id), userId: String(row.user_id) }));
   const actorClassIds = new Set(rows.filter((row) => row.userId === input.actorId).map((row) => row.classId));
@@ -118,8 +126,10 @@ export async function syncExamAssignments(input: { actorId: string; actorRole: U
   if (input.actorRole === "professor" && String(exam.creator_id) !== input.actorId) throw new Error("Você não pode inativar atribuições de uma prova de outro professor.");
   const subjectId = exam.subject_id ? String(exam.subject_id) : "";
   for (const item of toArchive) {
-    if (isPrivilegedRole(input.actorRole) || !subjectId) continue;
-    const hasScope = await canActOnExamScope({ classId: item.classId, role: input.actorRole, subjectId, userId: input.actorId });
+    if (isPrivilegedRole(input.actorRole)) continue;
+    const hasScope = subjectId
+      ? await canActOnExamScope({ classId: item.classId, role: input.actorRole, subjectId, userId: input.actorId })
+      : await canActOnClassScope({ classId: item.classId, role: input.actorRole, userId: input.actorId });
     if (!hasScope) throw new Error("Você não pode inativar uma atribuição fora do seu escopo pedagógico.");
   }
   for (const item of toArchive) ensure((await client.from("exam_assignments").update({ active: false, archived_at: now }).eq("id", item.id).eq("active", true)).error, "Não foi possível inativar a atribuição.");
