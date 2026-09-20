@@ -28,6 +28,7 @@
     "test:internal-reporting": "npx --no-install tsx scripts/verify-internal-reporting.ts",
     "test:exam-center-audit": "npx --no-install tsx scripts/verify-exam-center-audit.ts",
     "test:system-health-panel": "npx --no-install tsx scripts/verify-system-health-panel.ts",
+    "test:operational-export": "npx --no-install tsx scripts/verify-operational-export.ts",
     "test:pedagogical-alerts": "npx --no-install tsx scripts/verify-pedagogical-alerts.ts",
     "test:print-audit": "npx --no-install tsx scripts/verify-print-audit.ts",
     "test:exam-content-versions": "npx --no-install tsx scripts/verify-exam-content-versions.ts",
