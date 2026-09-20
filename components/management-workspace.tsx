@@ -46,6 +46,7 @@ type AdminUserRow = {
 };
 
 type OperationalHealth = {
+  retention: { cronConfigured: boolean };
   status: { configured: boolean; mode: string; studentsTab: string; usersTab: string };
   totals: { alunos: number; correcoes: number; provas: number; turmas: number; usuarios: number };
 };
@@ -1421,7 +1422,7 @@ function SystemHealthPanel() {
     </div>
     {state === "loading" ? <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5" aria-label="Carregando estado do sistema">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-2xl bg-[var(--surface-strong)] motion-reduce:animate-none" />)}</div> : null}
     {state === "error" ? <div role="alert" className="mt-5 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--foreground)]">Não foi possível confirmar o estado do sistema agora. Tente atualizar; os dados existentes não foram alterados.</div> : null}
-    {state === "ready" && health ? <><div className="mt-5 flex flex-wrap gap-2"><Badge tone={health.status.configured ? "success" : "error"}>{health.status.configured ? "Banco conectado" : "Banco não configurado"}</Badge><Badge tone="neutral">Dados: {health.status.mode === "supabase" ? "Supabase" : health.status.mode}</Badge></div><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">{counts.map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><dt className="text-xs font-medium text-[var(--muted-foreground)]">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-[var(--foreground)]">{value}</dd></div>)}</dl></> : null}
+    {state === "ready" && health ? <><div className="mt-5 flex flex-wrap gap-2"><Badge tone={health.status.configured ? "success" : "error"}>{health.status.configured ? "Banco conectado" : "Banco não configurado"}</Badge><Badge tone="neutral">Dados: {health.status.mode === "supabase" ? "Supabase" : health.status.mode}</Badge><Badge tone={health.retention.cronConfigured ? "success" : "warning"}>{health.retention.cronConfigured ? "Arquivamento mensal pronto" : "Arquivamento: falta configurar o cron"}</Badge></div><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">{counts.map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><dt className="text-xs font-medium text-[var(--muted-foreground)]">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-[var(--foreground)]">{value}</dd></div>)}</dl></> : null}
   </Card>;
 }
 
