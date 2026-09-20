@@ -388,15 +388,41 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
     version: current.version + 1,
   });
   const { _creatorName, creator_id: _creatorId, id: _id, ...changes } = row;
-  const { data, error } = await db().from("exams").update(changes)
-    .eq("id", input.examId).eq("creator_id", input.actorId).eq("version", current.version).select("id").maybeSingle();
-  ensure(error);
-  if (!data) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de restaurar.");
-  await replaceExamContent(input.examId, restored);
-  ensure((await db().from("exam_sections").update({ question_count: Math.max(restored.questions.length, 1), subject: restored.subject || "Geral" })
-    .eq("exam_id", input.examId).eq("teacher_id", input.actorId)).error);
-  await saveExamContentVersion({ actorId: input.actorId, examId: input.examId, reason: "restaurada", snapshot: restored, version: current.version + 1 });
-  return current.version + 1;
+  void _creatorName;
+  void _creatorId;
+  void _id;
+  const questions = restored.questions.map((question, index) => ({
+    alternatives: question.alternatives,
+    annulled: question.annulled,
+    correction_criteria: question.correctionCriteria,
+    correction_notes: question.correctionNotes,
+    correct_answers: question.correctAnswers,
+    id: question.id?.trim() || crypto.randomUUID(),
+    image_path: question.imagePath || null,
+    needs_review: question.needsReview,
+    position: index + 1,
+    prompt: question.prompt,
+    type: question.type,
+    weight: question.weight,
+  }));
+  const { data, error } = await db().rpc("restore_teacher_exam_content_transaction", {
+    p_payload: {
+      actor_id: input.actorId,
+      exam: changes,
+      exam_id: input.examId,
+      expected_version: current.version,
+      max_score: questions.reduce((sum, question) => sum + Number(question.weight), 0) || 10,
+      next_version: current.version + 1,
+      questions,
+      snapshot: versionSnapshot(restored),
+      version_id: crypto.randomUUID(),
+      voided_questions: questions.filter((question) => question.annulled).map((question) => question.position),
+      weights_by_question: questions.filter((question) => Number(question.weight) !== 1).map((question) => ({ peso: question.weight, questao: question.position })),
+    },
+  });
+  ensure(error, "Não foi possível restaurar esta versão.");
+  if (Number(data) !== current.version + 1) throw new Error("A restauração não foi confirmada.");
+  return Number(data);
 }
 
 export async function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
