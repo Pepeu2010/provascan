@@ -18,7 +18,7 @@ const buttonVariants = cva(
         danger: "bg-[var(--error)] px-5 py-3 text-white shadow-[var(--shadow-soft)] hover:brightness-95",
       },
       size: {
-        default: "min-h-12 px-5", lg: "min-h-14 px-6 text-[17px]", icon: "size-12 p-0",
+        default: "min-h-12 px-5", sm: "min-h-9 px-3 text-sm", lg: "min-h-14 px-6 text-[17px]", icon: "size-12 p-0",
       },
     },
     defaultVariants: {
