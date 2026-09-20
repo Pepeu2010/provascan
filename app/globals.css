@@ -1097,4 +1097,7 @@ textarea { padding-block: 10px !important; }
   .app-page-header__title { font-size: 1.75rem; }
   .app-page-header__command { min-width: 44px; width: 44px; height: 44px; min-height: 44px; }
   .dashboard-sidebar__item { min-height: 48px; font-size: 15px; }
+  .dashboard-worklist__row { flex-wrap: wrap; }
+  .dashboard-worklist__row > .min-w-0.flex-1 { flex-basis: calc(100% - 54px); }
+  .dashboard-row-action { width: calc(100% - 54px); min-height: 52px; margin: 2px 0 0 54px; padding: 0 16px; justify-content: center; font-size: 16px; }
 }
