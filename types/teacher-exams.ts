@@ -82,3 +82,12 @@ export type TeacherExamInput = {
   estimatedDuration: number | null;
   questions: Array<Omit<TeacherExamQuestion, "id" | "imagePath"> & { id?: string; imagePath?: string | null }>;
 };
+
+/** Um retrato de conteúdo. A aplicação atual permanece fora da restauração. */
+export type TeacherExamContentVersion = {
+  id: string;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+  reason: "criada" | "salva" | "publicada" | "restaurada";
+};

@@ -3,8 +3,9 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
+import { teacherExamInputSchema } from "@/lib/teacher-exam-validation";
 import type { UserRole } from "@/types/auth";
-import type { TeacherExam, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
+import type { TeacherExam, TeacherExamContentVersion, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
 
 function db() {
   const url = process.env.SUPABASE_URL;
@@ -225,6 +226,7 @@ export async function createTeacherExam(input: {
       teacher_name: _creatorName,
     })).error);
     await replaceExamContent(examId, freeSubjectExam);
+    await saveExamContentVersion({ actorId: input.actorId, examId, reason: "criada", snapshot: freeSubjectExam, version: 1 });
     return examId;
   } catch (error) {
     await client.from("exam_sections").delete().eq("exam_id", examId);
@@ -263,6 +265,7 @@ async function createPublishedTeacherExam(input: {
   const { data, error } = await db().rpc("create_teacher_exam_transaction", { p_payload: payload });
   ensure(error, "Não foi possível publicar a prova.");
   if (String(data || "") !== examId) throw new Error("A publicação não foi confirmada.");
+  await saveExamContentVersion({ actorId: input.actorId, examId, reason: "publicada", snapshot: normalizedExam, version: 1 });
   return examId;
 }
 
@@ -278,6 +281,124 @@ function structuralFingerprint(exam: Pick<TeacherExam, "questions"> | TeacherExa
   })));
 }
 
+function versionSnapshot(input: TeacherExamInput): TeacherExamInput {
+  // A aplicação é preservada no estado atual. Restaurar uma versão antiga não
+  // pode redistribuir a prova a pessoas que hoje não possuem mais esse acesso.
+  return {
+    ...input,
+    assignmentGroups: [],
+    printOptions: normalizeExamPrintOptions(input.printOptions),
+    questions: input.questions.map((question, index) => ({ ...question, position: index + 1 })),
+    subject: input.subject.trim(),
+    subjectId: null,
+  };
+}
+
+async function saveExamContentVersion(input: { actorId: string; examId: string; reason: TeacherExamContentVersion["reason"]; snapshot: TeacherExamInput; version: number }) {
+  const { error } = await db().from("exam_content_versions").insert({
+    created_by: input.actorId,
+    exam_id: input.examId,
+    id: crypto.randomUUID(),
+    reason: input.reason,
+    snapshot: versionSnapshot(input.snapshot),
+    version: input.version,
+  });
+  ensure(error, "A prova foi salva, mas o histórico não pôde ser registrado.");
+}
+
+function inputFromExam(exam: TeacherExam): TeacherExamInput {
+  return {
+    assignmentGroups: [],
+    audienceId: exam.audienceId,
+    audienceLabel: exam.audienceLabel,
+    description: exam.description,
+    estimatedDuration: exam.estimatedDuration,
+    examDate: exam.examDate,
+    groupType: exam.groupType,
+    instructions: exam.instructions,
+    period: exam.period,
+    printOptions: exam.printOptions,
+    questions: exam.questions.map(({ id, imagePath, ...question }) => ({ ...question, id, imagePath })),
+    subject: exam.subject,
+    subjectId: null,
+    title: exam.title,
+    yearSegment: exam.yearSegment,
+  };
+}
+
+async function preserveCurrentExamContentVersion(actorId: string, exam: TeacherExam) {
+  const { error } = await db().from("exam_content_versions").upsert({
+    created_by: actorId,
+    exam_id: exam.id,
+    id: crypto.randomUUID(),
+    reason: "salva",
+    snapshot: versionSnapshot(inputFromExam(exam)),
+    version: exam.version,
+  }, { ignoreDuplicates: true, onConflict: "exam_id,version" });
+  ensure(error, "Não foi possível preservar a versão atual da prova.");
+}
+
+export async function listTeacherExamContentVersions(input: { actorId: string; examId: string; institutionalView?: boolean }) {
+  const exam = await getTeacherExam(input);
+  if (!exam) return null;
+  const { data, error } = await db().from("exam_content_versions")
+    .select("id,version,created_by,reason,created_at")
+    .eq("exam_id", input.examId)
+    .order("version", { ascending: false })
+    .limit(50);
+  ensure(error, "Não foi possível carregar as versões da prova.");
+  return (data ?? []).map((row) => ({
+    createdAt: String(row.created_at),
+    createdBy: String(row.created_by),
+    id: String(row.id),
+    reason: String(row.reason) as TeacherExamContentVersion["reason"],
+    version: Number(row.version),
+  } satisfies TeacherExamContentVersion));
+}
+
+export async function restoreTeacherExamContentVersion(input: { actorId: string; examId: string; expectedVersion?: number | null; versionId: string }) {
+  const current = await getTeacherExam({ actorId: input.actorId, examId: input.examId });
+  if (!current) throw new Error("Prova não encontrada ou não pertence a você.");
+  if (current.hasResults) throw new Error("Esta prova já possui correções. Duplique-a para preservar o histórico.");
+  if (input.expectedVersion && current.version !== input.expectedVersion) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de restaurar.");
+  await preserveCurrentExamContentVersion(input.actorId, current);
+  const { data: stored, error: storedError } = await db().from("exam_content_versions")
+    .select("snapshot")
+    .eq("exam_id", input.examId)
+    .eq("id", input.versionId)
+    .maybeSingle();
+  ensure(storedError, "Não foi possível encontrar esta versão.");
+  if (!stored) throw new Error("A versão solicitada não pertence a esta prova.");
+  const parsed = teacherExamInputSchema.safeParse(stored.snapshot);
+  if (!parsed.success) throw new Error("Esta versão antiga não está em um formato que pode ser restaurado com segurança.");
+  const restored = versionSnapshot(parsed.data);
+  const row = examRow(input.actorId, current.creatorName, input.examId, restored, current.status === "publicada" ? "publicar" : "rascunho", {
+    applied_at: current.appliedAt,
+    import_processing_error: current.importProcessingError,
+    import_processing_status: current.importProcessingStatus,
+    imported_at: current.importedAt,
+    legacy_contributors: current.legacyContributors,
+    needs_review: restored.questions.some((question) => question.needsReview),
+    original_file_mime_type: current.originalFileMimeType,
+    original_file_name: current.originalFileName,
+    original_file_size: current.originalFileSize,
+    published_at: current.publishedAt,
+    source_type: current.sourceType,
+    status: current.status,
+    version: current.version + 1,
+  });
+  const { _creatorName, creator_id: _creatorId, id: _id, ...changes } = row;
+  const { data, error } = await db().from("exams").update(changes)
+    .eq("id", input.examId).eq("creator_id", input.actorId).eq("version", current.version).select("id").maybeSingle();
+  ensure(error);
+  if (!data) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de restaurar.");
+  await replaceExamContent(input.examId, restored);
+  ensure((await db().from("exam_sections").update({ question_count: Math.max(restored.questions.length, 1), subject: restored.subject || "Geral" })
+    .eq("exam_id", input.examId).eq("teacher_id", input.actorId)).error);
+  await saveExamContentVersion({ actorId: input.actorId, examId: input.examId, reason: "restaurada", snapshot: restored, version: current.version + 1 });
+  return current.version + 1;
+}
+
 export async function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
   const current = await getTeacherExam({ actorId: input.actorId, examId: input.examId });
   if (!current) throw new Error("Prova não encontrada ou não pertence a você.");
@@ -285,6 +406,7 @@ export async function updateTeacherExam(input: { actorId: string; actorRole?: Us
   if (current.hasResults && structuralFingerprint(current) !== structuralFingerprint(input.exam)) {
     throw new Error("Esta prova já possui resultados. Duplique-a para alterar questões sem afetar o histórico.");
   }
+  await preserveCurrentExamContentVersion(input.actorId, current);
   const freeSubjectExam = { ...input.exam, printOptions: normalizeExamPrintOptions(input.exam.printOptions), subject: input.exam.subject.trim(), subjectId: null };
   if (input.intent === "publicar") {
     if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
@@ -314,6 +436,7 @@ export async function updateTeacherExam(input: { actorId: string; actorRole?: Us
     if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
     await syncExamAssignments({ actorId: input.actorId, actorRole: input.actorRole, examId: input.examId, groups: freeSubjectExam.assignmentGroups ?? [] });
   }
+  await saveExamContentVersion({ actorId: input.actorId, examId: input.examId, reason: input.intent === "publicar" ? "publicada" : "salva", snapshot: freeSubjectExam, version: current.version + 1 });
   return current.version + 1;
 }
 
