@@ -83,7 +83,14 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
   const isCard = kind === "cartao";
   const isKey = kind === "gabarito";
 
-  const print = () => setMessage(openExamPrint(exam, kind, options) ? `${isCard ? "Cartão-resposta" : isKey ? "Gabarito oficial" : "Prova"} aberto para impressão.` : "Permita pop-ups neste navegador para imprimir.");
+  const recordPrintEvent = (eventKind: "prova" | "gabarito" | "cartao" | "cartoes_individuais" | "etiquetas") => {
+    void fetch(`/api/teacher-exams/${encodeURIComponent(exam.id)}/print-events`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: eventKind }) }).catch(() => undefined);
+  };
+  const print = () => {
+    const opened = openExamPrint(exam, kind, options);
+    if (opened) recordPrintEvent(kind);
+    setMessage(opened ? `${isCard ? "Cartão-resposta" : isKey ? "Gabarito oficial" : "Prova"} aberto para impressão.` : "Permita pop-ups neste navegador para imprimir.");
+  };
   const loadRoster = async () => {
     setRosterLoading(true);
     setMessage("");
@@ -99,7 +106,11 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
     } finally { setRosterLoading(false); }
   };
   const selectedStudents = (roster ?? []).filter((student) => selectedStudentIds.includes(student.id));
-  const printStudentCards = () => setMessage(selectedStudents.length && openStudentCardsWindow(exam, selectedStudents, options) ? `${selectedStudents.length} ${selectedStudents.length === 1 ? "cartão foi aberto" : "cartões foram abertos"} para impressão.` : selectedStudents.length ? "Permita pop-ups neste navegador para imprimir." : "Selecione ao menos um aluno.");
+  const printStudentCards = () => {
+    const opened = Boolean(selectedStudents.length) && openStudentCardsWindow(exam, selectedStudents, options);
+    if (opened) recordPrintEvent("cartoes_individuais");
+    setMessage(opened ? `${selectedStudents.length} ${selectedStudents.length === 1 ? "cartão foi aberto" : "cartões foram abertos"} para impressão.` : selectedStudents.length ? "Permita pop-ups neste navegador para imprimir." : "Selecione ao menos um aluno.");
+  };
   const printLabels = async () => {
     if (!selectedStudents.length) return setMessage("Selecione ao menos um aluno.");
     setMessage("Gerando adesivos individuais…");
@@ -114,6 +125,7 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
       popup.opener = null;
       popup.document.write(`<!doctype html><html lang="pt-BR"><head><title>Adesivos individuais</title><style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;color:#111}.labels{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}.label{min-height:46mm;border:.35mm solid #111;padding:3mm;display:grid;grid-template-columns:32mm 1fr;gap:3mm;align-items:center;break-inside:avoid}.label img{width:30mm;height:30mm}.label b{display:block;font-size:12px}.label small{display:block;margin-top:2mm;color:#444;font-size:10px}@media print{.label{break-inside:avoid}}</style></head><body><main class="labels">${labels.map((label) => `<article class="label"><img src="${label.qr}" alt="QR de identificação"/><div><b>${label.studentName.replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</b><small>${label.className.replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</small><small>Adesivo de identificação</small></div></article>`).join("")}</main><script>window.addEventListener('load',()=>window.print(),{once:true})</script></body></html>`);
       popup.document.close();
+      recordPrintEvent("etiquetas");
       setMessage(`${labels.length} adesivos individuais foram abertos para impressão.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível gerar os adesivos."); }
   };

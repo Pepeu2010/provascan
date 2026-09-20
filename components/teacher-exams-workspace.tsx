@@ -534,6 +534,11 @@ function auditEventLabel(event: string) {
     teacher_exam_import_duplicate: "Arquivo já estava vinculado a esta prova",
     teacher_exam_imported: "Arquivo importado",
     teacher_exam_published: "Prova publicada",
+    teacher_exam_print_cartao: "Cartão-resposta preparado",
+    teacher_exam_print_cartoes_individuais: "Cartões individuais preparados",
+    teacher_exam_print_etiquetas: "Adesivos individuais preparados",
+    teacher_exam_print_gabarito: "Gabarito oficial preparado",
+    teacher_exam_print_prova: "Prova preparada para impressão",
     teacher_exam_restored: "Prova restaurada",
   };
   return labels[event] ?? "Atividade registrada";
