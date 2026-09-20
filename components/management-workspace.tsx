@@ -1289,6 +1289,7 @@ export function SettingsWorkspace() {
       <UsabilityControls />
       {session ? <AdministrationCenter /> : null}
       {session && canManagePasswordPolicy ? <SystemHealthPanel /> : null}
+      {session && canManagePasswordPolicy ? <OperationalExportPanel /> : null}
       {session && canManagePasswordPolicy ? <section id="equipe" className="scroll-mt-6"><UserManagementPanel currentUserId={session.id} currentRole={session.role} /></section> : null}
       {canManagePasswordPolicy ? (
         <Card id="seguranca" className="scroll-mt-6 p-6">
@@ -1421,6 +1422,45 @@ function SystemHealthPanel() {
     {state === "loading" ? <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5" aria-label="Carregando estado do sistema">{Array.from({ length: 5 }, (_, index) => <div key={index} className="h-24 animate-pulse rounded-2xl bg-[var(--surface-strong)] motion-reduce:animate-none" />)}</div> : null}
     {state === "error" ? <div role="alert" className="mt-5 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--foreground)]">Não foi possível confirmar o estado do sistema agora. Tente atualizar; os dados existentes não foram alterados.</div> : null}
     {state === "ready" && health ? <><div className="mt-5 flex flex-wrap gap-2"><Badge tone={health.status.configured ? "success" : "error"}>{health.status.configured ? "Banco conectado" : "Banco não configurado"}</Badge><Badge tone="neutral">Dados: {health.status.mode === "supabase" ? "Supabase" : health.status.mode}</Badge></div><dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">{counts.map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><dt className="text-xs font-medium text-[var(--muted-foreground)]">{label}</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-[var(--foreground)]">{value}</dd></div>)}</dl></> : null}
+  </Card>;
+}
+
+function OperationalExportPanel() {
+  const [state, setState] = useState<"idle" | "working" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  const download = async () => {
+    setState("working");
+    setMessage("Preparando exportação institucional…");
+    try {
+      const response = await fetch("/api/admin/operational-export", { method: "POST" });
+      if (!response.ok) {
+        const payload = await response.json() as { error?: string };
+        throw new Error(payload.error || "Não foi possível preparar a exportação.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `provascan-operacional-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setMessage("Exportação baixada. Guarde o arquivo em local seguro.");
+      setState("idle");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível preparar a exportação.");
+      setState("error");
+    }
+  };
+
+  return <Card className="p-6" aria-labelledby="operational-export-title">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div><div className="flex items-center gap-2"><Download className="size-5 text-[var(--accent)]" aria-hidden="true" /><h2 id="operational-export-title" className="text-xl font-semibold text-[var(--foreground)]">Exportação institucional</h2></div><p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Baixe uma cópia dos dados de turmas, alunos, provas, gabaritos, regras e correções. Senhas, códigos de recuperação, segredos MFA e imagens não entram no arquivo.</p></div>
+      <Button variant="secondary" disabled={state === "working"} loading={state === "working"} onClick={() => void download()}><Download className="size-4" />Baixar dados</Button>
+    </div>
+    {message ? <p className={`mt-4 text-sm ${state === "error" ? "text-[var(--error)]" : "text-[var(--muted-foreground)]"}`} role={state === "error" ? "alert" : "status"}>{message}</p> : null}
   </Card>;
 }
 
