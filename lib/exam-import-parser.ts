@@ -79,6 +79,7 @@ export function parseImportedExamText(text: string, fallbackTitle: string): Impo
       needsReview: !question.prompt.join(" ").trim() || (type === "multipla_escolha" && (!alternatives.length || !correctAnswer)),
       position: index + 1,
       prompt: question.prompt.join("\n").trim() || `Questão ${question.number}`,
+      topic: "",
       type,
       weight: 1,
     } satisfies TeacherExamInput["questions"][number];
@@ -95,6 +96,7 @@ export function parseImportedExamText(text: string, fallbackTitle: string): Impo
       needsReview: true,
       position: 1,
       prompt: body || lines.join("\n"),
+      topic: "",
       type: "discursiva",
       weight: 1,
     }];

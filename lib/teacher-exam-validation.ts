@@ -26,6 +26,8 @@ export const teacherExamQuestionSchema = z.object({
   correctionNotes: z.string().trim().max(4_000),
   needsReview: z.boolean(),
   imagePath: z.string().trim().max(500).nullable().optional(),
+  // Campo opcional com default para provas e versões antigas continuarem restauráveis.
+  topic: z.string().trim().max(200).default(""),
 }).strict();
 
 export const teacherExamInputSchema = z.object({
@@ -92,6 +94,7 @@ export function defaultQuestion(position: number, type: ExamQuestionType = "mult
     needsReview: false,
     position,
     prompt: "",
+    topic: "",
     type,
     weight: 1,
   } satisfies TeacherExamInput["questions"][number];

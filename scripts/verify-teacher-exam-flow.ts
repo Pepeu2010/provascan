@@ -20,6 +20,7 @@ assert.equal(imported.subject, "Ciências");
 assert.equal(imported.questions.length, 2);
 assert.deepEqual(imported.questions[0].correctAnswers, ["Marte"]);
 assert.deepEqual(imported.questions[1].correctAnswers, ["Sim"]);
+assert.equal(imported.questions[0].topic, "");
 
 const validExam = {
   audienceId: "turma-1",
@@ -64,6 +65,8 @@ assert.match(workspace, /Colar prova completa com gabarito/);
 assert.match(workspace, /parseImportedExamText/);
 assert.match(workspace, /Cole o gabarito de uma vez/);
 assert.match(workspace, /Preencher gabarito/);
+assert.match(workspace, /Conteúdo da questão/);
+assert.match(service, /topic: question\.topic\.trim\(\)/);
 assert.match(workspace, /Os campos abaixo não bloqueiam a criação da prova/);
 assert.match(workspace, /Opcional — aparece somente nesta prova; não é um cadastro/);
 assert.doesNotMatch(workspace, /Use uma disciplina cadastrada para definir turmas e publicar/);

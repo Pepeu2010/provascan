@@ -46,6 +46,8 @@ export type Exam = {
   releasedAt?: string | null;
   status?: "rascunho" | "publicada" | "aplicada" | "arquivada";
   creatorId?: string;
+  /** Conteúdo pedagógico livre por número de questão. */
+  questionTopics?: Record<string, string>;
 };
 
 export type AnswerKey = {
