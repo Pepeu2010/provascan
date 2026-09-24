@@ -66,7 +66,22 @@ async function verifyRealPhotos() {
   const phoneAnalysis = analyzeUniversalPage(phoneCanvas as unknown as HTMLCanvasElement);
   assert.ok(phoneAnalysis.layout.rows.length >= 40, "A análise estrutural deve recuperar ao menos 40 das 45 linhas desta foto difícil.");
 
-  console.log(`Entrada segura e OCR estrutural: 20/20 respostas nos scans e ${phoneAnalysis.layout.rows.length}/45 linhas na foto difícil.`);
+  const collaborativeImage = await loadImage(path.resolve("fixtures/ocr/provascan-card-30q-3-subjects-phone-photo.png"));
+  const collaborativeCanvas = createCanvas(collaborativeImage.width, collaborativeImage.height);
+  collaborativeCanvas.getContext("2d").drawImage(collaborativeImage, 0, 0);
+  const collaborative = analyzeUniversalPage(collaborativeCanvas as unknown as HTMLCanvasElement);
+  const collaborativeExpected = [
+    "A", "C", "B", "B", "E", "B", "A", "A", "B", "E", "A", "B", "A", "C", "E",
+    "B", "A", "B", "C", "E", "A", "C", "B", "D", "B", "A", "A", "C", "B", "C",
+  ];
+  assert.equal(collaborative.layout.rows.length, 30, "A foto real do modelo colaborativo deve preservar as 30 linhas.");
+  assert.deepEqual(
+    collaborative.layout.rows.map((row) => ["A", "B", "C", "D", "E"][row.marks.markedIndexes[0]] ?? ""),
+    collaborativeExpected,
+    "A foto real do modelo colaborativo deve recuperar as marcações na ordem das questões.",
+  );
+
+  console.log(`Entrada segura e OCR estrutural: 20/20 respostas nos scans, ${phoneAnalysis.layout.rows.length}/45 linhas na foto difícil e 30/30 no modelo colaborativo.`);
 }
 
 void verifyRealPhotos();

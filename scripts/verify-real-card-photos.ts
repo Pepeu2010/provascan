@@ -20,6 +20,13 @@ const cases = [
   },
   {
     answers: [
+      "A", "C", "B", "B", "E", "B", "A", "A", "B", "E", "A", "B", "A", "C", "E",
+      "B", "A", "B", "C", "E", "A", "C", "B", "D", "B", "A", "A", "C", "B", "C",
+    ],
+    file: "provascan-card-30q-3-subjects-phone-photo.png",
+  },
+  {
+    answers: [
       "B", "D", "C", "A", "E", "B", "D", "A", "C", "E", "B", "D", "C", "A", "E",
       "D", "B", "E", "A", "C", "D", "B", "E", "A", "C", "D", "B", "E", "A", "C",
       "B", "D", "A", "C", "E", "B", "D", "A", "C", "E", "B", "D", "A", "C", "E",
