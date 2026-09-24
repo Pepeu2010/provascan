@@ -8,7 +8,7 @@ import {
   validateExamStructure,
 } from "../services/universal-exam-core";
 
-for (const subjectCount of [1, 4, 5, 6]) {
+for (const subjectCount of [1, 3, 4, 5, 6, 7, 8]) {
   const questionCounts = Array.from({ length: subjectCount }, (_, index) => index + 3);
   const structure = buildExamStructure({
     alternativeCount: 5,
@@ -71,4 +71,4 @@ const grade = gradeObjectiveAnswers({
 assert.deepEqual(grade.summary, { blank: 1, correct: 1, incorrect: 1, multipleMarks: 1, review: 1, score: 2.5 });
 assert.deepEqual(grade.reviewQuestions, [4]);
 
-console.log("Núcleo do corretor universal validado: estruturas de 1/4/5/6 matérias, marcações e nota.");
+console.log("Núcleo do corretor universal validado: estruturas de 1 e 3–8 matérias, marcações e nota.");

@@ -1,5 +1,6 @@
 import { classifyUniversalMarks } from "@/services/universal-exam-core";
 import { rectifyMobilePhoto } from "@/services/mobile-photo-rectification";
+import { detectOfficialAnswerGrid } from "@/services/official-answer-grid";
 
 export type BubbleCandidate = {
   fillScore: number;
@@ -184,6 +185,11 @@ export function analyzeUniversalAnswerSheet(canvas: HTMLCanvasElement) {
 export function analyzeUniversalPage(source: HTMLCanvasElement) {
   const upright = source.width > source.height ? rotateCanvas(source) : source;
   const candidates: Array<{ canvas: HTMLCanvasElement; layout: UniversalLayoutResult; perspectiveCorrected: boolean }> = [];
+  const uprightContext = upright.getContext("2d", { willReadFrequently: true });
+  if (uprightContext) {
+    const official = detectOfficialAnswerGrid(uprightContext.getImageData(0, 0, upright.width, upright.height));
+    if (official) candidates.push({ canvas: upright, layout: official, perspectiveCorrected: false });
+  }
   try {
     candidates.push({ canvas: upright, layout: analyzeUniversalAnswerSheet(upright), perspectiveCorrected: false });
   } catch {

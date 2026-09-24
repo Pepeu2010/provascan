@@ -13,6 +13,7 @@ import { ANSWER_SHEET_TEMPLATE, getBubbleBounds, getQuestionLayout } from "@/ser
 import { FANUCCHI_ANSWER_SHEET_VERSION, getFanucchiBubbleBounds } from "@/services/fanucchi-answer-sheet";
 import { extractIdentityFromImage, extractTextFromImage } from "@/services/ocr";
 import { buildIdentificationCode } from "@/services/exam-correction";
+import { detectOfficialAnswerGrid } from "@/services/official-answer-grid";
 import type { Exam, Student } from "@/types/domain";
 
 export type QrPayload = {
@@ -311,6 +312,8 @@ function analyzeProvaScanCard(params: {
     throw new Error("Informe a quantidade de questões do gabarito antes de ler o cartão.");
   }
 
+  const officialGrid = detectOfficialAnswerGrid(imageData, { alternatives, questionCount: answerKeyLength });
+
   // A phone photo may retain a few pixels of table/background even after the
   // page is rectified. Anchor the bubbles to the printed answer-frame itself
   // so this residual margin cannot shift an entire column.
@@ -320,6 +323,10 @@ function analyzeProvaScanCard(params: {
     imageData.width,
     imageData.height,
   );
+  const alignedToTemplate = Math.abs(answerRect.x - expectedRect.x) <= imageData.width * 0.035
+    && Math.abs(answerRect.y - expectedRect.y) <= imageData.height * 0.035
+    && Math.abs(answerRect.width / Math.max(expectedRect.width, 1) - 1) <= 0.07
+    && Math.abs(answerRect.height / Math.max(expectedRect.height, 1) - 1) <= 0.07;
 
   const standardAnswers = readProvaScanCardAnswers({
     alternatives,
@@ -370,11 +377,28 @@ function analyzeProvaScanCard(params: {
     imageData,
   });
   const inkGridAnswers = readBlueInkGridAnswers({ alternatives, answerKeyLength, imageData });
-  const answers = inkGridAnswers.length
+  const officialGridAnswers = officialGrid?.rows.map((row) => ({
+    blockTitle: "CARTÃO-RESPOSTA",
+    confidence: Math.round(row.marks.confidence * 100),
+    markedAnswers: row.marks.markedIndexes.map((index) => alternatives[index]).filter(Boolean),
+    question: row.question,
+    scores: row.bubbles.map((bubble, index) => ({ alternative: alternatives[index], score: bubble.fillScore })),
+    status: row.marks.status === "marked"
+      ? "MARKED" as const
+      : row.marks.status === "blank"
+        ? "BLANK" as const
+        : row.marks.status === "multiple_marks"
+          ? "MULTIPLE" as const
+          : "LOW_CONFIDENCE" as const,
+  })) ?? [];
+  const legacyAnswers = inkGridAnswers.length
     ? inkGridAnswers
     : [standardAnswers, compactPrintAnswers, templateAnswers].reduce((best, candidate) =>
       scoreProvaScanCardAnswers(candidate) > scoreProvaScanCardAnswers(best) ? candidate : best,
     );
+  const answers = officialGridAnswers.length === answerKeyLength && !alignedToTemplate
+    ? officialGridAnswers
+    : legacyAnswers;
 
   return {
     answers,
