@@ -4,6 +4,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { validateDocumentHeader } from "../services/document-ingestion";
 import { groupBubbleCandidates, type BubbleCandidate } from "../services/universal-layout-analysis";
 import { analyzeUniversalAnswerSheet, analyzeUniversalPage } from "../services/universal-layout-analysis";
+import { measureCaptureQuality } from "../services/capture-quality";
 
 const ascii = (value: string) => Uint8Array.from([...value].map((character) => character.charCodeAt(0)));
 
@@ -70,11 +71,14 @@ async function verifyRealPhotos() {
   const collaborativeCanvas = createCanvas(collaborativeImage.width, collaborativeImage.height);
   collaborativeCanvas.getContext("2d").drawImage(collaborativeImage, 0, 0);
   const collaborative = analyzeUniversalPage(collaborativeCanvas as unknown as HTMLCanvasElement);
+  const captureWarning = measureCaptureQuality(collaborativeCanvas as unknown as HTMLCanvasElement);
+  assert.ok(captureWarning.issues.every((issue) => issue.code !== "blur"), "A foto legível não deve receber aviso falso de desfoque.");
   const collaborativeExpected = [
     "A", "C", "B", "B", "E", "B", "A", "A", "B", "E", "A", "B", "A", "C", "E",
     "B", "A", "B", "C", "E", "A", "C", "B", "D", "B", "A", "A", "C", "B", "C",
   ];
   assert.equal(collaborative.layout.rows.length, 30, "A foto real do modelo colaborativo deve preservar as 30 linhas.");
+  assert.equal(collaborative.disputedQuestions.size, 0, "Leitores independentes não devem criar dúvidas falsas nesta foto de referência.");
   assert.deepEqual(
     collaborative.layout.rows.map((row) => ["A", "B", "C", "D", "E"][row.marks.markedIndexes[0]] ?? ""),
     collaborativeExpected,
