@@ -1,0 +1,29 @@
+[
+  {
+    "file": "provascan-card-10q-clean.png",
+    "answers": "ACEBADCBED",
+    "expectedQuestions": 10,
+    "expectedOutcome": "accept",
+    "origin": "synthetic"
+  },
+  {
+    "file": "provascan-card-10q-faint-blue.png",
+    "answers": "ACEBADCBED",
+    "expectedQuestions": 10,
+    "expectedOutcome": "accept",
+    "origin": "synthetic"
+  },
+  {
+    "file": "provascan-card-30q-3-subjects-phone-photo.png",
+    "answers": "ACBBEBAABEABACEBABCEACBDBAACBC",
+    "expectedQuestions": 30,
+    "expectedOutcome": "accept",
+    "origin": "synthetic"
+  },
+  {
+    "file": "provascan-card-45q-phone-photo.png",
+    "expectedQuestions": 45,
+    "expectedOutcome": "reject",
+    "origin": "synthetic"
+  }
+]
