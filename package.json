@@ -14,6 +14,7 @@
     "test:universal-exam-core": "npx --no-install tsx scripts/verify-universal-exam-core.ts",
     "test:universal-document": "npx --no-install tsx scripts/verify-universal-document.ts",
     "test:universal-sheet-validation": "npx --no-install tsx scripts/verify-universal-sheet-validation.ts",
+    "test:omr-ground-truth": "npx --no-install tsx scripts/verify-omr-ground-truth.ts",
     "test:official-card-matrix": "npx --no-install tsx scripts/verify-official-card-matrix.ts",
     "test:universal-persistence": "npx --no-install tsx scripts/verify-universal-persistence.ts",
     "test:universal-correction-flow": "npx --no-install tsx scripts/verify-universal-correction-flow.ts",
