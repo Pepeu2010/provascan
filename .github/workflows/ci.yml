@@ -48,5 +48,8 @@ jobs:
       - name: Security hardening checks
         run: npm run test:security-hardening
 
+      - name: Critical exam, access, printing and correction regressions
+        run: npm run test:critical
+
       - name: Production build
         run: npm run build

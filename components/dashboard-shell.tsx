@@ -37,7 +37,9 @@ export function DashboardShell({
   const dialogCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogTransitionHandlerRef = useRef<((event: TransitionEvent) => void) | null>(null);
   const tabletCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeLabel = dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
+  const activeLabel = session?.role === "professor" && active === "/dashboard"
+    ? "Início"
+    : dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
 
   const summary = useMemo(
     () =>
@@ -52,7 +54,7 @@ export function DashboardShell({
   const commandItems = useMemo(
     () => (session?.role === "professor"
       ? [
-          { href: "/dashboard/minhas-provas", label: "Minhas provas", icon: Command },
+          { href: "/dashboard/provas", label: "Minhas provas", icon: Command },
           { href: "/dashboard/correcao", label: "Corrigir provas", icon: Command },
         ]
       : dashboardNavigationItems.filter((item) => !item.privileged || canAccessSensitiveSettings(session?.role ?? "professor"))),
