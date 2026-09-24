@@ -42,12 +42,14 @@ assert.match(usersRoute, /canAssignManagedRole/);
 assert.match(managedUserRoute, /canManageTargetUser/);
 assert.match(managedUserRoute, /export async function DELETE/);
 assert.match(managedUserRoute, /setManagedUserTemporaryPassword/);
-assert.match(correctionsRoute, /teacherCanCorrectExam/);
+assert.match(correctionsRoute, /getTeacherCorrectionAccess/);
+assert.match(correctionsRoute, /canCorrectAssignedStudent/);
 assert.match(correctionsRoute, /getStudentsForExam/);
 assert.match(printRosterRoute, /getExamSession/);
 assert.match(printRosterRoute, /getExamPrintRoster/);
-assert.match(printRosterService, /getTeacherExam\(input\)/);
+assert.match(printRosterService, /getTeacherExam\(\{ \.\.\.input, allowAssignedRead: true \}\)/);
+assert.match(printRosterService, /assignedTeacher/);
 assert.match(printRosterService, /exam_assignments/);
 assert.match(printRosterService, /IDs de\s+\* aluno enviados pelo navegador nunca definem/);
 
-console.log("API authorization regression passed: operational data is denied to teachers and unknown roles.");
+console.log("API authorization regression passed: teachers receive scoped data and unknown roles remain denied.");

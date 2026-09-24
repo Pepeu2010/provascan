@@ -19,7 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ examId
   if (!parsed.success) return NextResponse.json({ error: "Tipo de impressão inválido." }, { status: 400 });
   const { examId } = await context.params;
   try {
-    const exam = await getTeacherExam({ actorId: session.id, examId, institutionalView: session.institutionalView });
+    const exam = await getTeacherExam({ actorId: session.id, examId, institutionalView: session.institutionalView, allowAssignedRead: true });
     if (!exam) return NextResponse.json({ error: "Prova não encontrada." }, { status: 404 });
     await appendAuditEvent({ actorId: session.id, event: `teacher_exam_print_${parsed.data.kind}`, targetId: examId, metadata: { kind: parsed.data.kind } });
     return NextResponse.json({ message: "Impressão registrada." });

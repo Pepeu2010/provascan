@@ -6,6 +6,7 @@ const tsxCli = fileURLToPath(import.meta.resolve("tsx/cli"));
 const tests = [
   "verify-exam-create-permissions",
   "verify-exam-assignments",
+  "verify-assigned-exam-access",
   "verify-exam-subjects-scopes",
   "verify-teacher-exam-flow",
   "verify-teacher-home",

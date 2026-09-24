@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:critical": "node scripts/run-critical-tests.mjs",
+    "test:assigned-exam-access": "npx --no-install tsx scripts/verify-assigned-exam-access.ts",
     "test:ocr-fixture": "npx --no-install tsx scripts/verify-ocr-fixture.ts",
     "test:mobile-photo-fixture": "npx --no-install tsx scripts/verify-mobile-photo-fixture.ts",
     "test:real-card-photos": "npx --no-install tsx scripts/verify-real-card-photos.ts",

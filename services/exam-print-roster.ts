@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { getTeacherExam } from "@/services/teacher-exams";
+import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import type { ExamPrintStudent } from "@/lib/exam-print-document";
 
 function db() {
@@ -20,7 +21,7 @@ function ensure(error: { message?: string } | null, fallback: string) {
  * aluno enviados pelo navegador nunca definem quem receberá um cartão.
  */
 export async function getExamPrintRoster(input: { actorId: string; examId: string; institutionalView: boolean }) {
-  const exam = await getTeacherExam(input);
+  const exam = await getTeacherExam({ ...input, allowAssignedRead: true });
   if (!exam) return null;
   const client = db();
   const { data: assignments, error: assignmentError } = await client
@@ -31,8 +32,11 @@ export async function getExamPrintRoster(input: { actorId: string; examId: strin
     .is("archived_at", null);
   ensure(assignmentError, "Não foi possível carregar as turmas da prova.");
 
-  let classIds = [...new Set((assignments ?? []).map((item) => String(item.class_id)))];
-  if (!classIds.length) {
+  const assignedTeacher = !input.institutionalView && exam.creatorId !== input.actorId;
+  let classIds = assignedTeacher
+    ? [...(await getActiveAssignedExamClasses(input.actorId, exam.id)).get(exam.id) ?? []]
+    : [...new Set((assignments ?? []).map((item) => String(item.class_id)))];
+  if (!classIds.length && !assignedTeacher) {
     let classQuery = client.from("classes").select("id,name,year_segment,audience_id").order("name");
     if (exam.groupType === "TURMA" && exam.audienceId) classQuery = classQuery.eq("audience_id", exam.audienceId);
     else if (exam.yearSegment && exam.yearSegment !== "OUTROS") classQuery = classQuery.eq("year_segment", exam.yearSegment);
