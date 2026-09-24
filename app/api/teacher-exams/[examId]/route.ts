@@ -13,9 +13,9 @@ export async function GET(_request: Request, context: { params: Promise<{ examId
   if (!session) return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
   const { examId } = await context.params;
   try {
-    const exam = await getTeacherExam({ actorId: session.id, examId, institutionalView: session.institutionalView });
+    const exam = await getTeacherExam({ actorId: session.id, examId, institutionalView: session.institutionalView, allowAssignedRead: true });
     if (!exam) return NextResponse.json({ error: "Prova não encontrada." }, { status: 404 });
-    return NextResponse.json({ exam, readOnly: session.institutionalView }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ exam, readOnly: session.institutionalView || exam.creatorId !== session.id }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Não foi possível carregar a prova." }, { status: 503 });
   }

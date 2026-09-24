@@ -46,6 +46,8 @@ export type Exam = {
   releasedAt?: string | null;
   status?: "rascunho" | "publicada" | "aplicada" | "arquivada";
   creatorId?: string;
+  /** Classes autorizadas para esta visualização do professor; nunca é persistido na prova. */
+  assignedClassIds?: string[];
   /** Conteúdo pedagógico livre por número de questão. */
   questionTopics?: Record<string, string>;
 };

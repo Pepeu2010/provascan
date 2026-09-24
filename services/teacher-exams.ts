@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
+import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
 import { teacherExamInputSchema } from "@/lib/teacher-exam-validation";
 import { isMissingExamQuestionTopicSchema } from "@/lib/supabase-schema-compat";
@@ -133,16 +134,26 @@ export async function listTeacherExams(input: { actorId: string; includeArchived
   if (!input.includeArchived) query = query.neq("status", "arquivada");
   const { data, error } = await query;
   ensure(error);
-  return hydrate((data ?? []) as unknown as Array<Record<string, unknown>>);
+  const owned = (data ?? []) as unknown as Array<Record<string, unknown>>;
+  if (input.institutionalView) return hydrate(owned);
+  const assignedIds = [...(await getActiveAssignedExamClasses(input.actorId)).keys()];
+  if (!assignedIds.length) return hydrate(owned);
+  const { data: assigned, error: assignedError } = await db().from("exams").select(examColumns).in("id", assignedIds).in("status", ["publicada", "aplicada"]);
+  ensure(assignedError);
+  const byId = new Map([...owned, ...((assigned ?? []) as unknown as Array<Record<string, unknown>>)].map((row) => [String(row.id), row]));
+  return hydrate([...byId.values()].sort((left, right) => String(right.updated_at).localeCompare(String(left.updated_at))).slice(0, 500));
 }
 
-export async function getTeacherExam(input: { actorId: string; examId: string; institutionalView?: boolean }) {
+export async function getTeacherExam(input: { actorId: string; examId: string; institutionalView?: boolean; allowAssignedRead?: boolean }) {
   let query = db().from("exams").select(examColumns).eq("id", input.examId);
   if (!input.institutionalView) query = query.eq("creator_id", input.actorId);
   const { data, error } = await query.maybeSingle();
   ensure(error);
-  if (!data) return null;
-  return (await hydrate([data as unknown as Record<string, unknown>]))[0] ?? null;
+  if (data) return (await hydrate([data as unknown as Record<string, unknown>]))[0] ?? null;
+  if (!input.allowAssignedRead || input.institutionalView || !(await getActiveAssignedExamClasses(input.actorId, input.examId)).has(input.examId)) return null;
+  const { data: assigned, error: assignedError } = await db().from("exams").select(examColumns).eq("id", input.examId).in("status", ["publicada", "aplicada"]).maybeSingle();
+  ensure(assignedError);
+  return assigned ? (await hydrate([assigned as unknown as Record<string, unknown>]))[0] ?? null : null;
 }
 
 function examRow(actorId: string, creatorName: string, examId: string, input: TeacherExamInput, intent: "rascunho" | "publicar", source?: Partial<Record<string, unknown>>) {

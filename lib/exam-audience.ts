@@ -175,6 +175,11 @@ export function getStudentsForExam(exam: Exam | undefined, students: Student[], 
     return students;
   }
 
+  if (exam.assignedClassIds) {
+    const classIds = new Set(exam.assignedClassIds);
+    return students.filter((student) => classIds.has(student.turma));
+  }
+
   const classesById = new Map(classes.map((item) => [item.id, item] as const));
 
   if (exam.groupType === "TURMA") {
