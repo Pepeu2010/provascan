@@ -182,7 +182,7 @@ export function analyzeUniversalAnswerSheet(canvas: HTMLCanvasElement) {
   return result;
 }
 
-export function analyzeUniversalPage(source: HTMLCanvasElement) {
+export function analyzeUniversalPage(source: HTMLCanvasElement, expected?: { alternativeCount?: number; questionCount?: number }) {
   const upright = source.width > source.height ? rotateCanvas(source) : source;
   const candidates: Array<{ canvas: HTMLCanvasElement; layout: UniversalLayoutResult; perspectiveCorrected: boolean }> = [];
   const uprightContext = upright.getContext("2d", { willReadFrequently: true });
@@ -203,12 +203,26 @@ export function analyzeUniversalPage(source: HTMLCanvasElement) {
       // Keep the unrectified candidate when projective correction hurts detail.
     }
   }
-  const best = candidates.sort((left, right) => {
-    const rowDelta = right.layout.rows.length - left.layout.rows.length;
-    return rowDelta || right.layout.confidence - left.layout.confidence;
-  })[0];
+  const compatible = candidates.filter(({ layout }) =>
+    (!expected?.questionCount || layout.rows.length === expected.questionCount)
+    && (!expected?.alternativeCount || layout.alternativeCount === expected.alternativeCount));
+  const best = compatible.sort((left, right) => right.layout.confidence - left.layout.confidence || right.layout.rows.length - left.layout.rows.length)[0];
+  if (!best && candidates.length && expected?.questionCount) {
+    throw new Error(`A folha não corresponde ao modelo: esperadas ${expected.questionCount} questões e ${expected.alternativeCount ?? "as"} alternativas por questão. Confira a prova ou tire outra foto.`);
+  }
   if (!best) throw new Error("Não conseguimos identificar linhas de alternativas nesta página. Ajuste a estrutura manualmente ou envie outra imagem.");
-  return best;
+  const disputedQuestions = new Set<number>();
+  for (const other of compatible) {
+    if (other === best || other.layout.confidence < 0.6 || other.layout.rows.length !== best.layout.rows.length) continue;
+    best.layout.rows.forEach((row, index) => {
+      const alternate = other.layout.rows[index];
+      if (row.marks.status !== alternate.marks.status
+        || row.marks.markedIndexes.join(",") !== alternate.marks.markedIndexes.join(",")) {
+        disputedQuestions.add(index + 1);
+      }
+    });
+  }
+  return { ...best, disputedQuestions };
 }
 
 function rotateCanvas(source: HTMLCanvasElement) {

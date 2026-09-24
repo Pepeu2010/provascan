@@ -26,6 +26,7 @@ import { applyReviewEdit, buildReviewQueue, undoReviewEdit, type ReviewAuditEntr
 import { applyTemplateLibraryAction, sortTemplateLibrary } from "@/lib/external-template-actions";
 import { queueOfflineSyncJob } from "@/lib/offline-sync-queue";
 import { measureCaptureQuality, type CaptureQualityResult } from "@/services/capture-quality";
+import { groupCompleteSheetsWithSources, requiresManualMarkReview } from "@/lib/universal-sheet-validation";
 import {
   completeBatchItem,
   createBatchQueue,
@@ -304,16 +305,17 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const rows: UniversalBubbleRow[] = [];
+      const rows: Array<{ row: UniversalBubbleRow; disputed: boolean }> = [];
       await processDocumentPages(file, { signal: controller.signal, onPage: (page, total) => {
         setProgress(10 + Math.round((page / total) * 35));
         setProgressLabel(`Preparando página ${page} de ${total}...`);
       }, onDecodedPage: (page) => {
-        rows.push(...analyzeUniversalPage(page).layout.rows);
+        const analyzed = analyzeUniversalPage(page, { alternativeCount: structure.alternatives.length });
+        rows.push(...analyzed.layout.rows.map((row, index) => ({ row, disputed: analyzed.disputedQuestions.has(index + 1) })));
       } });
-      if (rows.length < structure.totalQuestions) throw new Error(`Encontramos ${rows.length} de ${structure.totalQuestions} questões. Revise a estrutura ou envie uma imagem mais nítida.`);
-      const imported = rows.slice(0, structure.totalQuestions).map((row) =>
-        row.marks.status === "marked" && row.marks.markedIndexes.length === 1
+      if (rows.length !== structure.totalQuestions) throw new Error(`Encontramos ${rows.length} linhas, mas a prova tem ${structure.totalQuestions} questões. Revise o modelo ou envie outra foto; nenhuma resposta foi descartada.`);
+      const imported = rows.map(({ row, disputed }) =>
+        !requiresManualMarkReview(row.marks, disputed) && row.marks.status === "marked" && row.marks.markedIndexes.length === 1
           ? structure.alternatives[row.marks.markedIndexes[0]] ?? ""
           : "",
       );
@@ -437,14 +439,14 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
 
   const analyzeStudentFile = async (file: File, fileIndex: number, totalFiles: number, signal: AbortSignal) => {
     const startedAt = window.performance.now();
-    const pageRows: Array<Array<UniversalBubbleRow & { previewUrl: string }>> = [];
+    const pageRows: Array<Array<UniversalBubbleRow & { disputed: boolean; previewUrl: string }>> = [];
     let quality: CaptureQualityResult | null = null;
     const pageCandidates: BatchResult["identityCandidates"][] = [];
     await processDocumentPages(file, { signal, onPage: (page, total) => {
       setProgressLabel(`Arquivo ${fileIndex + 1} de ${totalFiles}: página ${page} de ${total}...`);
       setProgress(Math.round(((fileIndex + page / total) / totalFiles) * 90));
     }, onDecodedPage: async (page) => {
-      const analyzed = analyzeUniversalPage(page);
+      const analyzed = analyzeUniversalPage(page, { alternativeCount: structure!.alternatives.length });
       quality ??= measureCaptureQuality(analyzed.canvas);
       try {
         const ocr = await extractTextFromImage(analyzed.canvas.toDataURL("image/jpeg", 0.8));
@@ -452,28 +454,29 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       } catch {
         pageCandidates.push([]);
       }
-      pageRows.push(analyzed.layout.rows.map((row) => ({
+      pageRows.push(analyzed.layout.rows.map((row, index) => ({
         ...row,
-        previewUrl: row.marks.status !== "marked" && row.marks.status !== "blank" ? cropRowPreview(analyzed.canvas, row) : "",
+        disputed: analyzed.disputedQuestions.has(index + 1),
+        previewUrl: requiresManualMarkReview(row.marks, analyzed.disputedQuestions.has(index + 1)) ? cropRowPreview(analyzed.canvas, row) : "",
       })));
     } });
-    const groups = groupPagesAsSheets(pageRows, structure!.totalQuestions);
-    const results = groups.map((rows, groupIndex) => {
-      const answers = rows.slice(0, structure!.totalQuestions).map((row, index) => ({
-        confidence: row.marks.confidence,
+    const groups = groupCompleteSheetsWithSources(pageRows, structure!.totalQuestions);
+    const results = groups.map(({ firstPageIndex, rows }, groupIndex) => {
+      const answers = rows.map((row, index) => ({
+        confidence: row.disputed ? 0 : row.marks.confidence,
         detectedAnswers: row.marks.markedIndexes.map((mark) => structure!.alternatives[mark]).filter(Boolean),
         question: index + 1,
-        status: row.marks.status,
+        status: requiresManualMarkReview(row.marks, row.disputed) ? "uncertain" as const : row.marks.status,
       }));
-      const identityCandidates = pageCandidates[groupIndex] ?? [];
+      const identityCandidates = pageCandidates[firstPageIndex] ?? [];
       return {
         answers,
         elapsedMs: Math.round((window.performance.now() - startedAt) / Math.max(groups.length, 1)),
         grade: gradeWithRules({ answerKey, answers, rules: gradingRules, structure: structure! }),
         identityCandidates,
         identityConfirmed: false,
-        previewUrls: Object.fromEntries(rows.map((row, index) => ({ question: index + 1, row })).filter(({ row }) => row.marks.status !== "marked" && row.marks.status !== "blank").map(({ question, row }) => [question, row.previewUrl])),
-        sourceLabel: safeSourceLabel(`${file.name}${groups.length > 1 ? ` · página ${groupIndex + 1}` : ""}`),
+        previewUrls: Object.fromEntries(rows.map((row, index) => ({ question: index + 1, row })).filter(({ row }) => row.previewUrl).map(({ question, row }) => [question, row.previewUrl])),
+        sourceLabel: safeSourceLabel(`${file.name}${groups.length > 1 ? ` · página ${firstPageIndex + 1}` : ""}`),
         studentId: identityCandidates[0]?.student.id,
         studentName: identityCandidates[0]?.student.nome ?? `Aluno ${groupIndex + 1}`,
       } satisfies BatchResult;
@@ -633,7 +636,7 @@ export function ExternalCorrectionWorkspace({ onBack }: { onBack: () => void }) 
       </Card> : null}
 
       {stage === "review" ? <Card className="p-5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Revisar dúvidas</h3><p className="mt-2 text-sm text-[var(--muted-foreground)]">Confirme primeiro os alunos e depois resolva somente as marcações indicadas.</p></div><div className="flex flex-wrap gap-2"><Badge tone={unresolvedIdentityCount ? "warning" : "success"}>{unresolvedIdentityCount} nomes</Badge><Badge tone={issueCount ? "warning" : "success"}>{issueCount} questões</Badge></div></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="text-xl font-semibold text-[var(--foreground)]">Revisar dúvidas</h3><p className="mt-2 text-sm text-[var(--muted-foreground)]">Confirme primeiro os alunos e depois resolva as marcações fracas, rasuradas ou que tiveram leituras diferentes. A nota só será salva depois dessa conferência.</p></div><div className="flex flex-wrap gap-2"><Badge tone={unresolvedIdentityCount ? "warning" : "success"}>{unresolvedIdentityCount} nomes</Badge><Badge tone={issueCount ? "warning" : "success"}>{issueCount} questões</Badge></div></div>
         {duplicateStudentNames.size ? <p role="alert" className="mt-4 rounded-xl border border-[var(--error-border)] bg-[var(--error-soft)] px-4 py-3 text-sm text-[var(--foreground)]">Há nomes repetidos. Confira se duas folhas não foram associadas ao mesmo aluno.</p> : null}
         <div className="mt-5 grid gap-4">{batch.map((item, batchIndex) => <section key={`${item.sourceLabel}-${batchIndex}`} className="rounded-2xl border border-[var(--border)] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0 flex-1"><Input aria-label={`Nome do aluno ${batchIndex + 1}`} value={item.studentName} onChange={(event) => setBatch((current) => current.map((value, index) => index === batchIndex ? { ...value, identityConfirmed: false, studentId: undefined, studentName: event.target.value } : value))} /><p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.sourceLabel}</p></div><div className="flex flex-wrap gap-2"><Badge tone={item.identityConfirmed ? "success" : "warning"}>{item.identityConfirmed ? "Aluno confirmado" : "Confirme o aluno"}</Badge><Badge tone="success">{item.grade.summary.correct} acertos</Badge><Badge tone="neutral">Nota {item.grade.summary.score.toFixed(1)}</Badge></div></div>
@@ -696,25 +699,6 @@ function parseSubjects(raw: string, total: number) {
   if (parsed.some((item) => item.count < 1)) throw new Error("Cada matéria precisa ter ao menos uma questão.");
   if (parsed.reduce((sum, item) => sum + item.count, 0) !== total) throw new Error("As quantidades das matérias precisam somar o total de questões.");
   return parsed;
-}
-
-function groupPagesAsSheets<T extends UniversalBubbleRow>(pages: T[][], expected: number) {
-  const groups: T[][] = [];
-  let partial: T[] = [];
-  for (const rows of pages) {
-    if (rows.length >= expected) {
-      if (partial.length) throw new Error(`Uma folha ficou incompleta: encontramos ${partial.length} de ${expected} questões.`);
-      groups.push(rows.slice(0, expected));
-      continue;
-    }
-    partial.push(...rows);
-    if (partial.length >= expected) {
-      groups.push(partial.slice(0, expected));
-      partial = partial.slice(expected);
-    }
-  }
-  if (partial.length) throw new Error(`A última folha ficou incompleta: encontramos ${partial.length} de ${expected} questões.`);
-  return groups;
 }
 
 function cropRowPreview(canvas: HTMLCanvasElement, row: UniversalBubbleRow) {
