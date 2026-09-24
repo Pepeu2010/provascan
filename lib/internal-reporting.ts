@@ -1,4 +1,4 @@
-import type { CorrectionSession } from "@/types/domain";
+import type { CorrectionSession, Exam } from "@/types/domain";
 
 export type QuestionPerformanceRow = {
   blank: number;
@@ -6,6 +6,17 @@ export type QuestionPerformanceRow = {
   correctRate: number;
   multiple: number;
   question: number;
+  total: number;
+  wrong: number;
+};
+
+export type TopicPerformanceRow = {
+  blank: number;
+  correct: number;
+  correctRate: number;
+  multiple: number;
+  questionCount: number;
+  topic: string;
   total: number;
   wrong: number;
 };
@@ -56,10 +67,47 @@ export function buildQuestionPerformance(records: CorrectionSession[]): Question
     .sort((left, right) => left.correctRate - right.correctRate || left.question - right.question);
 }
 
+export function buildTopicPerformance(records: CorrectionSession[], exams: Exam[]): TopicPerformanceRow[] {
+  const topicsByExam = new Map(exams.map((exam) => [exam.id, exam.questionTopics ?? {}] as const));
+  const rows = new Map<string, Omit<TopicPerformanceRow, "correctRate" | "questionCount"> & { questions: Set<string> }>();
+
+  for (const correction of records) {
+    const examTopics = topicsByExam.get(correction.prova.id) ?? correction.prova.questionTopics ?? {};
+    for (const answer of correction.respostas) {
+      const topic = (examTopics[String(answer.questao)] ?? "").trim() || "Sem conteúdo informado";
+      const key = topic.toLocaleLowerCase("pt-BR");
+      const row = rows.get(key) ?? { blank: 0, correct: 0, multiple: 0, questions: new Set<string>(), topic, total: 0, wrong: 0 };
+      row.total += 1;
+      row.questions.add(`${correction.prova.id}:${answer.questao}`);
+      if (answer.status === "acerto") row.correct += 1;
+      else if (answer.status === "em-branco") row.blank += 1;
+      else if (answer.status === "multipla-marcacao") row.multiple += 1;
+      else if (answer.status === "erro") row.wrong += 1;
+      rows.set(key, row);
+    }
+  }
+
+  return [...rows.values()]
+    .map(({ questions, ...row }) => ({
+      ...row,
+      correctRate: row.total ? Math.round((row.correct / row.total) * 100) : 0,
+      questionCount: questions.size,
+    }))
+    .sort((left, right) => left.correctRate - right.correctRate || left.topic.localeCompare(right.topic, "pt-BR"));
+}
+
 export function buildQuestionPerformanceCsv(rows: QuestionPerformanceRow[]) {
   const csvRows = [
     ["questao", "respostas", "acertos", "erros", "em_branco", "multiplas_marcacoes", "aproveitamento_percentual"],
     ...rows.map((row) => [row.question, row.total, row.correct, row.wrong, row.blank, row.multiple, row.correctRate]),
+  ];
+  return `\uFEFF${csvRows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+}
+
+export function buildTopicPerformanceCsv(rows: TopicPerformanceRow[]) {
+  const csvRows = [
+    ["conteudo", "questoes", "respostas", "acertos", "erros", "em_branco", "multiplas_marcacoes", "aproveitamento_percentual"],
+    ...rows.map((row) => [row.topic, row.questionCount, row.total, row.correct, row.wrong, row.blank, row.multiple, row.correctRate]),
   ];
   return `\uFEFF${csvRows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
 }

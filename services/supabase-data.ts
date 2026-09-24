@@ -6,7 +6,7 @@ import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
 import { getStudentsForExam, normalizeClasses } from "@/lib/exam-audience";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
-import { withTeacherExamSchemaFallback } from "@/lib/supabase-schema-compat";
+import { withExamQuestionTopicFallback, withTeacherExamSchemaFallback } from "@/lib/supabase-schema-compat";
 import type { ClassRoom, CorrectionSession, Exam, ExamCorrectionRule, Student, TeacherProfile } from "@/types/domain";
 import type { UserRecord } from "@/types/auth";
 
@@ -227,22 +227,37 @@ export async function getOperationalAppData(): Promise<AppDataState> {
     async () => db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at,status,creator_id"),
     async () => db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at"),
   );
-  const [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult] = await Promise.all([
+  const questionQuery = withExamQuestionTopicFallback(
+    async () => db.from("exam_questions").select("exam_id,position,topic"),
+    async () => db.from("exam_questions").select("exam_id,position"),
+  );
+  const [classResult, studentResult, examResult, questionResult, keyResult, ruleResult, correctionResult, settingsResult] = await Promise.all([
     db.from("classes").select("id,name,academic_year,audience_id,audience_label,group_type,year_segment"),
     db.from("students").select("id,name,class_id,status"),
     examQuery,
+    questionQuery,
     db.from("answer_keys").select("exam_id,question_number,correct_answer"),
     db.from("correction_rules").select("exam_id,max_score,rounding_places,default_weight,weights_by_question,voided_questions,voided_question_mode"),
     db.from("corrections").select("id,exam_id,student_id,detected_name,score,correct_count,incorrect_count,blank_count,multiple_marks_count,voided_count,percentage,corrected_at,source_image,correction_time,identification_method,student_snapshot,exam_snapshot,class_snapshot,answers,ocr_confidence,processed_image,observations,identification"),
     db.from("app_settings_internal").select("key,value"),
   ]);
-  [classResult, studentResult, examResult, keyResult, ruleResult, correctionResult, settingsResult].forEach((result) => dbError(result.error));
+  [classResult, studentResult, examResult, questionResult, keyResult, ruleResult, correctionResult, settingsResult].forEach((result) => dbError(result.error));
+  const questionTopicsByExam = new Map<string, Record<string, string>>();
+  for (const raw of questionResult.data ?? []) {
+    const row = raw as Record<string, unknown>;
+    const topic = String(row.topic || "").trim();
+    if (!topic) continue;
+    const examId = String(row.exam_id);
+    const topics = questionTopicsByExam.get(examId) ?? {};
+    topics[String(Number(row.position))] = topic;
+    questionTopicsByExam.set(examId, topics);
+  }
   const storedClasses = ((classResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), ano: String(row.academic_year), audienceId: String(row.audience_id || "") || undefined, audienceLabel: String(row.audience_label || "") || undefined, groupType: String(row.group_type || "") || undefined, yearSegment: String(row.year_segment || "") || undefined })) as ClassRoom[];
   const normalizedClasses = normalizeClasses(storedClasses);
   return {
     classes: normalizedClasses,
     students: ((studentResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), nome: String(row.name), turma: String(row.class_id ?? ""), status: mapStudentStatus(row.status) })) as Student[],
-    exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version), releasedAt: row.released_at ? String(row.released_at) : null, status: String(row.status || (row.released_at ? "publicada" : "rascunho")) as Exam["status"], creatorId: String(row.creator_id || "") })) as Exam[],
+    exams: ((examResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), titulo: String(row.title), audienceId: String(row.audience_id), audienceLabel: String(row.audience_label), groupType: String(row.group_type) as Exam["groupType"], yearSegment: String(row.year_segment) as Exam["yearSegment"], quantidadeQuestoes: Number(row.question_count), alternativas: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [], data: String(row.exam_date), codigo: String(row.code), templateVersion: String(row.template_version), releasedAt: row.released_at ? String(row.released_at) : null, status: String(row.status || (row.released_at ? "publicada" : "rascunho")) as Exam["status"], creatorId: String(row.creator_id || ""), questionTopics: questionTopicsByExam.get(String(row.id)) ?? {} })) as Exam[],
     answerKeys: ((keyResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), questao: Number(row.question_number), respostaCorreta: String(row.correct_answer) })),
     correctionRules: ((ruleResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ provaId: String(row.exam_id), notaMaxima: Number(row.max_score), arredondamentoCasas: Number(row.rounding_places), pesoPadrao: Number(row.default_weight), pesosPorQuestao: Array.isArray(row.weights_by_question) ? row.weights_by_question : [], questoesAnuladas: Array.isArray(row.voided_questions) ? row.voided_questions.map(Number) : [], modoQuestaoAnulada: String(row.voided_question_mode) as ExamCorrectionRule["modoQuestaoAnulada"] })),
     corrections: ((correctionResult.data ?? []) as Array<Record<string, unknown>>).map((row) => ({ correction: { id: String(row.id), provaId: String(row.exam_id), alunoId: String(row.student_id ?? ""), nomeDetectado: String(row.detected_name), nota: Number(row.score), acertos: Number(row.correct_count), erros: Number(row.incorrect_count), emBranco: Number(row.blank_count), multiplasMarcacoes: Number(row.multiple_marks_count), anuladas: Number(row.voided_count), percentual: Number(row.percentage), data: String(row.corrected_at), imagem: String(row.source_image), tempoCorrecao: String(row.correction_time), metodoIdentificacao: String(row.identification_method) as CorrectionSession["correction"]["metodoIdentificacao"] }, aluno: row.student_snapshot as Student, prova: row.exam_snapshot as Exam, turma: row.class_snapshot as ClassRoom, respostas: (row.answers as CorrectionSession["respostas"]) ?? [], confiancaOcr: Number(row.ocr_confidence), imagemProcessada: String(row.processed_image), observacoes: (row.observations as string[]) ?? [], identificacao: row.identification as CorrectionSession["identificacao"] })) as CorrectionSession[],

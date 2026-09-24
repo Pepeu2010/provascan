@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, Edit3, FileSpreadsheet, Heart, KeyRound, Printer, QrCode, Save, ShieldCheck, Trash2, Upload } from "lucide-react";
@@ -32,7 +32,7 @@ import type { StudentStatus } from "@/types/domain";
 import type { ExternalCorrectionRecord } from "@/types/universal-exams";
 import { parseStudentCsv, type StudentImportResult } from "@/lib/student-import";
 import { buildExternalCorrectionCsv, buildExternalReport, filterExternalCorrections } from "@/lib/external-reporting";
-import { buildCorrectionCsv, buildQuestionPerformance, buildQuestionPerformanceCsv } from "@/lib/internal-reporting";
+import { buildCorrectionCsv, buildQuestionPerformance, buildQuestionPerformanceCsv, buildTopicPerformance, buildTopicPerformanceCsv } from "@/lib/internal-reporting";
 import { buildCalibrationSheetHtml, buildPrintInstructionSheetHtml, getPrintPreflight } from "@/lib/print-preflight";
 import { UsabilityControls } from "@/components/usability-controls";
 
@@ -96,11 +96,14 @@ function downloadTextFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function openPedagogicalReport(title: string, total: number, average: number, rows: ReturnType<typeof buildQuestionPerformance>) {
+function openPedagogicalReport(title: string, total: number, average: number, rows: ReturnType<typeof buildQuestionPerformance>, topics: ReturnType<typeof buildTopicPerformance>) {
+  const topicRows = topics.length
+    ? topics.map((row) => `<tr><td>${escapeForHtml(row.topic)}</td><td>${row.questionCount}</td><td>${row.total}</td><td>${row.correct}</td><td>${row.wrong}</td><td>${row.blank}</td><td>${row.multiple}</td><td>${row.correctRate}%</td></tr>`).join("")
+    : '<tr><td colspan="8" class="empty">Nenhum conteúdo foi informado nas questões consideradas.</td></tr>';
   const questions = rows.length
     ? rows.map((row) => `<tr><td>${row.question}</td><td>${row.total}</td><td>${row.correct}</td><td>${row.wrong}</td><td>${row.blank}</td><td>${row.multiple}</td><td>${row.correctRate}%</td></tr>`).join("")
     : '<tr><td colspan="7" class="empty">Ainda não há correções para os filtros escolhidos.</td></tr>';
-  const report = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeForHtml(title)}</title><style>@page{size:A4 portrait;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#172033;margin:0}.eyebrow{color:#5716b0;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.title{font-size:26px;line-height:1.15;margin:8px 0}.meta{color:#536078;font-size:12px}.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:24px 0}.metric{border:1px solid #d6d9e1;border-radius:12px;padding:14px}.metric b{display:block;font-size:24px;margin-top:4px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border-bottom:1px solid #d6d9e1;padding:8px;text-align:left}th{background:#f5f3ff;color:#42228d}.empty{text-align:center;color:#64748b;padding:26px}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><p class="eyebrow">ProvaScan · relatório pedagógico</p><h1 class="title">${escapeForHtml(title)}</h1><p class="meta">Gerado em ${escapeForHtml(new Date().toLocaleString("pt-BR"))}</p><section class="summary"><div class="metric"><span>Correções consideradas</span><b>${total}</b></div><div class="metric"><span>Média de aproveitamento</span><b>${average}%</b></div></section><h2>Desempenho por questão</h2><table><thead><tr><th>Questão</th><th>Respostas</th><th>Acertos</th><th>Erros</th><th>Em branco</th><th>Múltiplas</th><th>Aproveitamento</th></tr></thead><tbody>${questions}</tbody></table></body></html>`;
+  const report = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapeForHtml(title)}</title><style>@page{size:A4 portrait;margin:16mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#172033;margin:0}.eyebrow{color:#5716b0;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.title{font-size:26px;line-height:1.15;margin:8px 0}.meta{color:#536078;font-size:12px}.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:24px 0}.metric{border:1px solid #d6d9e1;border-radius:12px;padding:14px}.metric b{display:block;font-size:24px;margin-top:4px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border-bottom:1px solid #d6d9e1;padding:8px;text-align:left}th{background:#f5f3ff;color:#42228d}.empty{text-align:center;color:#64748b;padding:26px}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><p class="eyebrow">ProvaScan · relatório pedagógico</p><h1 class="title">${escapeForHtml(title)}</h1><p class="meta">Gerado em ${escapeForHtml(new Date().toLocaleString("pt-BR"))}</p><section class="summary"><div class="metric"><span>Correções consideradas</span><b>${total}</b></div><div class="metric"><span>Média de aproveitamento</span><b>${average}%</b></div></section><h2>Desempenho por conteúdo</h2><table><thead><tr><th>Conteúdo</th><th>Questões</th><th>Respostas</th><th>Acertos</th><th>Erros</th><th>Em branco</th><th>Múltiplas</th><th>Aproveitamento</th></tr></thead><tbody>${topicRows}</tbody></table><h2>Desempenho por questão</h2><table><thead><tr><th>Questão</th><th>Respostas</th><th>Acertos</th><th>Erros</th><th>Em branco</th><th>Múltiplas</th><th>Aproveitamento</th></tr></thead><tbody>${questions}</tbody></table></body></html>`;
   const blob = new Blob([report], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const reportWindow = window.open(url, "_blank", "noopener,noreferrer,width=960,height=760");
@@ -119,6 +122,16 @@ function escapeForHtml(value: string) {
   const span = document.createElement("span");
   span.textContent = value;
   return span.innerHTML;
+}
+
+function TopicPerformanceCard({ rows }: { rows: ReturnType<typeof buildTopicPerformance> }) {
+  return <Card className="p-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Leitura pedagógica</p><h3 className="mt-2 text-xl font-semibold text-[var(--foreground)]">Resultado por conteúdo</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">Agrupa questões pelo conteúdo informado em cada item, sem criar um catálogo separado de matérias.</p></div>
+      <Badge tone="accent">{rows.length} {rows.length === 1 ? "conteúdo" : "conteúdos"} com dados</Badge>
+    </div>
+    {rows.length ? <div className="mt-5 grid gap-3">{rows.map((item) => <article key={item.topic.toLocaleLowerCase("pt-BR")} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><strong className="text-sm text-[var(--foreground)]">{item.topic}</strong><p className="mt-1 text-xs text-[var(--muted-foreground)]">{item.questionCount} {item.questionCount === 1 ? "questão" : "questões"} · {item.correct} acertos em {item.total} respostas</p></div><Badge tone={item.correctRate >= 70 ? "success" : item.correctRate >= 50 ? "warning" : "error"}>{item.correctRate}% de aproveitamento</Badge></div><div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--surface-strong)]"><div className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-strong))]" style={{ width: `${item.correctRate}%` }} /></div><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]"><span>{item.wrong} erraram</span><span>{item.blank} em branco</span><span>{item.multiple} múltiplas marcações</span></div></article>)}</div> : <p className="mt-5 rounded-2xl border border-dashed border-[var(--border-strong)] px-5 py-8 text-center text-sm text-[var(--muted-foreground)]">Informe o conteúdo nas questões da prova para ver esta leitura pedagógica.</p>}
+  </Card>;
 }
 
 function openPrintWindow(title: string, body: string) {
@@ -1072,9 +1085,12 @@ export function ReportsWorkspace() {
     ? Math.round(filteredCorrections.reduce((sum, item) => sum + item.correction.percentual, 0) / filteredCorrections.length)
     : 0;
   const questionPerformance = useMemo(() => buildQuestionPerformance(filteredCorrections), [filteredCorrections]);
+  const topicPerformance = useMemo(() => buildTopicPerformance(filteredCorrections, data.exams), [data.exams, filteredCorrections]);
+  const weakestTaggedTopic = topicPerformance.find((item) => item.topic !== "Sem conteúdo informado");
   const selectedStudent = studentFilter === "all" ? null : data.students.find((student) => student.id === studentFilter) ?? null;
   const pedagogicalAlerts = [
     ...(filteredCorrections.length && filteredAverage < 60 ? [{ detail: `A média atual é ${filteredAverage}%. Vale revisar o conteúdo antes da próxima aplicação.`, title: "Aproveitamento abaixo do esperado" }] : []),
+    ...(weakestTaggedTopic && weakestTaggedTopic.correctRate < 45 ? [{ detail: `${weakestTaggedTopic.topic}: ${weakestTaggedTopic.correctRate}% de aproveitamento em ${weakestTaggedTopic.total} respostas de ${weakestTaggedTopic.questionCount} ${weakestTaggedTopic.questionCount === 1 ? "questão" : "questões"}.`, title: "Conteúdo para reforçar" }] : []),
     ...(questionPerformance[0] && questionPerformance[0].correctRate < 45 ? [{ detail: `Questão ${questionPerformance[0].question}: ${questionPerformance[0].correctRate}% de aproveitamento em ${questionPerformance[0].total} respostas.`, title: "Questão para revisar" }] : []),
   ];
   const filteredExternalCorrections = useMemo(() => filterExternalCorrections(externalCorrections, { dateFrom: externalDateFrom, dateTo: externalDateTo, query: externalQuery, templateId: externalTemplateFilter }), [externalCorrections, externalDateFrom, externalDateTo, externalQuery, externalTemplateFilter]);
@@ -1138,13 +1154,17 @@ export function ReportsWorkspace() {
           <Button variant="secondary" disabled={!filteredCorrections.length} onClick={() => downloadTextFile("desempenho-por-questao.csv", buildQuestionPerformanceCsv(questionPerformance), "text/csv;charset=utf-8")}>
             <FileSpreadsheet className="size-4" /> Baixar desempenho por questão
           </Button>
-          <Button variant="ghost" disabled={!filteredCorrections.length} onClick={() => openPedagogicalReport("Relatório pedagógico", filteredCorrections.length, filteredAverage, questionPerformance)}>
+          <Button variant="secondary" disabled={!filteredCorrections.length} onClick={() => downloadTextFile("desempenho-por-conteudo.csv", buildTopicPerformanceCsv(topicPerformance), "text/csv;charset=utf-8")}>
+            <FileSpreadsheet className="size-4" /> Baixar desempenho por conteúdo
+          </Button>
+          <Button variant="ghost" disabled={!filteredCorrections.length} onClick={() => openPedagogicalReport("Relatório pedagógico", filteredCorrections.length, filteredAverage, questionPerformance, topicPerformance)}>
             <Printer className="size-4" /> Imprimir ou salvar em PDF
           </Button>
         </div>
       </Card>
       {pedagogicalAlerts.length ? <Card className="border-[var(--warning-border)] bg-[var(--warning-soft)] p-5 sm:p-6"><div className="flex flex-col gap-2"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--foreground)]">Atenção pedagógica</p><h3 className="text-lg font-semibold text-[var(--foreground)]">Pontos que merecem uma nova olhada</h3><p className="text-sm text-[var(--muted-foreground)]">Os avisos usam somente as correções filtradas acima.</p></div><ul className="mt-4 grid gap-3">{pedagogicalAlerts.map((alert) => <li key={alert.title} className="rounded-xl border border-[var(--warning-border)] bg-[var(--card-solid)] p-4"><strong className="text-sm text-[var(--foreground)]">{alert.title}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">{alert.detail}</p></li>)}</ul></Card> : null}
       {selectedStudent ? <Card className="p-5 sm:p-6"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">Resumo individual</p><h3 className="mt-1 text-xl font-semibold text-[var(--foreground)]">{selectedStudent.nome}</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{filteredCorrections.length ? `${filteredCorrections.length} ${filteredCorrections.length === 1 ? "correção considerada" : "correções consideradas"} pelos filtros atuais.` : "Ainda não há correções para os filtros atuais."}</p></div><Badge tone={filteredAverage >= 70 ? "success" : filteredAverage >= 50 ? "warning" : "error"}>{filteredAverage}% de aproveitamento</Badge></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Melhor ponto observado</p><strong className="mt-2 block text-lg text-[var(--foreground)]">{questionPerformance.at(-1) ? `Questão ${questionPerformance.at(-1)?.question} · ${questionPerformance.at(-1)?.correctRate}%` : "Aguardando dados"}</strong></div><div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Ponto para reforçar</p><strong className="mt-2 block text-lg text-[var(--foreground)]">{questionPerformance[0] ? `Questão ${questionPerformance[0].question} · ${questionPerformance[0].correctRate}%` : "Aguardando dados"}</strong></div><div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Marcações em branco</p><strong className="mt-2 block text-lg text-[var(--foreground)]">{filteredCorrections.reduce((sum, correction) => sum + correction.correction.emBranco, 0)}</strong></div></div></Card> : null}
+            <TopicPerformanceCard rows={topicPerformance} />
       <Card className="p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Leitura pedagógica</p><h3 className="mt-2 text-xl font-semibold text-[var(--foreground)]">Resultado por questão</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">As questões com menor aproveitamento aparecem primeiro. Use os filtros acima para olhar uma prova, turma ou aluno.</p></div>

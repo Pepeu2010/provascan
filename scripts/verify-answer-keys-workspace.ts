@@ -35,8 +35,8 @@ function exam(overrides: Partial<TeacherExam> = {}): TeacherExam {
     period: "1º Bimestre",
     publishedAt: "2026-09-16T12:30:00.000Z",
     questions: [
-      { alternatives: ["3", "4", "5", "6"], annulled: false, correctAnswers: ["4"], correctionCriteria: "", correctionNotes: "", id: "q1", imagePath: null, needsReview: false, position: 1, prompt: "Quanto é 2 + 2?", type: "multipla_escolha", weight: 1 },
-      { alternatives: [], annulled: false, correctAnswers: [], correctionCriteria: "Explica o raciocínio corretamente.", correctionNotes: "", id: "q2", imagePath: null, needsReview: false, position: 2, prompt: "Explique.", type: "discursiva", weight: 2 },
+      { alternatives: ["3", "4", "5", "6"], annulled: false, correctAnswers: ["4"], correctionCriteria: "", correctionNotes: "", id: "q1", imagePath: null, needsReview: false, position: 1, prompt: "Quanto é 2 + 2?", topic: "Aritmética", type: "multipla_escolha", weight: 1 },
+      { alternatives: [], annulled: false, correctAnswers: [], correctionCriteria: "Explica o raciocínio corretamente.", correctionNotes: "", id: "q2", imagePath: null, needsReview: false, position: 2, prompt: "Explique.", topic: "", type: "discursiva", weight: 2 },
     ],
     sourceType: "manual",
     status: "publicada",

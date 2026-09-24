@@ -151,6 +151,7 @@ export function normalizeExam(
     groupType: audience.groupType,
     id: exam.id,
     quantidadeQuestoes: exam.quantidadeQuestoes,
+    questionTopics: exam.questionTopics,
     templateVersion: exam.templateVersion,
     titulo: exam.titulo,
     yearSegment: audience.yearSegment,

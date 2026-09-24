@@ -26,6 +26,8 @@ export type TeacherExamQuestion = {
   correctionNotes: string;
   needsReview: boolean;
   imagePath: string | null;
+  /** Texto livre para leitura pedagógica; não cria disciplina nem catálogo. */
+  topic: string;
 };
 
 export type TeacherExam = {

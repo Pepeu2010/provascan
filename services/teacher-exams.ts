@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
 import { teacherExamInputSchema } from "@/lib/teacher-exam-validation";
+import { isMissingExamQuestionTopicSchema } from "@/lib/supabase-schema-compat";
 import type { UserRole } from "@/types/auth";
 import type { TeacherExam, TeacherExamContentVersion, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
 
@@ -18,6 +19,22 @@ function ensure(error: { message?: string } | null, fallback = "Erro ao acessar 
   if (error) throw new Error(error.message || fallback);
 }
 
+async function upsertExamQuestions(rows: Array<Record<string, unknown>>) {
+  if (!rows.length) return;
+  const client = db();
+  const result = await client.from("exam_questions").upsert(rows, { onConflict: "id" });
+  if (!isMissingExamQuestionTopicSchema(result.error)) {
+    ensure(result.error);
+    return;
+  }
+
+  const legacyRows = rows.map(({ topic: _topic, ...row }) => {
+    void _topic;
+    return row;
+  });
+  ensure((await client.from("exam_questions").upsert(legacyRows, { onConflict: "id" })).error);
+}
+
 function mapQuestion(row: Record<string, unknown>): TeacherExamQuestion {
   return {
     alternatives: Array.isArray(row.alternatives) ? row.alternatives.map(String) : [],
@@ -30,6 +47,7 @@ function mapQuestion(row: Record<string, unknown>): TeacherExamQuestion {
     needsReview: Boolean(row.needs_review),
     position: Number(row.position),
     prompt: String(row.prompt || ""),
+    topic: String(row.topic || ""),
     type: String(row.type) as TeacherExamQuestion["type"],
     weight: Number(row.weight),
   };
@@ -172,6 +190,7 @@ async function replaceExamContent(examId: string, input: TeacherExamInput) {
     needs_review: question.needsReview,
     position: index + 1,
     prompt: question.prompt,
+    topic: question.topic.trim(),
     type: question.type,
     weight: question.weight,
   }));
@@ -184,7 +203,7 @@ async function replaceExamContent(examId: string, input: TeacherExamInput) {
   const annulled = questions.filter((question) => question.annulled).map((question) => question.position);
   ensure((await client.from("answer_keys").delete().eq("exam_id", examId)).error);
   ensure((await client.from("exam_questions").delete().eq("exam_id", examId)).error);
-  if (questions.length) ensure((await client.from("exam_questions").insert(questions)).error);
+  if (questions.length) await upsertExamQuestions(questions);
   if (answerKeys.length) ensure((await client.from("answer_keys").insert(answerKeys)).error);
   ensure((await client.from("correction_rules").upsert({
     default_weight: 1,
@@ -251,7 +270,7 @@ async function createPublishedTeacherExam(input: {
     alternatives: question.alternatives, annulled: question.annulled, correct_answers: question.correctAnswers,
     correction_criteria: question.correctionCriteria, correction_notes: question.correctionNotes,
     id: question.id?.trim() || crypto.randomUUID(), image_path: question.imagePath || null,
-    needs_review: question.needsReview, position: index + 1, prompt: question.prompt, type: question.type, weight: question.weight,
+    needs_review: question.needsReview, position: index + 1, prompt: question.prompt, topic: question.topic.trim(), type: question.type, weight: question.weight,
   }));
   const payload = {
     audit_event: "teacher_exam_published", audit_id: crypto.randomUUID(),
@@ -265,6 +284,7 @@ async function createPublishedTeacherExam(input: {
   const { data, error } = await db().rpc("create_teacher_exam_transaction", { p_payload: payload });
   ensure(error, "Não foi possível publicar a prova.");
   if (String(data || "") !== examId) throw new Error("A publicação não foi confirmada.");
+  await upsertExamQuestions(questions.map((question) => ({ ...question, exam_id: examId })));
   await saveExamContentVersion({ actorId: input.actorId, examId, reason: "publicada", snapshot: normalizedExam, version: 1 });
   return examId;
 }
@@ -276,6 +296,7 @@ function structuralFingerprint(exam: Pick<TeacherExam, "questions"> | TeacherExa
     correctAnswers: question.correctAnswers,
     correctionCriteria: question.correctionCriteria,
     prompt: question.prompt,
+    topic: question.topic,
     type: question.type,
     weight: question.weight,
   })));
@@ -402,6 +423,7 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
     needs_review: question.needsReview,
     position: index + 1,
     prompt: question.prompt,
+    topic: question.topic.trim(),
     type: question.type,
     weight: question.weight,
   }));
@@ -422,6 +444,7 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
   });
   ensure(error, "Não foi possível restaurar esta versão.");
   if (Number(data) !== current.version + 1) throw new Error("A restauração não foi confirmada.");
+  await upsertExamQuestions(questions.map((question) => ({ ...question, exam_id: input.examId })));
   return Number(data);
 }
 
