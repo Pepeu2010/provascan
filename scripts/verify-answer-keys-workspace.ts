@@ -84,6 +84,8 @@ assert.match(workspace, /answer-key-detail__choices/);
 assert.match(workspace, /PrintStudio/);
 assert.doesNotMatch(workspace, /\$\{String\.fromCharCode\(65 \+ index\)\} — \$\{answer\}/);
 assert.doesNotMatch(workspace, /Gabaritos das suas provas/);
+const styles = readFileSync(new URL("../components/answer-keys-workspace.css", import.meta.url), "utf8");
+assert.match(styles, /@media \(max-width: 1220px\) \{[\s\S]*?\.answer-keys__grid \{ grid-template-columns: minmax\(0, 1fr\); \}/);
 
 console.log("Answer-key workspace checks passed: dedicated library, protected answers, filters, and print actions are present.");
 }
