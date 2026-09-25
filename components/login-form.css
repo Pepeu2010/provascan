@@ -328,6 +328,8 @@
 @media (max-width: 1023px) {
   .login-page__story { max-width: 620px; }
   .login-page__workflow { max-width: 620px; }
+  .login-page__story { display: none; }
+  .login-page__shell { align-content: center; }
 }
 
 @media (max-width: 640px) {
@@ -379,4 +381,14 @@
   .login-page__workflow { margin-top: 12px; }
   .login-page__workflow li { min-height: 42px; padding: 8px 6px; }
   .login-page__form-card { width: 100%; padding: 20px 16px; }
+}
+
+/* O anel de foco pertence ao campo inteiro, não a um segundo retângulo interno. */
+.auth-field__control input:focus,
+.auth-field__control input:focus-visible { outline: 0 !important; box-shadow: none; }
+
+@media (max-width: 640px) {
+  .login-page__shell { align-content: start; }
+  .login-page__access { width: 100%; }
+  .login-page__heading { margin-top: 18px; }
 }

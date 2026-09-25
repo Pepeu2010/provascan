@@ -459,3 +459,51 @@
   .question-batch { padding: 14px; }
   .question-batch__presets { width: 100%; justify-content: space-between; }
 }
+
+/* Um gabarito longo vira uma matriz de conferência, não uma lista de enunciados. */
+.exam-studio__steps { scroll-margin-top: 18px; }
+.exam-studio__action-progress { display: grid; align-content: center; gap: 2px; margin-right: auto; color: var(--muted-foreground); font-size: 11px; line-height: 1.2; }
+.exam-studio__action-progress strong { color: var(--foreground); font-size: 13px; }
+.answer-key-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 22px 0 12px; }
+.answer-key-toolbar > div { display: grid; gap: 2px; }
+.answer-key-toolbar strong { font-size: 15px; }
+.answer-key-toolbar span { color: var(--muted-foreground); font-size: 12px; }
+.answer-key-toolbar button { min-height: 44px; flex: none; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 14px; color: var(--foreground); font-size: 12px; font-weight: 750; }
+.answer-key-toolbar button:hover, .answer-key-toolbar button.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.answer-key-toolbar button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.answer-key-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); align-items: start; gap: 14px; }
+.answer-key-block { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card-solid); }
+.answer-key-block h3 { border-bottom: 1px solid var(--border); background: var(--surface); padding: 11px 14px; color: var(--muted-foreground); font-size: 12px; font-weight: 750; }
+.answer-key-list { gap: 0; }
+.answer-key-row { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 8px; min-width: 0; min-height: 61px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: var(--card-solid); padding: 8px 12px; }
+.answer-key-row:last-child { border-bottom: 0; }
+.answer-key-row.is-complete { border-color: var(--border); }
+.answer-key-row__identity { display: grid; gap: 1px; }
+.answer-key-row__identity strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.answer-key-row__identity span { color: var(--muted-foreground); font-size: 9px; font-weight: 650; }
+.answer-key-row__choices { min-width: 0; gap: 5px; }
+.answer-key-row__choices button { width: 40px; height: 40px; border-radius: 10px; }
+.answer-key-row__choices button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.answer-key-row__options summary { min-height: 40px; display: flex; align-items: center; padding: 4px; }
+.answer-key-row__options summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.answer-key-row__options[open] { grid-column: 1 / -1; }
+.answer-key-row__options > div { grid-template-columns: minmax(100px, 150px) 1fr; align-items: end; }
+.answer-key-empty { border: 1px solid color-mix(in srgb, var(--success) 35%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--success) 8%, var(--card-solid)); padding: 22px; color: var(--foreground); text-align: center; }
+
+@media (max-width: 640px) {
+  .answer-key-toolbar { align-items: stretch; flex-direction: column; }
+  .answer-key-toolbar button { align-self: flex-start; }
+  .answer-key-blocks { grid-template-columns: 1fr; }
+  .answer-key-row { grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; }
+  .exam-studio__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exam-studio__action-progress { grid-column: 1 / -1; }
+  .exam-studio__actions .button { min-width: 0; font-size: 12px; }
+}
+
+@media (max-width: 390px) {
+  .exam-studio__actions { grid-template-columns: 1fr; }
+  .exam-studio__canvas :is(input, textarea, select, button) { scroll-margin-bottom: 210px; }
+  .answer-key-row { grid-template-columns: 45px minmax(0, 1fr); }
+  .answer-key-row__options { grid-column: 2; }
+  .answer-key-row__options[open] { grid-column: 1 / -1; }
+}
