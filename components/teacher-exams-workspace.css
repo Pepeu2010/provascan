@@ -507,3 +507,24 @@
   .answer-key-row__options { grid-column: 2; }
   .answer-key-row__options[open] { grid-column: 1 / -1; }
 }
+
+/* A navegação lateral reduz a largura útil antes do breakpoint de tablet. */
+.question-batch { flex-wrap: wrap; }
+.question-batch > div:first-child { min-width: min(100%, 220px); flex: 1 1 220px; }
+.question-batch__controls { min-width: 0; flex: 1 1 360px; flex-wrap: wrap; }
+.question-batch__presets { flex-wrap: wrap; }
+
+@media (max-width: 1150px) {
+  .exam-studio__layout { grid-template-columns: minmax(0, 1fr); }
+  .exam-studio__rail { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .exam-studio__steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .exam-studio__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .exam-studio__rail { grid-template-columns: minmax(0, 1fr); }
+  .question-batch { align-items: stretch; }
+}
