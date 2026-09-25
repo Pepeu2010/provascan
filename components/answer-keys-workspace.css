@@ -189,3 +189,10 @@
   .answer-key-detail__sheet ol { grid-template-columns: 1fr; }
   .answer-key-detail__sheet li { border-right: 0; }
 }
+
+/* A barra lateral deixa menos espaço do que a largura total da janela sugere. */
+@media (max-width: 1220px) {
+  .answer-keys__hero { align-items: flex-start; flex-direction: column; }
+  .answer-keys__privacy { width: min(100%, 420px); }
+  .answer-keys__grid { grid-template-columns: minmax(0, 1fr); }
+}
