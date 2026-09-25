@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getTeacherExam } from "@/services/teacher-exams";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
+import { restrictRosterClassIds, selectLegacyRosterClassIds } from "@/lib/exam-roster-scope";
 import type { ExamPrintStudent } from "@/lib/exam-print-document";
 
 function db() {
@@ -37,12 +38,25 @@ export async function getExamPrintRoster(input: { actorId: string; examId: strin
     ? [...(await getActiveAssignedExamClasses(input.actorId, exam.id)).get(exam.id) ?? []]
     : [...new Set((assignments ?? []).map((item) => String(item.class_id)))];
   if (!classIds.length && !assignedTeacher) {
-    let classQuery = client.from("classes").select("id,name,year_segment,audience_id").order("name");
-    if (exam.groupType === "TURMA" && exam.audienceId) classQuery = classQuery.eq("audience_id", exam.audienceId);
-    else if (exam.yearSegment && exam.yearSegment !== "OUTROS") classQuery = classQuery.eq("year_segment", exam.yearSegment);
-    const { data: legacyClasses, error: classError } = await classQuery;
+    const { data: legacyClasses, error: classError } = await client.from("classes").select("id,year_segment,audience_id");
     ensure(classError, "Não foi possível carregar as turmas da prova.");
-    classIds = (legacyClasses ?? []).map((item) => String(item.id));
+    classIds = selectLegacyRosterClassIds(exam, (legacyClasses ?? []).map((item) => ({
+      audienceId: String(item.audience_id ?? ""),
+      id: String(item.id),
+      yearSegment: String(item.year_segment ?? ""),
+    })));
+  }
+  if (!input.institutionalView) {
+    const { data: scopeRows, error: scopeError } = await client.from("pedagogical_scopes")
+      .select("class_id,subject_id")
+      .eq("user_id", input.actorId)
+      .eq("active", true)
+      .is("archived_at", null);
+    ensure(scopeError, "Não foi possível validar as turmas autorizadas.");
+    const allowed = new Set((scopeRows ?? [])
+      .filter((item) => !exam.subjectId || String(item.subject_id) === exam.subjectId)
+      .map((item) => String(item.class_id)));
+    classIds = restrictRosterClassIds(classIds, allowed);
   }
   if (!classIds.length) return { exam, students: [] satisfies ExamPrintStudent[] };
 
