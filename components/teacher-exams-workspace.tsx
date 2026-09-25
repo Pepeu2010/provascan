@@ -376,6 +376,7 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [targetQuestionCount, setTargetQuestionCount] = useState(10);
   const [bulkExamText, setBulkExamText] = useState("");
+  const stepsRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -389,6 +390,11 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
     return () => { cancelled = true; };
   }, []);
   const steps: Array<{ id: EditorStep; label: string }> = [{ id: "informacoes", label: "Informações" }, { id: "questoes", label: "Questões" }, { id: "gabarito", label: "Gabarito" }, { id: "aplicacao", label: "Aplicação" }, { id: "revisao", label: "Revisão" }];
+  const stepIndex = steps.findIndex((item) => item.id === step);
+  const goToStep = (next: EditorStep) => {
+    setStep(next);
+    requestAnimationFrame(() => stepsRef.current?.scrollIntoView({ block: "start" }));
+  };
   const publicationErrors = validateExamForPublication(draft);
   const totalWeight = draft.questions.reduce((sum, question) => sum + Number(question.weight || 0), 0);
   const updateQuestion = (index: number, changes: Partial<TeacherExamInput["questions"][number]>) => setDraft((current) => ({ ...current, questions: current.questions.map((question, questionIndex) => questionIndex === index ? { ...question, ...changes } : question) }));
@@ -427,7 +433,7 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
   return <div className="exam-studio"><header className="exam-studio__header"><Button variant="ghost" onClick={onBack}><ArrowLeft className="size-4" />Voltar</Button><div className="min-w-0 flex-1"><p className="teacher-exams__eyebrow">{active ? `VERSÃO ${active.version}` : "NOVA PROVA"}</p><h1>{draft.title || "Prova sem título"}</h1><p>{readOnly ? `Criada por ${active?.creatorName}` : autoSavedAt ? `Edição protegida neste aparelho às ${autoSavedAt}` : "Seu progresso é salvo neste aparelho"}</p></div>{active ? <Badge tone={statusTones[active.status]}>{statusLabels[active.status]}</Badge> : <Badge tone="warning">Novo rascunho</Badge>}</header>
     {active?.hasResults ? <div className="teacher-exams__warning"><CircleAlert className="size-5" /><span><strong>Histórico protegido.</strong> Esta prova já possui correções. Para mudar questões ou gabarito, duplique a prova.</span></div> : null}
     {active?.needsReview ? <div className="teacher-exams__warning"><Sparkles className="size-5" /><span><strong>Revise o conteúdo importado.</strong> Corrija os itens destacados antes de publicar.</span></div> : null}
-    <nav className="exam-studio__steps" aria-label="Etapas da criação">{steps.map((item, index) => <button type="button" key={item.id} aria-current={step === item.id ? "step" : undefined} onClick={() => setStep(item.id)} className={step === item.id ? "is-active" : ""}><span aria-hidden="true">{index + 1}</span><strong>{item.label}</strong></button>)}</nav>
+    <nav ref={stepsRef} className="exam-studio__steps" aria-label="Etapas da criação">{steps.map((item, index) => <button type="button" key={item.id} aria-current={step === item.id ? "step" : undefined} onClick={() => goToStep(item.id)} className={step === item.id ? "is-active" : ""}><span aria-hidden="true">{index + 1}</span><strong>{item.label}</strong></button>)}</nav>
     {message ? <p className="teacher-exams__message whitespace-pre-line" role="status" aria-live="polite">{message}</p> : null}
     <div className="exam-studio__layout"><Card className="exam-studio__canvas">
       {step === "informacoes" ? <BasicInformation draft={draft} readOnly={readOnly} setDraft={setDraft} /> : null}
@@ -436,7 +442,7 @@ function ExamEditor({ active, autoSavedAt, busy, draft, message, readOnly, step,
       {step === "aplicacao" ? <ApplicationEditor audience={audience} draft={draft} loading={audienceLoading} readOnly={readOnly} setDraft={setDraft} viewerId={viewerId} /> : null}
       {step === "revisao" ? <ExamReview draft={draft} errors={publicationErrors} active={active} audience={audience} readOnly={readOnly} onRestoreVersion={onRestoreVersion} /> : null}
     </Card><aside className="exam-studio__rail"><Card className="p-5"><h2 className="exam-studio__summary-title">Resumo da prova</h2><dl><div><dt>Questões</dt><dd>{draft.questions.length}</dd></div><div><dt>Pontuação</dt><dd>{totalWeight.toLocaleString("pt-BR")}</dd></div><div><dt>Para quem</dt><dd>{draft.audienceLabel || "Não definido"}</dd></div><div><dt>Disciplina</dt><dd>{draft.subject || "Não definida"}</dd></div></dl>{publicationErrors.length ? <div className="exam-studio__pending"><CircleAlert className="size-4" /><span>{publicationErrors.length} {publicationErrors.length === 1 ? "ajuste" : "ajustes"} antes de publicar</span></div> : <div className="exam-studio__ready"><Check className="size-4" /><span>Pronta para publicar</span></div>}</Card>{active?.originalFileName ? <Card className="p-5"><p className="teacher-exams__eyebrow">ARQUIVO ORIGINAL</p><p className="mt-3 truncate font-semibold">{active.originalFileName}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">Armazenado de forma privada · {active.originalFileSize ? `${(active.originalFileSize / 1024 / 1024).toFixed(1)} MB` : ""}</p><Button asChild variant="secondary" className="mt-4 w-full"><a href={`/api/teacher-exams/${active.id}/original-file`} target="_blank" rel="noreferrer"><Download className="size-4" />Abrir original</a></Button></Card> : null}</aside></div>
-    {!readOnly ? <footer className="exam-studio__actions"><Button variant="secondary" disabled={busy} loading={busy} onClick={() => void onSave("rascunho")}><Save className="size-4" />Salvar rascunho</Button><Button disabled={busy} loading={busy} onClick={() => void onSave("publicar")}><BookOpenCheck className="size-4" />Publicar prova</Button></footer> : null}</div>;
+    {!readOnly ? <footer className="exam-studio__actions"><span className="exam-studio__action-progress">Etapa {stepIndex + 1} de {steps.length} <strong>{steps[stepIndex]?.label}</strong></span><Button variant="secondary" disabled={busy} loading={busy} onClick={() => void onSave("rascunho")}><Save className="size-4" />Salvar rascunho</Button>{step === "revisao" ? <Button disabled={busy} loading={busy} onClick={() => void onSave("publicar")}><BookOpenCheck className="size-4" />Publicar prova</Button> : <Button disabled={busy} onClick={() => goToStep(steps[stepIndex + 1].id)}>Continuar <ChevronRight className="size-4" /></Button>}</footer> : null}</div>;
 }
 
 function BasicInformation({ draft, readOnly, setDraft }: { draft: TeacherExamInput; readOnly: boolean; setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>> }) {
@@ -474,6 +480,7 @@ function QuestionEditor({ index, question, total, readOnly, onChange, onDelete, 
 function AnswerKeyEditor({ draft, readOnly, setDraft, updateQuestion, totalWeight }: { draft: TeacherExamInput; readOnly: boolean; setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>>; updateQuestion: (index: number, changes: Partial<TeacherExamInput["questions"][number]>) => void; totalWeight: number }) {
   const [sequence, setSequence] = useState("");
   const [sequenceMessage, setSequenceMessage] = useState("");
+  const [onlyPending, setOnlyPending] = useState(false);
   const objectiveCount = draft.questions.filter((question) => (question.type === "multipla_escolha" || question.type === "verdadeiro_falso") && !question.annulled).length;
   const sequenceAnswers = sequence.toLocaleUpperCase("pt-BR").match(/[A-H]/g) ?? [];
   const applySequence = () => {
@@ -491,8 +498,38 @@ function AnswerKeyEditor({ draft, readOnly, setDraft, updateQuestion, totalWeigh
     }) }));
     setSequenceMessage(`${applied} ${applied === 1 ? "resposta aplicada" : "respostas aplicadas"}${unavailable ? ` · ${unavailable} aguardam alternativas preenchidas` : ""}.`);
   };
-  const answeredCount = draft.questions.filter((question) => (question.type === "multipla_escolha" || question.type === "verdadeiro_falso") && (question.annulled || question.correctAnswers.length)).length;
-  return <section><SectionHeading eyebrow="ETAPA 3" title="Preencha o gabarito" detail="Cole as letras de uma vez. Depois, só confira os itens que ficaram pendentes." /><div className="answer-key-summary"><span><strong>{answeredCount}</strong> respondidas</span><span><strong>{Math.max(0, objectiveCount - answeredCount)}</strong> faltam conferir</span><span><strong>{totalWeight.toLocaleString("pt-BR")}</strong> pontos</span></div>{!readOnly && objectiveCount ? <div className="answer-key-batch"><div><strong>Cole o gabarito de uma vez</strong><span>Ex.: <b>A B C D</b> ou <b>ABCD</b>. Cada letra segue a ordem das questões.</span></div><label><span className="sr-only">Sequência de respostas corretas</span><Textarea rows={2} value={sequence} onChange={(event) => { setSequence(event.target.value); setSequenceMessage(""); }} placeholder="A B C D A B..." /></label><div><span>{sequenceAnswers.length} {sequenceAnswers.length === 1 ? "resposta pronta para aplicar" : "respostas prontas para aplicar"}</span><Button variant="secondary" disabled={!sequenceAnswers.length} onClick={applySequence}><Check className="size-4" />Preencher gabarito</Button></div>{sequenceMessage ? <p role="status" aria-live="polite">{sequenceMessage}</p> : null}</div> : null}<div className="answer-key-list">{draft.questions.map((question, index) => { const objective = question.type === "multipla_escolha" || question.type === "verdadeiro_falso"; return <article key={question.id ?? index} className={`answer-key-row ${question.correctAnswers.length || question.annulled ? "is-complete" : ""}`}><div><strong>Questão {index + 1}</strong><span>{objective ? question.prompt || "Enunciado ainda não preenchido" : "Resposta por critério"}</span></div>{objective ? <div className="answer-key-row__choices" role="group" aria-label={`Resposta correta da questão ${index + 1}`}>{question.alternatives.map((alternative, alternativeIndex) => <button key={`${alternative}-${alternativeIndex}`} type="button" disabled={readOnly || question.annulled || !alternative.trim()} aria-pressed={question.correctAnswers[0] === alternative} className={question.correctAnswers[0] === alternative ? "is-selected" : ""} onClick={() => updateQuestion(index, { correctAnswers: [alternative], needsReview: false })}>{String.fromCharCode(65 + alternativeIndex)}</button>)}{!question.alternatives.some((alternative) => alternative.trim()) ? <span>Volte em Questões e escreva as alternativas.</span> : null}</div> : <span className="answer-key-row__manual">Esta resposta será avaliada pelo critério que você definiu.</span>}<details className="answer-key-row__options"><summary>Opções</summary><div><label>Valor<Input disabled={readOnly} type="number" min={0} step="0.1" value={question.weight} onChange={(event) => updateQuestion(index, { weight: Number(event.target.value) })} /></label><Checkbox disabled={readOnly} checked={question.annulled} label="Anular questão" onChange={(event) => updateQuestion(index, { annulled: event.target.checked, correctAnswers: event.target.checked ? [] : question.correctAnswers })} /></div></details></article>; })}</div></section>;
+  const answeredCount = draft.questions.filter((question) => (question.type === "multipla_escolha" || question.type === "verdadeiro_falso") && !question.annulled && question.correctAnswers.length).length;
+  const pendingCount = objectiveCount - answeredCount;
+  const blocks = Array.from({ length: Math.ceil(draft.questions.length / 10) }, (_, blockIndex) => ({
+    start: blockIndex * 10 + 1,
+    end: Math.min((blockIndex + 1) * 10, draft.questions.length),
+    items: draft.questions.slice(blockIndex * 10, (blockIndex + 1) * 10)
+      .map((question, itemIndex) => ({ question, index: blockIndex * 10 + itemIndex }))
+      .filter(({ question }) => !onlyPending || ((question.type === "multipla_escolha" || question.type === "verdadeiro_falso") && !question.annulled && !question.correctAnswers.length)),
+  })).filter((block) => block.items.length > 0);
+  return <section>
+    <SectionHeading eyebrow="ETAPA 3" title="Preencha o gabarito" detail="Cole as letras de uma vez ou marque a alternativa correta. Aqui você confere só número e resposta." />
+    <div className="answer-key-summary"><span><strong>{answeredCount}</strong> respondidas</span><span><strong>{pendingCount}</strong> faltam conferir</span><span><strong>{totalWeight.toLocaleString("pt-BR")}</strong> pontos</span></div>
+    {!readOnly && objectiveCount ? <div className="answer-key-batch">
+      <div><strong>Cole o gabarito de uma vez</strong><span>Ex.: <b>A B C D</b> ou <b>ABCD</b>. Cada letra segue a ordem das questões.</span></div>
+      <label><span className="sr-only">Sequência de respostas corretas</span><Textarea rows={2} value={sequence} onChange={(event) => { setSequence(event.target.value); setSequenceMessage(""); }} placeholder="A B C D A B..." /></label>
+      <div><span>{sequenceAnswers.length} {sequenceAnswers.length === 1 ? "resposta pronta para aplicar" : "respostas prontas para aplicar"}</span><Button variant="secondary" disabled={!sequenceAnswers.length} onClick={applySequence}><Check className="size-4" />Preencher gabarito</Button></div>
+      {sequenceMessage ? <p role="status" aria-live="polite">{sequenceMessage}</p> : null}
+    </div> : null}
+    <div className="answer-key-toolbar"><div><strong>Conferência por blocos de 10</strong><span>{draft.questions.length} questões · {pendingCount} pendentes</span></div><button type="button" className={onlyPending ? "is-active" : ""} aria-pressed={onlyPending} onClick={() => setOnlyPending((current) => !current)}>{onlyPending ? "Mostrar todas" : "Mostrar só pendentes"}</button></div>
+    {blocks.length ? <div className="answer-key-blocks">{blocks.map((block) => <section key={block.start} className="answer-key-block" aria-label={"Questões " + block.start + " a " + block.end}>
+      <h3>Questões {block.start}–{block.end}</h3>
+      <div className="answer-key-list">{block.items.map(({ question, index }) => {
+        const objective = question.type === "multipla_escolha" || question.type === "verdadeiro_falso";
+        const complete = Boolean(question.correctAnswers.length || question.annulled || !objective);
+        return <article key={question.id ?? index} className={"answer-key-row" + (complete ? " is-complete" : "")}>
+          <div className="answer-key-row__identity"><strong>{String(index + 1).padStart(2, "0")}</strong><span>{question.annulled ? "Anulada" : objective ? question.correctAnswers.length ? "Conferida" : "Pendente" : "Manual"}</span></div>
+          {objective ? <div className="answer-key-row__choices" role="group" aria-label={"Resposta correta da questão " + (index + 1)}>{question.alternatives.map((alternative, alternativeIndex) => <button key={alternativeIndex} type="button" disabled={readOnly || question.annulled || !alternative.trim()} aria-label={"Questão " + (index + 1) + ": alternativa " + String.fromCharCode(65 + alternativeIndex)} aria-pressed={question.correctAnswers[0] === alternative} className={question.correctAnswers[0] === alternative ? "is-selected" : ""} onClick={() => updateQuestion(index, { correctAnswers: [alternative], needsReview: false })}>{String.fromCharCode(65 + alternativeIndex)}</button>)}{!question.alternatives.some((alternative) => alternative.trim()) ? <span>Preencha as alternativas em Questões.</span> : null}</div> : <span className="answer-key-row__manual">Correção por critério</span>}
+          <details className="answer-key-row__options"><summary>Ajustes</summary><div><label>Valor<Input disabled={readOnly} type="number" min={0} step="0.1" value={question.weight} onChange={(event) => updateQuestion(index, { weight: Number(event.target.value) })} /></label><Checkbox disabled={readOnly} checked={question.annulled} label="Anular questão" onChange={(event) => updateQuestion(index, { annulled: event.target.checked, correctAnswers: event.target.checked ? [] : question.correctAnswers })} /></div></details>
+        </article>;
+      })}</div>
+    </section>)}</div> : <p className="answer-key-empty" role="status">Tudo conferido. Nenhuma questão pendente.</p>}
+  </section>;
 }
 
 function ApplicationEditor({ audience, draft, loading, readOnly, setDraft, viewerId }: { audience: ExamAudience; draft: TeacherExamInput; loading: boolean; readOnly: boolean; setDraft: React.Dispatch<React.SetStateAction<TeacherExamInput>>; viewerId: string }) {

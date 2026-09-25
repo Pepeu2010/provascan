@@ -19,6 +19,8 @@ assert.match(login, /type="submit"/);
 assert.match(loginCss, /@media \(max-width: 1023px\) \{\s*\.login-page \{/);
 assert.match(loginCss, /\.login-page__shell \{\s*width: 100%;\s*min-height: calc\(100dvh - 40px\);\s*grid-template-columns: minmax\(0, 1fr\)/);
 assert.match(loginCss, /\.login-page__access \{\s*width: min\(100%, 620px\);\s*min-width: 0;/);
+assert.match(loginCss, /\.login-page__story \{ display: none; \}/);
+assert.match(loginCss, /\.auth-field__control input:focus-visible \{ outline: 0 !important;/);
 
 const security = read("components/auth-security-flow.tsx");
 assert.match(security, /import "\.\/auth-security-flow\.css"/);
@@ -67,8 +69,18 @@ assert.match(exams, /window\.localStorage\.setItem\(LOCAL_DRAFT_KEY/);
 assert.match(exams, /onSave\("rascunho"\)/);
 assert.match(exams, /onSave\("publicar"\)/);
 assert.match(exams, /menu \? "has-open-menu" : ""/);
+assert.match(exams, /goToStep\(steps\[stepIndex \+ 1\]\.id\)/);
+assert.match(exams, /step === "revisao" \? <Button disabled=\{busy\} loading=\{busy\} onClick=\{\(\) => void onSave\("publicar"\)\}/);
+const answerEditor = exams.split("function AnswerKeyEditor(")[1]?.split("function ApplicationEditor(")[0] ?? "";
+assert.match(answerEditor, /Math\.ceil\(draft\.questions\.length \/ 10\)/);
+assert.match(answerEditor, /Mostrar só pendentes/);
+assert.doesNotMatch(answerEditor, /question\.prompt/);
 
 const examsCss = read("components/teacher-exams-workspace.css");
 assert.match(examsCss, /\.exam-card\.has-open-menu\s*\{[^}]*z-index:\s*40/);
+assert.match(examsCss, /\.answer-key-blocks \{ display: grid;/);
+assert.match(examsCss, /@media \(max-width: 390px\) \{/);
+const officialCss = read("components/answer-keys-workspace.css");
+assert.match(officialCss, /\.answer-key-detail__sheet ol \{ grid-template-columns: repeat\(auto-fit,/);
 
 console.log("Premium auth and exams UI contract passed.");
