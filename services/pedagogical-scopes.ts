@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { canActInPedagogicalScope } from "@/lib/pedagogical-scope-policy";
+import { scopeAllowsExam } from "@/lib/pedagogical-scope-match";
 import type { UserRole } from "@/types/auth";
 import type { PedagogicalScope, Subject } from "@/types/pedagogical-scopes";
 
@@ -44,7 +45,7 @@ export async function listPedagogicalScopes(userId: string): Promise<Pedagogical
     archivedAt: row.archived_at ? String(row.archived_at) : null,
     classId: String(row.class_id),
     id: String(row.id),
-    subjectId: String(row.subject_id),
+    subjectId: row.subject_id === null ? null : String(row.subject_id),
     userId: String(row.user_id),
   }));
 }
@@ -53,15 +54,13 @@ export async function canActOnExamScope(input: { classId: string; role: UserRole
   if (canActInPedagogicalScope(input.role, false)) return true;
   const { data, error } = await db()
     .from("pedagogical_scopes")
-    .select("id")
+    .select("id,class_id,subject_id,active,archived_at")
     .eq("user_id", input.userId)
-    .eq("subject_id", input.subjectId)
     .eq("class_id", input.classId)
     .eq("active", true)
-    .is("archived_at", null)
-    .maybeSingle();
+    .is("archived_at", null);
   ensure(error, "Não foi possível validar o escopo pedagógico.");
-  return Boolean(data);
+  return (data ?? []).some((row) => scopeAllowsExam(row, input.classId, input.subjectId));
 }
 
 /**
@@ -78,7 +77,7 @@ export async function canActOnClassScope(input: { classId: string; role: UserRol
     .eq("class_id", input.classId)
     .eq("active", true)
     .is("archived_at", null)
-    .maybeSingle();
+    .limit(1);
   ensure(error, "Não foi possível validar o acesso à turma.");
-  return Boolean(data);
+  return Boolean(data?.length);
 }

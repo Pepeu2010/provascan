@@ -17,6 +17,10 @@ const examFoundationMigration = readFileSync(
   join(migrationsDirectory, "20260917113000_exam_subjects_and_pedagogical_scopes.sql"),
   "utf8",
 );
+const classOnlyScopeMigration = readFileSync(
+  join(migrationsDirectory, "20260925120000_class_only_pedagogical_scopes.sql"),
+  "utf8",
+);
 
 assert.match(rlsMigration, /to_regclass\(format\('public\.%I', target_table\)\) is null/);
 assert.match(subjectMigration, /to_regclass\('public\.grades'\) is not null/);
@@ -31,5 +35,7 @@ assert.match(examFoundationMigration, /add column if not exists subject_id text 
 assert.match(examFoundationMigration, /create table if not exists public\.pedagogical_scopes/);
 assert.match(examFoundationMigration, /pedagogical_scopes_active_unique_idx/);
 assert.doesNotMatch(examFoundationMigration, /update public\.exams/i);
+assert.match(classOnlyScopeMigration, /alter column subject_id drop not null/);
+assert.match(classOnlyScopeMigration, /unique index if not exists pedagogical_scopes_active_class_only_unique_idx/);
 
 console.log("Fresh Supabase schema migrations: OK");

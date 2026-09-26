@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getTeacherExam } from "@/services/teacher-exams";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { restrictRosterClassIds, selectLegacyRosterClassIds } from "@/lib/exam-roster-scope";
+import { scopeAllowsExam } from "@/lib/pedagogical-scope-match";
 import type { ExamPrintStudent } from "@/lib/exam-print-document";
 
 function db() {
@@ -48,13 +49,13 @@ export async function getExamPrintRoster(input: { actorId: string; examId: strin
   }
   if (!input.institutionalView) {
     const { data: scopeRows, error: scopeError } = await client.from("pedagogical_scopes")
-      .select("class_id,subject_id")
+      .select("class_id,subject_id,active,archived_at")
       .eq("user_id", input.actorId)
       .eq("active", true)
       .is("archived_at", null);
     ensure(scopeError, "Não foi possível validar as turmas autorizadas.");
     const allowed = new Set((scopeRows ?? [])
-      .filter((item) => !exam.subjectId || String(item.subject_id) === exam.subjectId)
+      .filter((item) => scopeAllowsExam(item, String(item.class_id), exam.subjectId ?? null))
       .map((item) => String(item.class_id)));
     classIds = restrictRosterClassIds(classIds, allowed);
   }
