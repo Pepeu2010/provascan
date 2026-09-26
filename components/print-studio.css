@@ -2,6 +2,18 @@
 .print-studio > header h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.025em; }
 .print-studio > header h2 svg { display: inline-block; margin-right: 7px; color: var(--accent); vertical-align: -2px; }
 .print-studio > header p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
+.print-studio__workbench { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); align-items: start; gap: 18px; }
+.print-studio__settings { display: grid; min-width: 0; gap: 14px; }
+.print-studio__preview { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.print-studio__preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; }
+.print-studio__preview-heading div { display: grid; gap: 2px; }
+.print-studio__preview-heading strong { font-size: 14px; }
+.print-studio__preview-heading span, .print-studio__preview > p { color: var(--muted-foreground); font-size: 11px; }
+.print-studio__preview-heading > span { border: 1px solid var(--border); border-radius: 999px; padding: 4px 8px; }
+.print-studio__preview-window { display: grid; min-width: 0; max-height: 560px; justify-items: center; overflow: auto; border-block: 1px solid var(--border); background: #dbe1e9; padding: 12px; }
+.print-studio__preview-page { flex: none; overflow: hidden; background: #fff; box-shadow: 0 8px 28px #11182729; }
+.print-studio__preview iframe { display: block; border: 0; transform-origin: top left; pointer-events: none; }
+.print-studio__preview > p { margin: 0; padding: 10px 14px; line-height: 1.5; }
 .print-studio__kind { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .print-studio__kind button { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; gap: 8px; border-right: 1px solid var(--border); color: var(--muted-foreground); font-size: 13px; font-weight: 720; transition: background-color var(--motion-fast), color var(--motion-fast); }
 .print-studio__kind button:last-child { border-right: 0; }
@@ -58,6 +70,7 @@
 .print-studio__preflight .print-studio__fineprint { font-size: 11px; }
 .print-studio footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .print-studio footer p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
+@media (max-width: 1100px) { .print-studio__workbench { grid-template-columns: 1fr; } .print-studio__preview { max-width: 650px; width: 100%; } }
 @media (max-width: 760px) { .print-studio__controls--three { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .print-studio { padding: 18px; } .print-studio__kind { grid-template-columns: 1fr; } .print-studio__kind button { border-right: 0; border-bottom: 1px solid var(--border); } .print-studio__kind button:last-child { border-bottom: 0; } .print-studio__templates { grid-template-columns: 1fr; } .print-studio__template { grid-template-columns: 72px minmax(0, 1fr); align-items: center; column-gap: 10px; } .print-studio__template > span { grid-row: span 2; height: 46px; } .print-studio__template strong, .print-studio__template small { align-self: end; } .print-studio__template small { align-self: start; } .print-studio__controls, .print-studio footer { grid-template-columns: 1fr; } .print-studio footer { display: grid; } .print-studio footer .button { width: 100%; } .print-studio__batch > header, .print-studio__batch-actions { display: grid; } }
 @media (prefers-reduced-motion: reduce) { .print-studio__kind button, .print-studio__template { transition: none; } }

@@ -71,6 +71,13 @@ export function DashboardWorkspace() {
         </Button>
       </section>
 
+      <nav className="dashboard-task-grid" aria-label="Ações da gestão">
+        <Link href="/dashboard/provas"><BookOpenCheck aria-hidden="true" /><span><strong>Gerenciar provas</strong><small>Crie, revise e acompanhe aplicações</small></span><ArrowRight aria-hidden="true" /></Link>
+        <Link href="/dashboard/gabaritos"><ClipboardList aria-hidden="true" /><span><strong>Preparar impressão</strong><small>Gabaritos e cartões por turma</small></span><ArrowRight aria-hidden="true" /></Link>
+        <Link href="/dashboard/correcao"><ScanCaptureIcon aria-hidden="true" /><span><strong>Corrigir cartões</strong><small>Confira as leituras antes de salvar</small></span><ArrowRight aria-hidden="true" /></Link>
+        <Link href="/dashboard/relatorios"><CheckCircle2 aria-hidden="true" /><span><strong>Ver resultados</strong><small>Encontre dificuldades e avanços</small></span><ArrowRight aria-hidden="true" /></Link>
+      </nav>
+
       {draftLabel ? <Card className="flex flex-col gap-4 border-[var(--accent)] bg-[var(--accent-soft)] p-5 sm:flex-row sm:items-center">
         <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--accent)] text-white"><History className="size-5" aria-hidden="true" /></span>
         <div className="min-w-0 flex-1"><h2 className="font-semibold text-[var(--foreground)]">Você tem uma correção em andamento</h2><p className="mt-1 text-sm text-[var(--muted-foreground)]">O rascunho foi salvo automaticamente neste aparelho.</p></div>
@@ -168,6 +175,12 @@ function TeacherDashboard({ exams, corrections, students, state, onRetry }: { ex
       <div className="min-w-0 flex-1"><h2>O que você quer fazer agora?</h2><p>Crie uma prova do zero ou importe um arquivo que já está pronto.</p></div>
       <Button asChild size="lg" className="dashboard-next-action__button"><Link href="/dashboard/provas"><Pencil className="size-4" />Criar prova<ArrowRight className="size-4" aria-hidden="true" /></Link></Button>
     </section>
+    <nav className="dashboard-task-grid" aria-label="Ações do professor">
+      <Link href="/dashboard/provas"><Pencil aria-hidden="true" /><span><strong>{drafts.length ? "Continuar prova" : "Criar prova"}</strong><small>{drafts.length ? `${drafts.length} rascunho${drafts.length === 1 ? "" : "s"} para revisar` : "Comece do zero ou importe"}</small></span><ArrowRight aria-hidden="true" /></Link>
+      <Link href="/dashboard/gabaritos"><BookOpenCheck aria-hidden="true" /><span><strong>Preparar cartões</strong><small>Confira respostas e impressão</small></span><ArrowRight aria-hidden="true" /></Link>
+      <Link href="/dashboard/correcao"><ScanCaptureIcon aria-hidden="true" /><span><strong>Corrigir provas</strong><small>Revise a leitura dos cartões</small></span><ArrowRight aria-hidden="true" /></Link>
+      <Link href="/dashboard/relatorios"><CheckCircle2 aria-hidden="true" /><span><strong>Ver resultados</strong><small>Veja onde a turma precisa de ajuda</small></span><ArrowRight aria-hidden="true" /></Link>
+    </nav>
     {state === "loading" ? <Card role="status" aria-live="polite" className="p-5 sm:p-6"><p className="font-semibold">Carregando suas provas…</p><p className="mt-1 text-sm text-[var(--muted-foreground)]">Seu resumo aparece assim que as provas estiverem prontas.</p></Card> : null}
     {state === "error" ? <Card role="alert" className="p-5 sm:p-6"><p className="font-semibold">Não foi possível carregar suas provas.</p><p className="mt-1 text-sm text-[var(--muted-foreground)]">Nenhuma informação foi perdida. Tente novamente.</p><Button className="mt-4" variant="secondary" onClick={onRetry}>Tentar novamente</Button></Card> : null}
     {state === "ready" ? <>

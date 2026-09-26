@@ -196,3 +196,10 @@
   .answer-keys__privacy { width: min(100%, 420px); }
   .answer-keys__grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.answer-key-card > footer { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+.answer-key-card > footer .button { min-width: 92px; }
+@media (max-width: 640px) {
+  .answer-key-card > footer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .answer-key-card > footer .button:first-child { grid-column: 1 / -1; }
+}

@@ -1101,3 +1101,15 @@ textarea { padding-block: 10px !important; }
   .dashboard-worklist__row > .min-w-0.flex-1 { flex-basis: calc(100% - 54px); }
   .dashboard-row-action { width: calc(100% - 54px); min-height: 52px; margin: 2px 0 0 54px; padding: 0 16px; justify-content: center; font-size: 16px; }
 }
+.dashboard-task-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.dashboard-task-grid a { display: grid; grid-template-columns: 24px minmax(0, 1fr) 16px; align-items: start; gap: 12px; min-height: 112px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card-solid); padding: 17px; transition: border-color var(--motion-fast), background-color var(--motion-fast); }
+.dashboard-task-grid a:hover, .dashboard-task-grid a:focus-visible { border-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 26%, var(--card-solid)); }
+.dashboard-task-grid a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.dashboard-task-grid svg { width: 21px; height: 21px; color: var(--accent); }
+.dashboard-task-grid a > svg:last-child { width: 16px; height: 16px; color: var(--muted-foreground); }
+.dashboard-task-grid span { display: grid; gap: 7px; min-width: 0; }
+.dashboard-task-grid strong { color: var(--foreground); font-size: 14px; line-height: 1.25; }
+.dashboard-task-grid small { color: var(--muted-foreground); font-size: 12px; line-height: 1.4; }
+@media (max-width: 1350px) { .dashboard-task-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .dashboard-task-grid { grid-template-columns: 1fr; } .dashboard-task-grid a { min-height: 76px; align-items: center; } }
+@media (prefers-reduced-motion: reduce) { .dashboard-task-grid a { transition: none; } }

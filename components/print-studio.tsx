@@ -3,7 +3,7 @@
 import "./print-studio.css";
 
 import { CheckSquare, FileCheck2, FileText, LayoutTemplate, Printer, ScanLine, Type, UsersRound } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import {
@@ -60,28 +60,55 @@ function openExamPrint(exam: TeacherExam, kind: ExamPrintKind = "prova", options
   return openPrintWindow(exam, kind, options === defaultExamPrintOptions ? normalizeExamPrintOptions(exam.printOptions) : options);
 }
 
-export function ExamPresentationControls({ disabled = false, value, onChange }: { disabled?: boolean; value: ExamPrintOptions; onChange: (next: ExamPrintOptions) => void }) {
+function PrintPreview({ exam, kind, options }: { exam: TeacherExam; kind: ExamPrintKind; options: ExamPrintOptions }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+  const documentHtml = useMemo(() => createExamPrintDocument(exam, kind, options), [exam, kind, options]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const measure = () => setScale(Math.min(1, Math.max(0.25, (container.clientWidth - 24) / 794)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  const label = kind === "prova" ? "Prova" : kind === "gabarito" ? "Gabarito oficial" : "Cartão-resposta";
+  return <aside className="print-studio__preview" aria-label={`Prévia A4: ${label}`}>
+    <div className="print-studio__preview-heading"><div><strong>Prévia A4</strong><span>{label} · primeira página</span></div><span>Visualização</span></div>
+    <div className="print-studio__preview-window" ref={containerRef}>
+      <div className="print-studio__preview-page" style={{ width: 794 * scale, height: 1123 * scale }}>
+        <iframe title={`Prévia de ${label}`} srcDoc={documentHtml} sandbox="" tabIndex={-1} style={{ width: 794, height: 1123, transform: `scale(${scale})` }} />
+      </div>
+    </div>
+    <p>A prévia usa o mesmo documento da impressão. Confira todas as páginas na janela de impressão antes de confirmar.</p>
+  </aside>;
+}
+
+export function ExamPresentationControls({ disabled = false, mode = "full", value, onChange }: { disabled?: boolean; mode?: "full" | "card"; value: ExamPrintOptions; onChange: (next: ExamPrintOptions) => void }) {
   const typefaceId = useId();
   const sizeId = useId();
   const alternativesId = useId();
   const cardModelId = useId();
   const cardAreaId = useId();
   const update = <T extends keyof ExamPrintOptions>(key: T, next: ExamPrintOptions[T]) => onChange({ ...value, [key]: next });
-  return <section className="print-studio print-studio--editor" aria-label="Visual da prova">
-    <header><div><h2><LayoutTemplate className="size-4" />Visual da prova</h2><p>Escolha um modelo agora. A prévia e a impressão usam estas escolhas.</p></div></header>
-    <div className="print-studio__templates" role="radiogroup" aria-label="Modelo visual">
+  return <section className="print-studio print-studio--editor" aria-label={mode === "card" ? "Modelo do cartão-resposta" : "Visual da prova"}>
+    <header><div><h2><LayoutTemplate className="size-4" />{mode === "card" ? "Modelo do cartão-resposta" : "Visual da prova"}</h2><p>{mode === "card" ? "Escolha apenas o cartão que será impresso." : "Escolha um modelo agora. A prévia e a impressão usam estas escolhas."}</p></div></header>
+    {mode === "full" ? <><div className="print-studio__templates" role="radiogroup" aria-label="Modelo visual">
       {templates.map((template) => <button key={template.value} type="button" disabled={disabled} role="radio" aria-checked={value.template === template.value} className={`print-studio__template print-studio__template--${template.value} ${value.template === template.value ? "is-selected" : ""}`} onClick={() => update("template", template.value)}><span aria-hidden="true"><i /><i /><i /></span><strong>{template.title}</strong><small>{template.detail}</small></button>)}
     </div>
     <div className="print-studio__controls print-studio__controls--three">
       <label htmlFor={typefaceId}><Type className="size-4" />Fonte<Select id={typefaceId} disabled={disabled} value={value.typeface} onChange={(event) => update("typeface", event.target.value as PrintTypeface)}><option value="limpa">Limpa e objetiva</option><option value="serifada">Clássica para leitura</option><option value="didatica">Didática e espaçada</option></Select></label>
       <label htmlFor={sizeId}>Tamanho<Select id={sizeId} disabled={disabled} value={value.size} onChange={(event) => update("size", event.target.value as PrintSize)}><option value="compacta">Compacto</option><option value="normal">Normal</option><option value="ampliada">Ampliado</option></Select></label>
       <label htmlFor={alternativesId}>Alternativas<Select id={alternativesId} disabled={disabled} value={value.alternativeLayout} onChange={(event) => update("alternativeLayout", event.target.value as ExamPrintOptions["alternativeLayout"])}><option value="lista">Uma por linha</option><option value="duas_colunas">Duas colunas</option></Select></label>
-    </div>
+    </div></> : null}
     <div className="print-studio__controls print-studio__controls--two">
       <label htmlFor={cardModelId}><ScanLine className="size-4" />Cartão-resposta<Select id={cardModelId} disabled={disabled} value={value.answerSheetModel} onChange={(event) => update("answerSheetModel", event.target.value as AnswerSheetModel)}><option value="provascan">Padrão ProvaScan</option><option value="fanucchi">Modelo A4 Fanucchi</option></Select></label>
       <label htmlFor={cardAreaId}>Área do cartão<Select id={cardAreaId} disabled={disabled || value.answerSheetModel !== "fanucchi"} value={value.answerSheetArea} onChange={(event) => update("answerSheetArea", event.target.value as AnswerSheetArea)}><option value="automatica">Automática pela prova</option><option value="HUMANAS">Humanas</option><option value="EXATAS">Exatas</option></Select></label>
     </div>
-    <p className="print-studio__notice">O visual afeta a prova impressa. O cartão-resposta preserva as bolhas e a geometria para continuar compatível com a correção automática.</p>
+    <p className="print-studio__notice">{mode === "card" ? "As bolhas A–E mantêm a posição fixa para continuar compatíveis com a correção automática." : "O visual afeta a prova impressa. O cartão-resposta preserva as bolhas e a geometria para continuar compatível com a correção automática."}</p>
   </section>;
 }
 
@@ -151,15 +178,16 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
   };
 
   return <section className="print-studio" aria-label="Preparar impressão">
-    <header><div><h2>Preparar impressão</h2><p>Escolha um visual e abra a versão pronta para imprimir ou salvar em PDF.</p></div></header>
+    <header><div><h2>Preparar impressão</h2><p>Escolha o material, confira a prévia A4 e abra a versão para imprimir ou salvar em PDF.</p></div></header>
     <div className="print-studio__kind" role="tablist" aria-label="Material para imprimir">
       <button type="button" role="tab" aria-selected={kind === "prova"} className={kind === "prova" ? "is-active" : ""} onClick={() => setKind("prova")}><FileText className="size-4" />Prova</button>
       <button type="button" role="tab" aria-selected={isKey} className={isKey ? "is-active" : ""} onClick={() => setKind("gabarito")}><FileCheck2 className="size-4" />Gabarito oficial</button>
       <button type="button" role="tab" aria-selected={isCard} className={isCard ? "is-active" : ""} onClick={() => setKind("cartao")}><ScanLine className="size-4" />Cartão-resposta</button>
     </div>
-    <ExamPresentationControls value={options} onChange={setOptions} />
+    <div className="print-studio__workbench"><div className="print-studio__settings">
+    {!isKey ? <ExamPresentationControls mode={isCard ? "card" : "full"} value={options} onChange={setOptions} /> : <p className="print-studio__notice">O gabarito oficial usa o número de cada questão e sua resposta correta, sem enunciados.</p>}
     {isCard ? <><p className="print-studio__notice">O cartão mantém as bolhas A–E e a posição fixa para continuar compatível com a leitura automática.</p><section className="print-studio__batch"><header><div><h3><UsersRound className="size-4" />Cartões por aluno</h3><p>{options.answerSheetModel === "fanucchi" ? "Imprima o cartão-base e os adesivos QR individuais separadamente." : "Gere um cartão já identificado para cada aluno da turma, em uma única impressão."}</p></div>{roster === null ? <Button variant="secondary" disabled={rosterLoading} onClick={() => void loadRoster()}>{rosterLoading ? "Carregando…" : "Preparar lista"}</Button> : null}</header>{roster !== null ? roster.length ? <><div className="print-studio__batch-actions"><span>{selectedStudents.length} de {roster.length} alunos selecionados</span><div><button type="button" onClick={() => setSelectedStudentIds(roster.map((student) => student.id))}>Selecionar todos</button><button type="button" onClick={() => setSelectedStudentIds([])}>Limpar</button></div></div><div className="print-studio__roster">{roster.map((student) => <label key={student.id}><input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={(event) => setSelectedStudentIds((current) => event.target.checked ? [...current, student.id] : current.filter((id) => id !== student.id))} /><span><strong>{student.name}</strong><small>{student.className}</small></span></label>)}</div>{options.answerSheetModel === "fanucchi" ? <Button disabled={!canPrint} onClick={() => void printLabels()}><CheckSquare className="size-4" />Imprimir adesivos QR</Button> : <Button disabled={!canPrint} onClick={printStudentCards}><CheckSquare className="size-4" />Imprimir cartões selecionados</Button>}</> : <p className="print-studio__empty">Nenhum aluno disponível para esta prova. Confira a turma e seu acesso com a gestão. Você ainda pode imprimir o cartão em branco.</p> : null}</section></> : null}
-    {isKey ? <p className="print-studio__notice">O gabarito oficial mostra apenas o número da questão e a letra correta — sem enunciados ou alternativas.</p> : null}
+    </div><PrintPreview exam={exam} kind={kind} options={options} /></div>
     <section className="print-studio__preflight" aria-labelledby="print-preflight-title">
       <div><h3 id="print-preflight-title">Antes de imprimir</h3><p>Confira a prova e use estas opções na janela da impressora.</p></div>
       {contentReadiness.issues.length ? <ul className="print-studio__issues" role="alert">{contentReadiness.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul> : <p className="print-studio__ready">{kind === "prova" ? "Prova pronta para abrir." : "Questões e gabarito prontos para este material."}</p>}

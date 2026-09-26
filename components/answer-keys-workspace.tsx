@@ -156,8 +156,8 @@ function AnswerKeyCard({ exam, onOpen }: { exam: TeacherExam; onOpen: (kind: Exa
       <div className="answer-key-card__facts"><span>{statusLabels[exam.status]}</span><span>Atualizado em {formatDate(exam.updatedAt)}</span>{summary.annulled ? <span>{summary.annulled} anulada{summary.annulled === 1 ? "" : "s"}</span> : null}</div>
       <footer>
         {summary.complete ? <Button className="flex-1" onClick={() => onOpen("gabarito")}><BookOpenCheck className="size-4" />Visualizar gabarito</Button> : <Button asChild className="flex-1"><Link href="/dashboard/provas"><Sparkles className="size-4" />Completar em Provas</Link></Button>}
-        <Button variant="secondary" size="icon" aria-label={`Preparar cartão-resposta de ${exam.title}`} onClick={() => onOpen("cartao")}><FileText className="size-4" /></Button>
-        <Button variant="secondary" size="icon" aria-label={`Preparar impressão de ${exam.title}`} onClick={() => onOpen("prova")}><Printer className="size-4" /></Button>
+        <Button variant="secondary" aria-label={`Preparar cartão-resposta de ${exam.title}`} onClick={() => onOpen("cartao")}><FileText className="size-4" />Cartões</Button>
+        <Button variant="secondary" aria-label={`Preparar impressão de ${exam.title}`} onClick={() => onOpen("prova")}><Printer className="size-4" />Prova</Button>
       </footer>
     </Card>
   );
