@@ -4,7 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
-import { getStudentsForExam, normalizeClasses } from "@/lib/exam-audience";
+import { normalizeClasses } from "@/lib/exam-audience";
+import { selectTeacherCorrectionClassIds } from "@/lib/exam-roster-scope";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
 import { withExamQuestionTopicFallback, withTeacherExamSchemaFallback } from "@/lib/supabase-schema-compat";
@@ -271,25 +272,45 @@ export async function getOperationalSnapshot() { const [data, revision] = await 
 
 export async function getTeacherCorrectionSnapshot(teacherId: string) {
   const database = client();
-  const [{ data: ownedRows, error: ownedError }, assignedClasses, snapshot] = await Promise.all([
+  const [{ data: ownedRows, error: ownedError }, assignedClasses, snapshot, classResult, scopeResult] = await Promise.all([
     withTeacherExamSchemaFallback(
       async () => database.from("exams").select("id").eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]),
       async () => database.from("exam_sections").select("exam_id").eq("teacher_id", teacherId),
     ),
     getActiveAssignedExamClasses(teacherId),
     getOperationalSnapshot(),
+    database.from("classes").select("id,audience_id,year_segment"),
+    database.from("pedagogical_scopes").select("class_id,subject_id,active,archived_at").eq("user_id", teacherId).eq("active", true).is("archived_at", null),
   ]);
   dbError(ownedError);
+  dbError(classResult.error);
+  dbError(scopeResult.error);
   const ownedExamIds = new Set((ownedRows ?? []).map((item) => String("id" in item ? item.id : item.exam_id)));
+  const [{ data: subjectRows, error: subjectError }, { data: assignmentRows, error: assignmentError }] = await Promise.all([
+    ownedExamIds.size ? database.from("exams").select("id,subject_id").in("id", [...ownedExamIds]) : Promise.resolve({ data: [], error: null }),
+    ownedExamIds.size ? database.from("exam_assignments").select("exam_id,class_id").in("exam_id", [...ownedExamIds]).eq("active", true).is("archived_at", null) : Promise.resolve({ data: [], error: null }),
+  ]);
+  dbError(subjectError);
+  dbError(assignmentError);
+  const subjectsByExam = new Map((subjectRows ?? []).map((item) => [String(item.id), item.subject_id ? String(item.subject_id) : null]));
+  const rawClasses = (classResult.data ?? []).map((item) => ({ audienceId: String(item.audience_id ?? ""), id: String(item.id), yearSegment: String(item.year_segment ?? "") }));
+  const scopes = (scopeResult.data ?? []).map((item) => ({ active: Boolean(item.active), archived_at: item.archived_at ? String(item.archived_at) : null, class_id: String(item.class_id), subject_id: item.subject_id ? String(item.subject_id) : null }));
+  const ownedClassIds = new Map(snapshot.data.exams.filter((exam) => ownedExamIds.has(exam.id)).map((exam) => [
+    exam.id,
+    selectTeacherCorrectionClassIds(
+      { audienceId: exam.audienceId, groupType: exam.groupType, yearSegment: exam.yearSegment, subjectId: subjectsByExam.get(exam.id) ?? null },
+      rawClasses,
+      (assignmentRows ?? []).filter((item) => String(item.exam_id) === exam.id).map((item) => String(item.class_id)),
+      scopes,
+    ),
+  ]));
   const exams = snapshot.data.exams
     .filter((exam) => (ownedExamIds.has(exam.id) || assignedClasses.has(exam.id)) && (exam.status === "publicada" || exam.status === "aplicada"))
-    .map((exam) => ownedExamIds.has(exam.id) ? exam : { ...exam, assignedClassIds: [...(assignedClasses.get(exam.id) ?? [])] });
+    .map((exam) => ({ ...exam, assignedClassIds: [...(ownedExamIds.has(exam.id) ? ownedClassIds.get(exam.id) ?? [] : assignedClasses.get(exam.id) ?? [])] }));
   const examIds = new Set(exams.map((exam) => exam.id));
-  const allowedStudents = exams.flatMap((exam) => ownedExamIds.has(exam.id)
-    ? getStudentsForExam(exam, snapshot.data.students, snapshot.data.classes)
-    : snapshot.data.students.filter((student) => assignedClasses.get(exam.id)?.has(student.turma)));
-  const studentIds = new Set(allowedStudents.map((student) => student.id));
-  const classIds = new Set(allowedStudents.map((student) => student.turma));
+  const allowedClassesByExam = new Map(exams.map((exam) => [exam.id, new Set(exam.assignedClassIds ?? [])]));
+  const classIds = new Set(exams.flatMap((exam) => exam.assignedClassIds ?? []));
+  const studentIds = new Set(snapshot.data.students.filter((student) => classIds.has(student.turma)).map((student) => student.id));
 
   return {
     data: {
@@ -297,7 +318,7 @@ export async function getTeacherCorrectionSnapshot(teacherId: string) {
       answerKeys: snapshot.data.answerKeys.filter((item) => examIds.has(item.provaId)),
       classes: snapshot.data.classes.filter((item) => classIds.has(item.id)),
       correctionRules: snapshot.data.correctionRules.filter((item) => examIds.has(item.provaId)),
-      corrections: snapshot.data.corrections.filter((item) => examIds.has(item.correction.provaId) && (ownedExamIds.has(item.correction.provaId) || assignedClasses.get(item.correction.provaId)?.has(item.turma?.id ?? item.aluno?.turma ?? ""))),
+      corrections: snapshot.data.corrections.filter((item) => examIds.has(item.correction.provaId) && allowedClassesByExam.get(item.correction.provaId)?.has(item.turma?.id ?? item.aluno?.turma ?? "")),
       exams,
       students: snapshot.data.students.filter((student) => studentIds.has(student.id)),
     } satisfies AppDataState,
@@ -309,8 +330,8 @@ export async function teacherCanCorrectExam(teacherId: string, examId: string) {
   return Boolean(await getTeacherCorrectionAccess(teacherId, examId));
 }
 
-/** null classIds retains the legacy creator path; assigned access is per class. */
-export async function getTeacherCorrectionAccess(teacherId: string, examId: string): Promise<{ classIds: Set<string> | null } | null> {
+/** Both authorship and assignment require an active, concrete class scope. */
+export async function getTeacherCorrectionAccess(teacherId: string, examId: string): Promise<{ classIds: Set<string> } | null> {
   const database = client();
   const { data: exam, error } = await withTeacherExamSchemaFallback(
     async () => database.from("exams").select("id,status").eq("id", examId).eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]).maybeSingle(),
@@ -323,7 +344,24 @@ export async function getTeacherCorrectionAccess(teacherId: string, examId: stri
     },
   );
   dbError(error);
-  if (exam) return { classIds: null };
+  if (exam) {
+    const [examResult, classResult, scopeResult, assignmentResult] = await Promise.all([
+      database.from("exams").select("audience_id,group_type,year_segment,subject_id").eq("id", examId).maybeSingle(),
+      database.from("classes").select("id,audience_id,year_segment"),
+      database.from("pedagogical_scopes").select("class_id,subject_id,active,archived_at").eq("user_id", teacherId).eq("active", true).is("archived_at", null),
+      database.from("exam_assignments").select("class_id").eq("exam_id", examId).eq("active", true).is("archived_at", null),
+    ]);
+    [examResult, classResult, scopeResult, assignmentResult].forEach((result) => dbError(result.error));
+    if (!examResult.data) return null;
+    const row = examResult.data;
+    const classIds = selectTeacherCorrectionClassIds(
+      { audienceId: String(row.audience_id ?? ""), groupType: String(row.group_type ?? ""), yearSegment: String(row.year_segment ?? ""), subjectId: row.subject_id ? String(row.subject_id) : null },
+      (classResult.data ?? []).map((item) => ({ audienceId: String(item.audience_id ?? ""), id: String(item.id), yearSegment: String(item.year_segment ?? "") })),
+      (assignmentResult.data ?? []).map((item) => String(item.class_id)),
+      (scopeResult.data ?? []).map((item) => ({ active: Boolean(item.active), archived_at: item.archived_at ? String(item.archived_at) : null, class_id: String(item.class_id), subject_id: item.subject_id ? String(item.subject_id) : null })),
+    );
+    return classIds.size ? { classIds } : null;
+  }
   const classIds = (await getActiveAssignedExamClasses(teacherId, examId)).get(examId);
   return classIds?.size ? { classIds } : null;
 }
