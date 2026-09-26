@@ -767,7 +767,9 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
               <div>
                 <h3 className="text-2xl font-semibold text-[var(--foreground)]">Confira o cartão do aluno</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-                  Veja as respostas marcadas. Se estiverem certas, basta salvar. Para mudar uma delas, toque em “Corrigir resposta”.
+                  {review.pageType === "MANUAL"
+                    ? "Escolha o aluno e preencha cada resposta antes de salvar. Você também pode marcar uma questão em branco."
+                    : "Veja as respostas marcadas. Se estiverem certas, basta salvar. Para mudar uma delas, toque em “Corrigir resposta”."}
                 </p>
               </div>
               <button
@@ -816,7 +818,9 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
                     />
                   </div>
                   <p className="mt-2 text-xs font-medium text-[var(--muted-foreground)]">
-                    {summary.revisao > 0
+                    {review.pageType === "MANUAL" && summary.revisao > 0
+                      ? `Preencha ${summary.revisao} ${summary.revisao === 1 ? "questão pendente" : "questões pendentes"} antes de salvar.`
+                      : summary.revisao > 0
                       ? `Revise ${summary.revisao} ${summary.revisao === 1 ? "resposta" : "respostas"} com baixa confiança ou marcação especial antes de salvar.`
                       : summary.erros > 0
                         ? `Confira ${summary.erros} ${summary.erros === 1 ? "divergência" : "divergências"} com o cartão.`
@@ -1045,7 +1049,7 @@ function AnswerReviewGrid({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-[var(--radius-sm)] bg-[var(--surface)] p-3">
                 <p className="text-sm text-[var(--muted-foreground)]">Aluno marcou</p>
                 <p className="mt-1 text-2xl font-semibold text-[var(--foreground)]">{getDetectedAnswerLabel(answer)}</p>
