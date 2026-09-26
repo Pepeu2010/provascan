@@ -78,7 +78,7 @@ assert.match(page, /AnswerKeysWorkspace/);
 assert.match(workspace, /Central de gabaritos/);
 assert.match(workspace, /import "\.\/answer-keys-workspace\.css"/);
 assert.match(workspace, /Visualizar gabarito/);
-assert.match(workspace, /Gerar cartão-resposta/);
+assert.match(workspace, /Preparar cartão-resposta/);
 assert.match(workspace, /Respostas protegidas/);
 assert.match(workspace, /answer-key-detail__choices/);
 assert.match(workspace, /PrintStudio/);
