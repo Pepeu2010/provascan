@@ -78,13 +78,16 @@ assert.equal((fanucchiCard.match(/class="fanucchi-card__fiducial"/g) ?? []).leng
 
 const workspace = readFileSync(new URL("../components/teacher-exams-workspace.tsx", import.meta.url), "utf8");
 const printStudio = readFileSync(new URL("../components/print-studio.tsx", import.meta.url), "utf8");
-assert.match(workspace, /Gerar cartão-resposta/);
-assert.match(workspace, /openExamPrint/);
+assert.match(workspace, /Preparar impressão/);
+assert.match(workspace, /onPreparePrint/);
 assert.match(workspace, /PrintStudio/);
 assert.match(workspace, /ExamPresentationControls/);
 assert.match(printStudio, /Visual da prova/);
 assert.match(printStudio, /Gabarito oficial/);
 assert.match(printStudio, /Cartões por aluno/);
 assert.match(printStudio, /print-roster/);
+assert.match(printStudio, /getExamPrintReadiness/);
+assert.match(printStudio, /getPrintPreflight/);
+assert.match(printStudio, /disabled=\{!canPrint\}/);
 assert.doesNotMatch(workspace, /Enviar para conferência/);
 console.log("Teacher-owned exam printing checks passed.");

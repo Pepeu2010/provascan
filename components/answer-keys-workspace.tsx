@@ -9,7 +9,7 @@ import {
   KeyRound, LockKeyhole, Printer, Search, ShieldCheck, Sparkles, Target, UsersRound,
 } from "lucide-react";
 import { PrintStudio } from "@/components/print-studio";
-import { openPrint } from "@/components/teacher-exams-workspace";
+import type { ExamPrintKind } from "@/lib/exam-print-document";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -62,7 +62,7 @@ export function AnswerKeysWorkspace() {
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("todas");
   const [readiness, setReadiness] = useState<AnswerKeyReadiness>("todos");
-  const [selected, setSelected] = useState<TeacherExam | null>(null);
+  const [selected, setSelected] = useState<{ exam: TeacherExam; kind: ExamPrintKind } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -93,7 +93,7 @@ export function AnswerKeysWorkspace() {
     todos: exams.length,
   }), [exams]);
 
-  if (selected) return <AnswerKeyDetail exam={selected} onBack={() => setSelected(null)} />;
+  if (selected) return <AnswerKeyDetail exam={selected.exam} initialKind={selected.kind} onBack={() => setSelected(null)} />;
 
   const filtersActive = Boolean(query.trim()) || subject !== "todas" || readiness !== "todos";
   return (
@@ -133,14 +133,14 @@ export function AnswerKeysWorkspace() {
 
       {loading ? <AnswerKeySkeleton /> : filtered.length ? (
         <section className="answer-keys__grid" aria-label="Gabaritos encontrados">
-          {filtered.map((exam) => <AnswerKeyCard key={exam.id} exam={exam} onOpen={() => setSelected(exam)} onMessage={setMessage} />)}
+          {filtered.map((exam) => <AnswerKeyCard key={exam.id} exam={exam} onOpen={(kind) => setSelected({ exam, kind })} />)}
         </section>
       ) : <AnswerKeyEmpty filtered={filtersActive} />}
     </div>
   );
 }
 
-function AnswerKeyCard({ exam, onOpen, onMessage }: { exam: TeacherExam; onOpen: () => void; onMessage: (message: string) => void }) {
+function AnswerKeyCard({ exam, onOpen }: { exam: TeacherExam; onOpen: (kind: ExamPrintKind) => void }) {
   const summary = buildAnswerKeySummary(exam);
   const ready = summary.complete && exam.status !== "rascunho" && exam.status !== "arquivada";
   const progress = summary.questionCount ? Math.round((summary.answered / summary.questionCount) * 100) : 0;
@@ -155,15 +155,15 @@ function AnswerKeyCard({ exam, onOpen, onMessage }: { exam: TeacherExam; onOpen:
       <div className="answer-key-card__progress"><div><span>{summary.answered} de {summary.questionCount} respostas definidas</span><strong>{progress}%</strong></div><span role="progressbar" aria-label={`Gabarito de ${exam.title}: ${progress}% completo`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><i style={{ width: `${progress}%` }} /></span></div>
       <div className="answer-key-card__facts"><span>{statusLabels[exam.status]}</span><span>Atualizado em {formatDate(exam.updatedAt)}</span>{summary.annulled ? <span>{summary.annulled} anulada{summary.annulled === 1 ? "" : "s"}</span> : null}</div>
       <footer>
-        {summary.complete ? <Button className="flex-1" onClick={onOpen}><BookOpenCheck className="size-4" />Visualizar gabarito</Button> : <Button asChild className="flex-1"><Link href="/dashboard/provas"><Sparkles className="size-4" />Completar em Provas</Link></Button>}
-        <Button variant="secondary" size="icon" aria-label={`Gerar cartão-resposta de ${exam.title}`} onClick={() => onMessage(openPrint(exam, true) ? "Cartão-resposta aberto para impressão." : "Permita pop-ups para gerar o cartão.")}><FileText className="size-4" /></Button>
-        <Button variant="secondary" size="icon" aria-label={`Imprimir ${exam.title}`} onClick={() => onMessage(openPrint(exam) ? "Prova aberta para impressão." : "Permita pop-ups para imprimir.")}><Printer className="size-4" /></Button>
+        {summary.complete ? <Button className="flex-1" onClick={() => onOpen("gabarito")}><BookOpenCheck className="size-4" />Visualizar gabarito</Button> : <Button asChild className="flex-1"><Link href="/dashboard/provas"><Sparkles className="size-4" />Completar em Provas</Link></Button>}
+        <Button variant="secondary" size="icon" aria-label={`Preparar cartão-resposta de ${exam.title}`} onClick={() => onOpen("cartao")}><FileText className="size-4" /></Button>
+        <Button variant="secondary" size="icon" aria-label={`Preparar impressão de ${exam.title}`} onClick={() => onOpen("prova")}><Printer className="size-4" /></Button>
       </footer>
     </Card>
   );
 }
 
-function AnswerKeyDetail({ exam, onBack }: { exam: TeacherExam; onBack: () => void }) {
+function AnswerKeyDetail({ exam, initialKind, onBack }: { exam: TeacherExam; initialKind: ExamPrintKind; onBack: () => void }) {
   const summary = buildAnswerKeySummary(exam);
   return (
     <div className="answer-key-detail mx-auto grid max-w-[1180px] gap-5">
@@ -188,7 +188,7 @@ function AnswerKeyDetail({ exam, onBack }: { exam: TeacherExam; onBack: () => vo
           </li>
         ))}</ol>
       </Card>
-      <PrintStudio exam={exam} initialKind="cartao" />
+      <PrintStudio exam={exam} initialKind={initialKind} />
       <div className="answer-key-detail__actions">{(exam.status === "publicada" || exam.status === "aplicada") ? <Button asChild><Link href={`/dashboard/correcao?prova=${encodeURIComponent(exam.id)}`}>Corrigir agora<ChevronRight className="size-4" /></Link></Button> : <Button asChild><Link href="/dashboard/provas">Abrir em Provas<ChevronRight className="size-4" /></Link></Button>}</div>
     </div>
   );

@@ -12,7 +12,9 @@ import {
   type ExamPrintStudent,
   type ExamPrintKind,
 } from "@/lib/exam-print-document";
+import { getExamPrintReadiness } from "@/lib/exam-print-readiness";
 import { defaultExamPrintOptions, normalizeExamPrintOptions, type AnswerSheetArea, type AnswerSheetModel, type ExamPrintOptions, type PrintSize, type PrintTemplate, type PrintTypeface } from "@/lib/exam-print-options";
+import { buildCalibrationSheetHtml, buildPrintInstructionSheetHtml, getPrintPreflight } from "@/lib/print-preflight";
 import type { TeacherExam } from "@/types/teacher-exams";
 
 const templates: Array<{ value: PrintTemplate; title: string; detail: string }> = [
@@ -44,7 +46,17 @@ function openStudentCardsWindow(exam: TeacherExam, students: ExamPrintStudent[],
   return true;
 }
 
-export function openExamPrint(exam: TeacherExam, kind: ExamPrintKind = "prova", options: ExamPrintOptions = defaultExamPrintOptions) {
+function openReferenceWindow(title: string, content: string) {
+  const popup = window.open("", "_blank", "width=960,height=760");
+  if (!popup) return false;
+  popup.opener = null;
+  popup.document.open();
+  popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${title}</title><style>@page{size:A4;margin:0}body{margin:0;background:#fff}</style></head><body>${content}<script>window.addEventListener('load',()=>window.print(),{once:true})</script></body></html>`);
+  popup.document.close();
+  return true;
+}
+
+function openExamPrint(exam: TeacherExam, kind: ExamPrintKind = "prova", options: ExamPrintOptions = defaultExamPrintOptions) {
   return openPrintWindow(exam, kind, options === defaultExamPrintOptions ? normalizeExamPrintOptions(exam.printOptions) : options);
 }
 
@@ -80,13 +92,19 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
   const [roster, setRoster] = useState<ExamPrintStudent[] | null>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [a4Confirmed, setA4Confirmed] = useState(false);
+  const [scaleConfirmed, setScaleConfirmed] = useState(false);
   const isCard = kind === "cartao";
   const isKey = kind === "gabarito";
+  const contentReadiness = getExamPrintReadiness(exam, kind, options);
+  const paperReadiness = getPrintPreflight({ paperSize: a4Confirmed ? "A4" : "", scalePercent: scaleConfirmed ? 100 : 0 });
+  const canPrint = contentReadiness.ready && paperReadiness.ready;
 
   const recordPrintEvent = (eventKind: "prova" | "gabarito" | "cartao" | "cartoes_individuais" | "etiquetas") => {
     void fetch(`/api/teacher-exams/${encodeURIComponent(exam.id)}/print-events`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: eventKind }) }).catch(() => undefined);
   };
   const print = () => {
+    if (!canPrint) return setMessage([...contentReadiness.issues, ...paperReadiness.warnings][0] ?? "Confira a prova antes de imprimir.");
     const opened = openExamPrint(exam, kind, options);
     if (opened) recordPrintEvent(kind);
     setMessage(opened ? `${isCard ? "Cartão-resposta" : isKey ? "Gabarito oficial" : "Prova"} aberto para impressão.` : "Permita pop-ups neste navegador para imprimir.");
@@ -107,11 +125,13 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
   };
   const selectedStudents = (roster ?? []).filter((student) => selectedStudentIds.includes(student.id));
   const printStudentCards = () => {
+    if (!canPrint) return setMessage([...contentReadiness.issues, ...paperReadiness.warnings][0] ?? "Confira a prova antes de imprimir.");
     const opened = Boolean(selectedStudents.length) && openStudentCardsWindow(exam, selectedStudents, options);
     if (opened) recordPrintEvent("cartoes_individuais");
     setMessage(opened ? `${selectedStudents.length} ${selectedStudents.length === 1 ? "cartão foi aberto" : "cartões foram abertos"} para impressão.` : selectedStudents.length ? "Permita pop-ups neste navegador para imprimir." : "Selecione ao menos um aluno.");
   };
   const printLabels = async () => {
+    if (!canPrint) return setMessage([...contentReadiness.issues, ...paperReadiness.warnings][0] ?? "Confira a prova antes de imprimir.");
     if (!selectedStudents.length) return setMessage("Selecione ao menos um aluno.");
     setMessage("Gerando adesivos individuais…");
     try {
@@ -138,8 +158,18 @@ export function PrintStudio({ exam, initialKind = "prova" }: { exam: TeacherExam
       <button type="button" role="tab" aria-selected={isCard} className={isCard ? "is-active" : ""} onClick={() => setKind("cartao")}><ScanLine className="size-4" />Cartão-resposta</button>
     </div>
     <ExamPresentationControls value={options} onChange={setOptions} />
-    {isCard ? <><p className="print-studio__notice">O cartão mantém as bolhas A–E e a posição fixa para continuar compatível com a leitura automática.</p><section className="print-studio__batch"><header><div><h3><UsersRound className="size-4" />Cartões por aluno</h3><p>{options.answerSheetModel === "fanucchi" ? "Imprima o cartão-base e os adesivos QR individuais separadamente." : "Gere um cartão já identificado para cada aluno da turma, em uma única impressão."}</p></div>{roster === null ? <Button variant="secondary" disabled={rosterLoading} onClick={() => void loadRoster()}>{rosterLoading ? "Carregando…" : "Preparar lista"}</Button> : null}</header>{roster !== null ? roster.length ? <><div className="print-studio__batch-actions"><span>{selectedStudents.length} de {roster.length} alunos selecionados</span><div><button type="button" onClick={() => setSelectedStudentIds(roster.map((student) => student.id))}>Selecionar todos</button><button type="button" onClick={() => setSelectedStudentIds([])}>Limpar</button></div></div><div className="print-studio__roster">{roster.map((student) => <label key={student.id}><input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={(event) => setSelectedStudentIds((current) => event.target.checked ? [...current, student.id] : current.filter((id) => id !== student.id))} /><span><strong>{student.name}</strong><small>{student.className}</small></span></label>)}</div>{options.answerSheetModel === "fanucchi" ? <Button onClick={() => void printLabels()}><CheckSquare className="size-4" />Imprimir adesivos QR</Button> : <Button onClick={printStudentCards}><CheckSquare className="size-4" />Imprimir cartões selecionados</Button>}</> : <p className="print-studio__empty">Nenhum aluno disponível para esta prova. Confira a turma e seu acesso com a gestão. Você ainda pode imprimir o cartão em branco.</p> : null}</section></> : null}
+    {isCard ? <><p className="print-studio__notice">O cartão mantém as bolhas A–E e a posição fixa para continuar compatível com a leitura automática.</p><section className="print-studio__batch"><header><div><h3><UsersRound className="size-4" />Cartões por aluno</h3><p>{options.answerSheetModel === "fanucchi" ? "Imprima o cartão-base e os adesivos QR individuais separadamente." : "Gere um cartão já identificado para cada aluno da turma, em uma única impressão."}</p></div>{roster === null ? <Button variant="secondary" disabled={rosterLoading} onClick={() => void loadRoster()}>{rosterLoading ? "Carregando…" : "Preparar lista"}</Button> : null}</header>{roster !== null ? roster.length ? <><div className="print-studio__batch-actions"><span>{selectedStudents.length} de {roster.length} alunos selecionados</span><div><button type="button" onClick={() => setSelectedStudentIds(roster.map((student) => student.id))}>Selecionar todos</button><button type="button" onClick={() => setSelectedStudentIds([])}>Limpar</button></div></div><div className="print-studio__roster">{roster.map((student) => <label key={student.id}><input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={(event) => setSelectedStudentIds((current) => event.target.checked ? [...current, student.id] : current.filter((id) => id !== student.id))} /><span><strong>{student.name}</strong><small>{student.className}</small></span></label>)}</div>{options.answerSheetModel === "fanucchi" ? <Button disabled={!canPrint} onClick={() => void printLabels()}><CheckSquare className="size-4" />Imprimir adesivos QR</Button> : <Button disabled={!canPrint} onClick={printStudentCards}><CheckSquare className="size-4" />Imprimir cartões selecionados</Button>}</> : <p className="print-studio__empty">Nenhum aluno disponível para esta prova. Confira a turma e seu acesso com a gestão. Você ainda pode imprimir o cartão em branco.</p> : null}</section></> : null}
     {isKey ? <p className="print-studio__notice">O gabarito oficial mostra apenas o número da questão e a letra correta — sem enunciados ou alternativas.</p> : null}
-    <footer><Button onClick={print}><Printer className="size-4" />Abrir para imprimir</Button>{message ? <p role="status" aria-live="polite">{message}</p> : null}</footer>
+    <section className="print-studio__preflight" aria-labelledby="print-preflight-title">
+      <div><h3 id="print-preflight-title">Antes de imprimir</h3><p>Confira a prova e use estas opções na janela da impressora.</p></div>
+      {contentReadiness.issues.length ? <ul className="print-studio__issues" role="alert">{contentReadiness.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul> : <p className="print-studio__ready">{kind === "prova" ? "Prova pronta para abrir." : "Questões e gabarito prontos para este material."}</p>}
+      <div className="print-studio__checks">
+        <label><input type="checkbox" checked={a4Confirmed} onChange={(event) => setA4Confirmed(event.target.checked)} />Vou selecionar papel A4</label>
+        <label><input type="checkbox" checked={scaleConfirmed} onChange={(event) => setScaleConfirmed(event.target.checked)} />Vou usar escala 100%, sem ajustar à página</label>
+      </div>
+      <div className="print-studio__references"><button type="button" onClick={() => { if (!openReferenceWindow("Calibração ProvaScan", buildCalibrationSheetHtml())) setMessage("Permita pop-ups para abrir a calibração."); }}>Folha de calibração</button><button type="button" onClick={() => { if (!openReferenceWindow("Instruções ProvaScan", buildPrintInstructionSheetHtml())) setMessage("Permita pop-ups para abrir as instruções."); }}>Instruções de impressão</button></div>
+      <p className="print-studio__fineprint">Essa conferência não lê as configurações da impressora. Confira A4 e 100% novamente na janela de impressão; meça a folha de calibração antes de imprimir a turma toda.</p>
+    </section>
+    <footer><Button disabled={!canPrint} onClick={print}><Printer className="size-4" />Abrir para imprimir</Button>{message ? <p role="status" aria-live="polite">{message}</p> : null}</footer>
   </section>;
 }
