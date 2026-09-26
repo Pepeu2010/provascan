@@ -1,5 +1,7 @@
 "use client";
 
+import "./dashboard-workspace.css";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, BookOpenCheck, CheckCircle2, CircleAlert, ClipboardList, FileUp, History, Pencil, UsersRound } from "lucide-react";

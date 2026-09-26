@@ -202,4 +202,5 @@
 @media (max-width: 640px) {
   .answer-key-card > footer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .answer-key-card > footer .button:first-child { grid-column: 1 / -1; }
+  .answer-key-detail__actions { position: static; }
 }
