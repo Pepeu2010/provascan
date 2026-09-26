@@ -393,8 +393,8 @@
 
 @media (max-width: 640px) {
   .teacher-exams__command { align-items: stretch; flex-direction: column; padding: 20px; }
-  .teacher-exams__command-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .teacher-exams__command-actions > button { width: auto !important; }
+  .teacher-exams__command-actions { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+  .teacher-exams__command-actions > button { width: 100% !important; }
   .creation-hub__header { padding: 20px; }
 }
 
