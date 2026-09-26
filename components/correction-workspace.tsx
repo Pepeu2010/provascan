@@ -51,10 +51,12 @@ type ReviewFilter = "all" | "divergences" | "review" | "blank";
 type ScanAnswer = {
   confidence: number;
   correctAnswer: string;
+  evidenceRect?: { height: number; width: number; x: number; y: number };
   /** Defined only for manual entry; false means the teacher has not decided. */
   explicitlyReviewed?: boolean;
   markedAnswers: string[];
   question: number;
+  status?: "BLANK" | "LOW_CONFIDENCE" | "MARKED" | "MULTIPLE";
 };
 
 type ScanReview = {
@@ -68,12 +70,16 @@ type ScanReview = {
   processingLabel: string;
   qrStatus: "ignored" | "success" | "invalid" | "not-found" | "unreadable";
   processedPreviewUrl: string;
+  evidencePreviewUrl: string;
+  evidenceWidth: number;
+  evidenceHeight: number;
   qualitySummary: {
     brightness: string;
     cropApplied: boolean;
     dimensions: string;
     lowLight: boolean;
     orientation: string;
+    perspectiveCorrected: boolean;
     blurRisk: boolean;
     shadowRisk: boolean;
   };
@@ -92,6 +98,7 @@ type PreprocessResult = {
   perspectiveCorrected: boolean;
   processedCanvas: HTMLCanvasElement;
   previewUrl: string;
+  evidencePreviewUrl: string;
   processedLabel: string;
   shadowRisk: boolean;
   width: number;
@@ -133,6 +140,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
   const { data, saveCorrection, syncStatus } = useAppData();
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const batchInputRef = useRef<HTMLInputElement | null>(null);
   const cancelProcessingRef = useRef(false);
 
   const [examId, setExamId] = useState(data.exams[0]?.id ?? "");
@@ -152,6 +160,13 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
   const [previewRotation, setPreviewRotation] = useState(0);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
+  const [recorrectionReason, setRecorrectionReason] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [batchSaved, setBatchSaved] = useState(0);
+  const [batchSkipped, setBatchSkipped] = useState(0);
+  const [savedCurrent, setSavedCurrent] = useState(false);
+  const [reviewAudit, setReviewAudit] = useState<Array<{ question: number; before: string[]; after: string[] }>>([]);
 
   const exam = data.exams.find((item) => item.id === examId) ?? data.exams[0];
   const answerKey = useMemo(
@@ -183,21 +198,24 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
 
   const summary = useMemo(() => {
     if (!review) {
-      return { acertos: 0, erros: 0, percentual: 0, revisao: 0 };
+      return { acertos: 0, erros: 0, percentual: 0, revisao: 0, claras: 0, emBranco: 0, multiplas: 0 };
     }
 
     const acertos = review.answers.filter((item) => getAnswerState(item) === "acerto").length;
     const erros = review.answers.filter((item) => getAnswerState(item) === "erro").length;
-    const revisao = review.answers.filter((item) => item.explicitlyReviewed === false || (item.explicitlyReviewed === undefined && item.confidence < MIN_CONFIDENCE_REVIEW) || item.markedAnswers.length > 1).length;
+    const revisao = review.answers.filter(needsAnswerReview).length;
+    const claras = review.answers.filter((item) => !needsAnswerReview(item) && item.markedAnswers.length === 1).length;
+    const emBranco = review.answers.filter((item) => item.markedAnswers.length === 0).length;
+    const multiplas = review.answers.filter((item) => item.markedAnswers.length > 1).length;
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
-    return { acertos, erros, percentual, revisao };
+    return { acertos, erros, percentual, revisao, claras, emBranco, multiplas };
   }, [review]);
   const visibleAnswers = useMemo(() => {
     if (!review || reviewFilter === "all") return review?.answers ?? [];
     return review.answers.filter((item) => {
       if (reviewFilter === "divergences") return getAnswerState(item) === "erro";
       if (reviewFilter === "blank") return item.markedAnswers.length === 0;
-      return item.explicitlyReviewed === false || (item.explicitlyReviewed === undefined && item.confidence < MIN_CONFIDENCE_REVIEW) || item.markedAnswers.length > 1;
+      return needsAnswerReview(item);
     });
   }, [review, reviewFilter]);
   if (!exam || !studentsForExam.length) {
@@ -220,6 +238,10 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       review?.detectedName &&
       selectedReviewStudent?.nome &&
       normalizePersonName(review.detectedName) !== normalizePersonName(selectedReviewStudent.nome),
+  );
+  const identityNeedsConfirmation = Boolean(review && (identityMismatch || review.identificationMethod === "manual"));
+  const earlierCorrections = data.corrections.filter((item) =>
+    item.correction.provaId === exam.id && item.correction.alunoId === review?.matchedStudentId,
   );
 
   const processSelectedImage = async (fileToProcess = selectedFile) => {
@@ -267,17 +289,20 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       const isFanucchi = exam.templateVersion === FANUCCHI_ANSWER_SHEET_VERSION;
       const token = isFanucchi ? await decodeOpaqueAnswerSheetToken(preprocessing.processedCanvas) : null;
       let identity: { confidence: number; detectedName: string; invalidMessage: string; method: "ocr" | "manual" | "qr"; matchedStudentId: string };
-      if (isFanucchi) {
-        if (!token) throw new Error("Não foi possível ler o adesivo QR. Confira se o adesivo está colado e visível antes de corrigir.");
+      if (isFanucchi && token) {
         const response = await fetch("/api/answer-sheet-labels/resolve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
         const payload = await response.json() as { assignment?: { examId: string; studentId: string; templateVersion: string }; error?: string };
-        if (!response.ok || !payload.assignment || payload.assignment.examId !== exam.id || payload.assignment.templateVersion !== FANUCCHI_ANSWER_SHEET_VERSION) throw new Error(payload.error ?? "Este adesivo não pertence à prova selecionada.");
-        const student = studentsForExam.find((item) => item.id === payload.assignment?.studentId);
-        if (!student) throw new Error("O aluno deste adesivo não está autorizado para esta prova.");
-        identity = { confidence: 100, detectedName: student.nome, invalidMessage: "", matchedStudentId: student.id, method: "qr" };
+        const student = response.ok && payload.assignment?.examId === exam.id && payload.assignment.templateVersion === FANUCCHI_ANSWER_SHEET_VERSION
+          ? studentsForExam.find((item) => item.id === payload.assignment?.studentId)
+          : undefined;
+        identity = student
+          ? { confidence: 100, detectedName: student.nome, invalidMessage: "", matchedStudentId: student.id, method: "qr" }
+          : { confidence: 0, detectedName: "", invalidMessage: "O adesivo não corresponde à prova ou à turma selecionada. Confirme a prova e escolha o aluno manualmente.", matchedStudentId: "", method: "manual" };
+      } else if (isFanucchi) {
+        identity = { confidence: 0, detectedName: "", invalidMessage: "O adesivo não foi lido. As respostas podem ser conferidas, mas escolha e confirme o aluno antes de salvar.", matchedStudentId: "", method: "manual" };
       } else {
         const ocrIdentity = await detectIdentityWithOcr({ canvas: preprocessing.processedCanvas, preferredStudentId: activePreferredStudentId, students: studentsForExam });
-        identity = { confidence: ocrIdentity?.confidence ?? 0, detectedName: ocrIdentity?.detectedName ?? selectedReviewStudent.nome, invalidMessage: "", method: (ocrIdentity?.status === "matched" ? "ocr" : "manual") as "ocr" | "manual", matchedStudentId: ocrIdentity?.studentId ?? activePreferredStudentId };
+        identity = { confidence: ocrIdentity?.status === "matched" ? ocrIdentity.confidence : 0, detectedName: ocrIdentity?.status === "matched" ? ocrIdentity.detectedName : "", invalidMessage: ocrIdentity?.status === "matched" ? "" : "Não foi possível identificar o aluno pela foto. Escolha e confirme o nome antes de salvar.", method: ocrIdentity?.status === "matched" ? "ocr" : "manual", matchedStudentId: ocrIdentity?.status === "matched" ? ocrIdentity.studentId : "" };
       }
 
       setProgressLabel(PROCESSING_STEPS[3].label);
@@ -297,10 +322,27 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
         );
       }
 
-      const detectedAnswers = omrAnalysis.answers.slice(0, answerKey.length).map((item) => ({
-        ...item,
-        correctAnswer: answerKey.find((answer) => answer.questao === item.question)?.respostaCorreta ?? exam.alternativas[0] ?? "A",
-      }));
+      const detectedByQuestion = new Map(omrAnalysis.answers.map((item) => [item.question, item]));
+      if (detectedByQuestion.size !== answerKey.length || omrAnalysis.answers.length !== answerKey.length ||
+        answerKey.some((key) => !detectedByQuestion.has(key.questao))) {
+        throw new Error("A leitura não encontrou todas as linhas do cartão. Confira a folha inteira e envie outra foto.");
+      }
+      // A page-wide contrast measure can confuse printed black text with a
+      // shadow. Keep the warning, but do not send every clear bubble to review.
+      const photoNeedsReview = preprocessing.lowLight;
+      const detectedAnswers: ScanAnswer[] = answerKey.map((key) => {
+        const item = detectedByQuestion.get(key.questao)!;
+        const uncertain = photoNeedsReview || item.status !== "MARKED" || item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1;
+        return {
+          confidence: item.confidence,
+          correctAnswer: key.respostaCorreta,
+          evidenceRect: item.evidenceRect,
+          explicitlyReviewed: uncertain ? false : undefined,
+          markedAnswers: item.markedAnswers,
+          question: key.questao,
+          status: item.status,
+        };
+      });
 
       setProgressLabel(PROCESSING_STEPS[3].label);
       setProgress(PROCESSING_STEPS[4].progress);
@@ -308,10 +350,9 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       await waitWithCancel(120, cancelProcessingRef);
 
       const needsManualReview =
-        preprocessing.lowLight ||
         preprocessing.shadowRisk ||
         identity.confidence < MIN_CONFIDENCE_REVIEW ||
-        detectedAnswers.some((item) => item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1);
+        detectedAnswers.some(needsAnswerReview);
 
       setReview({
         answers: detectedAnswers,
@@ -327,7 +368,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             ? "O scanner priorizou o template esperado da prova antes da leitura do cabeçalho."
             : `Classificação do modelo pelo cabeçalho com confiança ${omrAnalysis.modelConfidence}%.`,
           omrAnalysis.headerText ? `Cabeçalho OCR: ${omrAnalysis.headerText.slice(0, 140)}` : "Cabeçalho OCR indisponível nesta imagem.",
-          isFanucchi ? "Adesivo QR validado no servidor antes da leitura OMR." : "Identificação por OCR e confirmação manual.",
+          identity.invalidMessage || (identity.method === "qr" ? "Adesivo QR validado no servidor; leitura das bolhas independente do adesivo." : "Identificação por OCR e confirmação manual."),
           preprocessing.processedLabel,
           preprocessing.perspectiveCorrected
             ? "Perspectiva de foto de celular corrigida antes da leitura."
@@ -344,6 +385,9 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
         processingLabel:
           needsManualReview ? "Revisão manual obrigatória" : "Leitura pronta para conferência",
         processedPreviewUrl: preprocessing.previewUrl,
+        evidencePreviewUrl: preprocessing.evidencePreviewUrl,
+        evidenceWidth: preprocessing.width,
+        evidenceHeight: preprocessing.height,
         qrStatus: "ignored",
         qualitySummary: {
           brightness: preprocessing.lowLight ? "Baixa" : "Boa",
@@ -352,6 +396,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
           dimensions: preprocessing.dimensions,
           lowLight: preprocessing.lowLight,
           orientation: preprocessing.orientation,
+          perspectiveCorrected: preprocessing.perspectiveCorrected,
           shadowRisk: preprocessing.shadowRisk,
         },
         templateId: omrAnalysis.templateId,
@@ -360,7 +405,8 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       setPhase("review");
       setPreviewZoom(1);
       setPreviewRotation(0);
-      setReviewFilter("all");
+      setReviewFilter(detectedAnswers.some(needsAnswerReview) ? "review" : "all");
+      setReviewAudit([]);
       setIdentityConfirmed(false);
       setEditingQuestion(null);
       setScreenMessage("");
@@ -399,6 +445,9 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       pageType: "MANUAL",
       processingLabel: "Preenchimento manual",
       processedPreviewUrl: rawPreviewUrl,
+      evidencePreviewUrl: rawPreviewUrl,
+      evidenceWidth: 0,
+      evidenceHeight: 0,
       qrStatus: "not-found",
       qualitySummary: {
         brightness: "Não avaliada",
@@ -407,6 +456,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
         dimensions: selectedFile ? `${selectedFile.name}` : "Sem imagem",
         lowLight: false,
         orientation: "Manual",
+        perspectiveCorrected: false,
         shadowRisk: false,
       },
       templateId: "MANUAL",
@@ -416,18 +466,33 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
     setPreviewZoom(1);
     setPreviewRotation(0);
     setReviewFilter("all");
+    setReviewAudit([]);
     setIdentityConfirmed(false);
+    setRecorrectionReason("");
     setScreenMessage("Modo manual habilitado. A imagem continua disponível para consulta.");
   };
 
-  const handleFileSelected = async (file: File | null) => {
+  const handleFileSelected = async (file: File | null, preserveQueue = false, confirmedReplace = false) => {
+    if (phase === "processing") {
+      setScreenMessage("Aguarde a leitura atual terminar antes de escolher outro cartão.");
+      return;
+    }
+    if (file && review && !savedCurrent && !confirmedReplace && !window.confirm("Trocar a foto descarta as respostas conferidas nesta leitura. Deseja continuar?")) return;
+    if (!preserveQueue) {
+      setPendingFiles([]);
+      setBatchTotal(0);
+      setBatchSaved(0);
+      setBatchSkipped(0);
+    }
     setScreenMessage("");
     setReview(null);
+    setReviewAudit([]);
     setEditingQuestion(null);
     setErrorMessage("");
     setProgress(0);
     setProgressLabel("Preparando fluxo...");
     setPhase("idle");
+    setSavedCurrent(false);
 
     if (!file) {
       return;
@@ -436,6 +501,8 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
     const validation = await validateImageFile(file);
     if (!validation.ok) {
       setSelectedFile(null);
+      if (rawPreviewUrl) URL.revokeObjectURL(rawPreviewUrl);
+      setRawPreviewUrl("");
       setErrorMessage(validation.message);
       setPhase("error");
       return;
@@ -451,7 +518,32 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
     void processSelectedImage(file);
   };
 
+  const handleBatchSelected = (files: File[]) => {
+    if (phase === "processing") return;
+    if (!files.length) return;
+    if (review && !savedCurrent && !window.confirm("Iniciar outro lote descarta a conferência atual. Deseja continuar?")) return;
+    setBatchTotal(files.length);
+    setBatchSaved(0);
+    setBatchSkipped(0);
+    setPendingFiles(files.slice(1));
+    void handleFileSelected(files[0], true, true);
+  };
+
+  const advanceBatch = () => {
+    if (phase === "processing") return;
+    if (!pendingFiles.length) return;
+    if (!savedCurrent && !window.confirm("Este cartão ainda não foi salvo. Colocá-lo como pendente de nova foto e continuar?")) return;
+    if (!savedCurrent) setBatchSkipped((current) => current + 1);
+    const [next, ...rest] = pendingFiles;
+    setPendingFiles(rest);
+    void handleFileSelected(next, true, true);
+  };
+
   const updateMarkedAnswer = (question: number, markedAnswers: string[]) => {
+    const previousAnswer = review?.answers.find((item) => item.question === question);
+    if (previousAnswer && (previousAnswer.explicitlyReviewed !== true || previousAnswer.markedAnswers.join("|") !== markedAnswers.join("|"))) {
+      setReviewAudit((current) => [...current, { question, before: previousAnswer.markedAnswers, after: markedAnswers }]);
+    }
     setReview((previous) =>
       previous
         ? {
@@ -480,11 +572,13 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
     setSelectedFile(null);
     setRawPreviewUrl("");
     setReview(null);
+    setReviewAudit([]);
     setEditingQuestion(null);
     setPreviewZoom(1);
     setPreviewRotation(0);
     setReviewFilter("all");
     setIdentityConfirmed(false);
+    setRecorrectionReason("");
     setProgress(0);
     setProgressLabel("Preparando fluxo...");
     setScreenMessage("Leitura fechada. Você pode enviar ou tirar outra foto.");
@@ -493,6 +587,10 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
   };
 
   const confirmCorrection = async () => {
+    if (savedCurrent) {
+      setScreenMessage("Este cartão já foi salvo. Escolha o próximo cartão ou uma nova foto.");
+      return;
+    }
     if (!review) {
       setErrorMessage("Nenhuma leitura para salvar. Inicie um OCR ou abra o modo manual.");
       setPhase("error");
@@ -504,20 +602,19 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       return;
     }
 
-    if (identityMismatch && !identityConfirmed) {
+    if (identityNeedsConfirmation && !identityConfirmed) {
       setErrorMessage("Confirme que o aluno selecionado é realmente o dono deste cartão antes de salvar.");
       return;
     }
 
-    const undecided = review.answers.some((item) => item.explicitlyReviewed === false);
-    if (undecided) {
-      setErrorMessage("Revise cada questão: escolha uma alternativa ou marque explicitamente em branco.");
+    const undecided = review.answers.filter(needsAnswerReview);
+    if (undecided.length) {
+      setReviewFilter("review");
+      setErrorMessage(`Confira ${undecided.length} ${undecided.length === 1 ? "questão sinalizada" : "questões sinalizadas"} antes de salvar. Abra a questão e confirme a marcação ou o espaço em branco.`);
       return;
     }
-
-    const uncertainBlank = review.answers.some((item) => !item.markedAnswers.length && item.confidence < MIN_CONFIDENCE_REVIEW && item.explicitlyReviewed !== true);
-    if (uncertainBlank) {
-      setErrorMessage("Confira as questões sem marcação e confirme cada resposta em branco antes de salvar.");
+    if (earlierCorrections.length && recorrectionReason.trim().length < 10) {
+      setErrorMessage("Já existe uma correção para este aluno nesta prova. Para recalcular sem apagar o histórico, explique o motivo em pelo menos 10 caracteres.");
       return;
     }
 
@@ -527,6 +624,8 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       examId: exam.id,
       imageLabel: selectedFile?.name ?? "captura-manual.jpg",
       method: review.identificationMethod,
+      reviewAudit,
+      recorrectionReason: earlierCorrections.length ? recorrectionReason.trim() : undefined,
       notes: [
         notes,
         `Confianca geral do OCR: ${review.confidence}%`,
@@ -537,6 +636,8 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
     });
 
     if (result.ok) {
+      setSavedCurrent(true);
+      if (batchTotal) setBatchSaved((current) => current + 1);
       setScreenMessage(result.message);
       setErrorMessage("");
       return;
@@ -640,7 +741,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
               <Badge tone="accent">Automático</Badge>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" className="min-h-12 flex-1" onClick={() => cameraInputRef.current?.click()}>
+              <Button size="lg" className="min-h-12 flex-1" disabled={phase === "processing"} onClick={() => cameraInputRef.current?.click()}>
                 <Camera className="size-4" />
                 Tirar foto
               </Button>
@@ -648,12 +749,16 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
                 size="lg"
                 variant="secondary"
                 className="min-h-12 flex-1"
+                disabled={phase === "processing"}
                 onClick={() => uploadInputRef.current?.click()}
               >
                 <ImagePlus className="size-4" />
                 Enviar arquivo
               </Button>
             </div>
+            <button type="button" disabled={phase === "processing"} className="mt-3 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] disabled:opacity-50" onClick={() => batchInputRef.current?.click()}>
+              Enviar várias fotos para uma fila
+            </button>
             <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
               Fotografe a folha inteira, com os quatro cantos visíveis e sem sombra forte. A perspectiva, rotação e contraste são ajustados automaticamente.
             </p>
@@ -667,7 +772,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             capture="environment"
             className="hidden"
             onChange={(event) => {
-              void handleFileSelected(event.target.files?.[0] ?? null);
+              void handleFileSelected(event.target.files?.[0] ?? null, batchTotal > 0);
               event.target.value = "";
             }}
           />
@@ -677,10 +782,30 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             accept="image/jpeg,image/png,image/webp,application/pdf"
             className="hidden"
             onChange={(event) => {
-              void handleFileSelected(event.target.files?.[0] ?? null);
+              void handleFileSelected(event.target.files?.[0] ?? null, batchTotal > 0);
               event.target.value = "";
             }}
           />
+          <input
+            ref={batchInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              handleBatchSelected(Array.from(event.target.files ?? []));
+              event.target.value = "";
+            }}
+          />
+
+          {batchTotal > 0 ? (
+            <section className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4" aria-label="Fila de cartões" aria-live="polite">
+              <p className="text-sm font-semibold text-[var(--foreground)]">Fila de cartões</p>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">{batchSaved} salvos · {batchSkipped} precisam de nova foto · {pendingFiles.length} aguardando</p>
+              <p className="mt-2 truncate text-xs text-[var(--muted-foreground)]">Atual: {selectedFile?.name ?? "nenhum arquivo"}</p>
+              {pendingFiles.length ? <Button className="mt-3 min-h-11 w-full" variant="secondary" disabled={phase === "processing"} onClick={advanceBatch}>{savedCurrent ? "Abrir próximo cartão" : "Deixar pendente e abrir próximo"}</Button> : <p className="mt-2 text-xs text-[var(--muted-foreground)]">{savedCurrent ? "Fila concluída." : "Confira ou refaça a foto atual para concluir."}</p>}
+            </section>
+          ) : null}
 
           {selectedFile ? (
             <details className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4" open={phase === "processing"}>
@@ -792,18 +917,18 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
               <div className="grid gap-5 px-5 py-5 sm:px-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <h4 className="text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">Resultado da correção</h4>
+                    <h4 className="text-lg font-semibold tracking-[-0.02em] text-[var(--foreground)]">{summary.revisao ? "Leitura aguardando conferência" : "Resultado da correção"}</h4>
                     <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                      {summary.acertos === 1 ? "1 resposta correta" : `${summary.acertos} respostas corretas`} de {review.answers.length}
+                      {summary.revisao ? "A nota ficará disponível depois da conferência." : `${summary.acertos} ${summary.acertos === 1 ? "resposta correta" : "respostas corretas"} de ${review.answers.length}`}
                     </p>
                   </div>
                   <p className="text-3xl font-semibold tabular-nums tracking-[-0.04em] text-[var(--foreground)]">
-                    {summary.percentual}%
+                    {summary.revisao ? "—" : `${summary.percentual}%`}
                   </p>
                 </div>
 
                 <div>
-                  <div
+                  {!summary.revisao ? <div
                     aria-label={`Aproveitamento: ${summary.percentual}%`}
                     aria-valuemax={100}
                     aria-valuemin={0}
@@ -816,12 +941,12 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
                       className="block h-full rounded-full bg-[var(--accent)] transition-[width] duration-200 motion-reduce:transition-none"
                       style={{ width: `${summary.percentual}%` }}
                     />
-                  </div>
+                  </div> : null}
                   <p className="mt-2 text-xs font-medium text-[var(--muted-foreground)]">
                     {review.pageType === "MANUAL" && summary.revisao > 0
                       ? `Preencha ${summary.revisao} ${summary.revisao === 1 ? "questão pendente" : "questões pendentes"} antes de salvar.`
                       : summary.revisao > 0
-                      ? `Revise ${summary.revisao} ${summary.revisao === 1 ? "resposta" : "respostas"} com baixa confiança ou marcação especial antes de salvar.`
+                      ? `Confirme ${summary.revisao} ${summary.revisao === 1 ? "resposta" : "respostas"} sinalizadas antes de ver a nota e salvar.`
                       : summary.erros > 0
                         ? `Confira ${summary.erros} ${summary.erros === 1 ? "divergência" : "divergências"} com o cartão.`
                         : "Todas as respostas foram lidas com boa confiança."}
@@ -832,18 +957,39 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
               <dl className="grid border-t border-[color-mix(in_srgb,var(--accent)_22%,var(--border))] sm:grid-cols-3">
                 <div className="px-5 py-4 sm:px-6">
                   <dt className="text-xs font-medium text-[var(--muted-foreground)]">Acertos</dt>
-                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.acertos}</dd>
+                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.revisao ? "—" : summary.acertos}</dd>
                 </div>
                 <div className="border-t border-[color-mix(in_srgb,var(--accent)_22%,var(--border))] px-5 py-4 sm:border-t-0 sm:border-l sm:px-6">
                   <dt className="text-xs font-medium text-[var(--muted-foreground)]">Divergências</dt>
-                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.erros}</dd>
+                  <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.revisao ? "—" : summary.erros}</dd>
                 </div>
                 <div className="border-t border-[color-mix(in_srgb,var(--accent)_22%,var(--border))] px-5 py-4 sm:border-t-0 sm:border-l sm:px-6">
                   <dt className="text-xs font-medium text-[var(--muted-foreground)]">Para revisar</dt>
                   <dd className="mt-1 text-xl font-semibold tabular-nums text-[var(--foreground)]">{summary.revisao}</dd>
                 </div>
               </dl>
+              <p className="border-t border-[var(--border)] px-5 py-3 text-sm text-[var(--muted-foreground)] sm:px-6" aria-live="polite">
+                {summary.claras} claras · {summary.emBranco} em branco · {summary.multiplas} com mais de uma marca · {summary.revisao} para conferir
+              </p>
             </section>
+
+            {review.pageType !== "MANUAL" ? (
+              <section className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5" aria-label="Qualidade da foto">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-base font-semibold text-[var(--foreground)]">Qualidade da foto</h4>
+                    <p className="mt-1 text-sm text-[var(--muted-foreground)]">A imagem original continua disponível acima para comparar com a leitura.</p>
+                  </div>
+                  <Button variant="secondary" size="default" onClick={() => cameraInputRef.current?.click()}><Camera className="size-4" />Tirar outra foto</Button>
+                </div>
+                <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+                  <li className="rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--foreground)]">{review.qualitySummary.lowLight ? "Pouca luz: confira todas as respostas" : "Luz suficiente para análise"}</li>
+                  <li className="rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--foreground)]">{review.qualitySummary.shadowRisk ? "Sombra ou contraste irregular: confira as respostas" : "Sem sombra forte detectada"}</li>
+                  <li className="rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--foreground)]">{review.qualitySummary.perspectiveCorrected ? "Folha alinhada automaticamente" : "Bordas não confirmadas: confira o enquadramento"}</li>
+                  <li className="rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--foreground)]">Imagem analisada: {review.qualitySummary.dimensions}</li>
+                </ul>
+              </section>
+            ) : null}
 
             <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
               <FieldLabel label="Aluno que fez esta prova">
@@ -852,6 +998,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
                   onChange={(event) =>
                     {
                       setIdentityConfirmed(false);
+                      setRecorrectionReason("");
                       setReview((previous) =>
                         previous ? { ...previous, matchedStudentId: event.target.value } : previous,
                       );
@@ -867,11 +1014,20 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
                 </Select>
               </FieldLabel>
               <p className="mt-3 text-sm text-[var(--muted-foreground)]">Se este não for o aluno, escolha o nome correto antes de salvar.</p>
-              {identityMismatch ? (
+              {earlierCorrections.length ? (
+                <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4" role="status">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">Este aluno já tem {earlierCorrections.length} {earlierCorrections.length === 1 ? "correção" : "correções"} nesta prova</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">Salvar novamente cria uma recorreção e preserva o resultado anterior. Explique por que está corrigindo outra vez.</p>
+                  <FieldLabel label="Motivo da recorreção">
+                    <Textarea value={recorrectionReason} onChange={(event) => setRecorrectionReason(event.target.value)} className="mt-2 min-h-24" placeholder="Ex.: nova foto após marcação ambígua" />
+                  </FieldLabel>
+                </div>
+              ) : null}
+              {identityNeedsConfirmation ? (
                 <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--error-border)] bg-[var(--error-soft)] p-3" role="alert">
                   <p className="text-sm font-semibold text-[var(--foreground)]">Confira o aluno antes de salvar</p>
                   <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">
-                    O cartão parece ser de <strong>{review.detectedName}</strong>, mas o aluno selecionado é <strong>{selectedReviewStudent.nome}</strong>.
+                    {identityMismatch ? <>O cartão parece ser de <strong>{review.detectedName}</strong>, mas o aluno selecionado é <strong>{selectedReviewStudent.nome}</strong>.</> : "O sistema não confirmou o nome pela imagem. Confira a prova e selecione o aluno correto."}
                   </p>
                   <label className="mt-3 flex items-start gap-3 text-sm font-semibold text-[var(--foreground)]">
                     <input
@@ -898,7 +1054,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             <AnswerSheetReviewOverlay
               alternatives={exam.alternativas}
               answers={review.answers}
-              src={review.processedPreviewUrl}
+              src={review.evidencePreviewUrl}
               templateId={review.templateId}
             />
 
@@ -931,13 +1087,13 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
             <AnswerReviewGrid
               alternatives={exam.alternativas}
               answers={visibleAnswers}
+              evidencePreviewUrl={review.evidencePreviewUrl}
+              evidenceWidth={review.evidenceWidth}
+              evidenceHeight={review.evidenceHeight}
               editingQuestion={editingQuestion}
               onEdit={setEditingQuestion}
               onMarkBlank={(question) => updateMarkedAnswer(question, [])}
-              onMarkMultiple={(answer) => {
-                const alternate = exam.alternativas.find((item) => item !== answer.correctAnswer) ?? answer.correctAnswer;
-                updateMarkedAnswer(answer.question, [answer.correctAnswer, alternate]);
-              }}
+              onMarkMultiple={(question, alternatives) => updateMarkedAnswer(question, alternatives)}
               onSelect={(question, alternative) => updateMarkedAnswer(question, [alternative])}
             />
 
@@ -1007,6 +1163,9 @@ export function EmptyReviewState() {
 function AnswerReviewGrid({
   alternatives,
   answers,
+  evidencePreviewUrl,
+  evidenceWidth,
+  evidenceHeight,
   editingQuestion,
   onEdit,
   onMarkBlank,
@@ -1015,12 +1174,17 @@ function AnswerReviewGrid({
 }: {
   alternatives: string[];
   answers: ScanAnswer[];
+  evidencePreviewUrl: string;
+  evidenceWidth: number;
+  evidenceHeight: number;
   editingQuestion: number | null;
   onEdit: (question: number | null) => void;
   onMarkBlank: (question: number) => void;
-  onMarkMultiple: (answer: ScanAnswer) => void;
+  onMarkMultiple: (question: number, alternatives: string[]) => void;
   onSelect: (question: number, alternative: string) => void;
 }) {
+  const [multipleQuestion, setMultipleQuestion] = useState<number | null>(null);
+  const [multipleChoices, setMultipleChoices] = useState<string[]>([]);
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {answers.map((answer) => {
@@ -1062,6 +1226,7 @@ function AnswerReviewGrid({
 
             {isEditing ? (
               <div className="mt-4 rounded-[var(--radius-sm)] border border-[var(--accent)] bg-[var(--accent-soft)] p-3">
+                <QuestionEvidenceCrop answer={answer} src={evidencePreviewUrl} imageWidth={evidenceWidth} imageHeight={evidenceHeight} />
                 <p className="text-sm font-semibold text-[var(--foreground)]">Qual resposta está marcada no cartão?</p>
                 <div className="mt-3 grid grid-cols-5 gap-2">
                   {alternatives.map((alternative) => (
@@ -1070,21 +1235,32 @@ function AnswerReviewGrid({
                       type="button"
                       className={cn(
                         "min-h-12 rounded-[var(--radius-sm)] border bg-[var(--card-solid)] text-base font-bold text-[var(--foreground)] transition-colors",
-                        answer.markedAnswers.includes(alternative)
+                        (multipleQuestion === answer.question ? multipleChoices.includes(alternative) : answer.markedAnswers.includes(alternative))
                           ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-contrast)]"
                           : "border-[var(--border-strong)] hover:border-[var(--accent)]",
                       )}
-                      onClick={() => onSelect(answer.question, alternative)}
+                      aria-pressed={multipleQuestion === answer.question ? multipleChoices.includes(alternative) : answer.markedAnswers.includes(alternative)}
+                      onClick={() => {
+                        if (multipleQuestion === answer.question) {
+                          setMultipleChoices((current) => current.includes(alternative) ? current.filter((item) => item !== alternative) : [...current, alternative]);
+                        } else { onSelect(answer.question, alternative); setMultipleQuestion(null); }
+                      }}
                     >
                       {alternative}
                     </button>
                   ))}
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <Button size="default" variant="secondary" className="min-h-12" onClick={() => onMarkBlank(answer.question)}>Em branco</Button>
-                  <Button size="default" variant="secondary" className="min-h-12" onClick={() => onMarkMultiple(answer)}>Mais de uma</Button>
+                  <Button size="default" variant="secondary" className="min-h-12" onClick={() => { onMarkBlank(answer.question); setMultipleQuestion(null); }}>Em branco</Button>
+                  <Button size="default" variant="secondary" className="min-h-12" onClick={() => { setMultipleQuestion(answer.question); setMultipleChoices(answer.markedAnswers); }}>Mais de uma</Button>
                 </div>
-                <button type="button" className="mt-3 text-sm font-semibold text-[var(--accent)] underline underline-offset-4" onClick={() => onEdit(null)}>Cancelar</button>
+                {multipleQuestion === answer.question ? (
+                  <div className="mt-3 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--card-solid)] p-3">
+                    <p className="text-sm text-[var(--foreground)]">Selecione as alternativas realmente marcadas na foto.</p>
+                    <Button className="mt-3 min-h-11 w-full" disabled={multipleChoices.length < 2} onClick={() => { onMarkMultiple(answer.question, alternatives.filter((item) => multipleChoices.includes(item))); setMultipleQuestion(null); }}>Confirmar {multipleChoices.length} marcações</Button>
+                  </div>
+                ) : null}
+                <button type="button" className="mt-3 text-sm font-semibold text-[var(--accent)] underline underline-offset-4" onClick={() => { onEdit(null); setMultipleQuestion(null); }}>Cancelar</button>
               </div>
             ) : (
               <Button size="default" variant="secondary" className="mt-4 min-h-12 w-full" onClick={() => onEdit(answer.question)}>
@@ -1098,10 +1274,29 @@ function AnswerReviewGrid({
   );
 }
 
+function QuestionEvidenceCrop({ answer, src, imageWidth, imageHeight }: {
+  answer: ScanAnswer;
+  src: string;
+  imageWidth: number;
+  imageHeight: number;
+}) {
+  const rect = answer.evidenceRect;
+  if (!src || !rect || rect.width <= 0 || rect.height <= 0 || imageWidth <= 0 || imageHeight <= 0) return null;
+  return (
+    <figure className="mb-4">
+      <figcaption className="mb-2 text-xs font-semibold text-[var(--foreground)]">Questão {answer.question} na foto, antes do filtro preto e branco</figcaption>
+      <div className="relative overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-white" style={{ aspectRatio: `${rect.width * imageWidth} / ${rect.height * imageHeight}` }}>
+        <NextImage unoptimized src={src} alt={`Recorte da questão ${answer.question} para conferência visual`} width={imageWidth} height={imageHeight} className="absolute max-w-none" style={{ width: `${100 / rect.width}%`, height: `${100 / rect.height}%`, left: `${-rect.x / rect.width * 100}%`, top: `${-rect.y / rect.height * 100}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-[var(--muted-foreground)]">{answer.status === "MULTIPLE" ? "Há mais de uma marcação possível." : answer.status === "BLANK" ? "Nenhuma alternativa foi identificada com segurança." : answer.status === "LOW_CONFIDENCE" ? "As alternativas estão difíceis de distinguir." : "Confira a marcação antes de confirmar."}</p>
+    </figure>
+  );
+}
+
 function AnswerSheetReviewOverlay({ alternatives, answers, src, templateId }: { alternatives: string[]; answers: ScanAnswer[]; src: string; templateId: string }) {
   const isFanucchi = templateId === FANUCCHI_ANSWER_SHEET_VERSION;
   if (!templateId.toUpperCase().startsWith("PS-CARD") && !isFanucchi) return null;
-  const uncertain = answers.filter((answer) => answer.confidence < MIN_CONFIDENCE_REVIEW || answer.markedAnswers.length !== 1);
+  const uncertain = answers.filter(needsAnswerReview);
   if (!uncertain.length) return null;
   return <details className="rounded-[var(--radius-md)] border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4">
     <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">Ver pontos que exigem conferência sobre a folha</summary>
@@ -1206,10 +1401,12 @@ function PreviewPane({
       </div>
       <div className="relative grid min-h-[220px] place-items-center overflow-hidden rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <NextImage
+            unoptimized
             src={src}
             alt={label}
+            width={794}
+            height={1123}
             className="max-h-[420px] w-full origin-center object-contain transition-transform duration-300"
             style={{ transform: `rotate(${rotation}deg) scale(${zoom})` }}
           />
@@ -1440,6 +1637,7 @@ async function preprocessImage(
         : "A imagem está pequena demais para ler as bolhas com segurança. Aproxime a câmera sem cortar os quatro cantos da folha.",
     );
   }
+  const evidencePreviewUrl = targetCanvas.toDataURL("image/jpeg", 0.9);
   const binaryImage = binarizeImage(finalImage, preserveCardGeometry);
   targetContext.putImageData(binaryImage, 0, 0);
 
@@ -1475,6 +1673,7 @@ async function preprocessImage(
     perspectiveCorrected: rectification.applied,
     processedCanvas: targetCanvas,
     previewUrl: targetCanvas.toDataURL("image/jpeg", 0.88),
+    evidencePreviewUrl,
     processedLabel,
     shadowRisk,
     width: targetCanvas.width,
@@ -1683,6 +1882,13 @@ function getDetectedAnswerLabel(answer: ScanAnswer) {
   }
 
   return answer.markedAnswers[0];
+}
+
+function needsAnswerReview(answer: ScanAnswer) {
+  if (answer.explicitlyReviewed === true) return false;
+  if (answer.explicitlyReviewed === false) return true;
+  return answer.status === "LOW_CONFIDENCE" || answer.status === "MULTIPLE" ||
+    answer.confidence < MIN_CONFIDENCE_REVIEW || answer.markedAnswers.length !== 1;
 }
 
 function getAnswerState(answer: ScanAnswer) {

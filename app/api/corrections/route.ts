@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { isAcademicManagementRole } from "@/lib/access-control";
 import { canCorrectAssignedStudent } from "@/lib/assigned-exam-access";
+import { formatReviewAudit } from "@/lib/correction-review-audit";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
@@ -26,6 +27,12 @@ const schema = z.object({
   imageLabel: z.string().trim().min(1).max(260),
   method: z.enum(["qr", "ocr", "manual"]),
   notes: z.array(z.string().trim().max(500)).max(40),
+  recorrectionReason: z.string().trim().min(10).max(500).optional(),
+  reviewAudit: z.array(z.object({
+    question: z.number().int().min(1).max(200),
+    before: z.array(z.string().trim().min(1).max(30)).max(10),
+    after: z.array(z.string().trim().min(1).max(30)).max(10),
+  }).strict()).max(200).optional(),
   studentId: z.string().trim().min(1).max(120),
 }).strict();
 
@@ -69,6 +76,14 @@ export async function POST(request: Request) {
     const answerKey = data.answerKeys.filter((item) => item.provaId === exam.id).sort((a, b) => a.questao - b.questao);
     if (!answerKey.length) return NextResponse.json({ error: "Esta prova ainda não possui gabarito completo." }, { status: 400 });
     if (input.answers.length !== answerKey.length) return NextResponse.json({ error: "Revise todas as questões antes de salvar." }, { status: 400 });
+    const questionIds = new Set(answerKey.map((item) => item.questao));
+    if (input.reviewAudit?.some((item) => !questionIds.has(item.question))) {
+      return NextResponse.json({ error: "Há uma conferência de questão fora desta prova." }, { status: 400 });
+    }
+    const priorCorrections = data.corrections.filter((item) => item.correction.provaId === exam.id && item.correction.alunoId === student.id);
+    if (priorCorrections.length && !input.recorrectionReason) {
+      return NextResponse.json({ error: "Já existe uma correção deste aluno para esta prova. Informe o motivo para criar uma recorreção sem apagar o histórico." }, { status: 409 });
+    }
 
     const session = buildCorrectionSession({
       answerKey,
@@ -78,7 +93,7 @@ export async function POST(request: Request) {
       exams: data.exams,
       imageLabel: input.imageLabel,
       method: input.method,
-      notes: input.notes,
+      notes: [...input.notes, ...formatReviewAudit(input.reviewAudit), ...(input.recorrectionReason ? [`Recorreção: ${input.recorrectionReason}`] : [])],
       rules: data.correctionRules,
       student,
     });
@@ -87,7 +102,7 @@ export async function POST(request: Request) {
       actorId: validation.session.id,
       event: "correction_created",
       targetId: session.correction.id,
-      metadata: { examId: exam.id, role: validation.session.role },
+      metadata: { examId: exam.id, role: validation.session.role, recorrection: priorCorrections.length > 0, priorCorrectionId: priorCorrections.at(0)?.correction.id ?? "", manualReviewChanges: input.reviewAudit?.length ?? 0 },
     });
     return NextResponse.json({ correction: session, message: "Correção salva com sucesso." }, { status: 201 });
   } catch (error) {
