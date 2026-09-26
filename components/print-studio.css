@@ -1,4 +1,4 @@
-.print-studio { display: grid; gap: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card-solid); padding: 22px; box-shadow: var(--shadow-soft); }
+.print-studio { display: grid; min-width: 0; gap: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card-solid); padding: 22px; box-shadow: var(--shadow-soft); container-type: inline-size; }
 .print-studio > header h2 { margin: 0; font-size: 1.15rem; letter-spacing: -.025em; }
 .print-studio > header h2 svg { display: inline-block; margin-right: 7px; color: var(--accent); vertical-align: -2px; }
 .print-studio > header p { margin: 5px 0 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.5; }
@@ -37,8 +37,10 @@
 .print-studio__controls--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .exam-form__presentation { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 20px; }
 .print-studio--editor { border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 28%, var(--card-solid)); box-shadow: none; }
-.print-studio__controls label { display: grid; gap: 7px; color: var(--muted-foreground); font-size: 12px; font-weight: 720; }
-.print-studio__controls label > svg { display: inline; margin-right: 6px; color: var(--accent); vertical-align: -3px; }
+.print-studio__controls label { display: grid; min-width: 0; align-content: start; gap: 7px; color: var(--muted-foreground); font-size: 12px; font-weight: 720; }
+.print-studio__field-title { display: inline-flex; min-height: 18px; align-items: center; gap: 6px; }
+.print-studio__field-title svg { flex: none; color: var(--accent); }
+.print-studio__controls .app-select, .print-studio__controls .app-select__trigger { min-width: 0; max-width: 100%; }
 .print-studio__notice { margin: 0; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border)); border-radius: var(--radius-sm); background: var(--surface); padding: 11px 12px; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
 .print-studio__batch { display: grid; gap: 13px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent-soft) 18%, var(--card-solid)); padding: 15px; }
 .print-studio__batch > header, .print-studio__batch-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -71,6 +73,7 @@
 .print-studio footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .print-studio footer p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
 @media (max-width: 1100px) { .print-studio__workbench { grid-template-columns: 1fr; } .print-studio__preview { max-width: 650px; width: 100%; } }
-@media (max-width: 760px) { .print-studio__controls--three { grid-template-columns: 1fr; } }
+@container (max-width: 620px) { .print-studio__controls--three { grid-template-columns: repeat(2, minmax(0, 1fr)); } .print-studio__controls--three > label:first-child { grid-column: 1 / -1; } }
+@container (max-width: 390px) { .print-studio__controls, .print-studio__controls--three { grid-template-columns: minmax(0, 1fr); } .print-studio__controls--three > label:first-child { grid-column: auto; } }
 @media (max-width: 640px) { .print-studio { padding: 18px; } .print-studio__kind { grid-template-columns: 1fr; } .print-studio__kind button { border-right: 0; border-bottom: 1px solid var(--border); } .print-studio__kind button:last-child { border-bottom: 0; } .print-studio__templates { grid-template-columns: 1fr; } .print-studio__template { grid-template-columns: 72px minmax(0, 1fr); align-items: center; column-gap: 10px; } .print-studio__template > span { grid-row: span 2; height: 46px; } .print-studio__template strong, .print-studio__template small { align-self: end; } .print-studio__template small { align-self: start; } .print-studio__controls, .print-studio footer { grid-template-columns: 1fr; } .print-studio footer { display: grid; } .print-studio footer .button { width: 100%; } .print-studio__batch > header, .print-studio__batch-actions { display: grid; } }
 @media (prefers-reduced-motion: reduce) { .print-studio__kind button, .print-studio__template { transition: none; } }
