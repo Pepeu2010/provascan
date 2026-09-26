@@ -3,12 +3,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { isAcademicManagementRole } from "@/lib/access-control";
-import { getStudentsForExam } from "@/lib/exam-audience";
 import { canCorrectAssignedStudent } from "@/lib/assigned-exam-access";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
 import { buildCorrectionSession } from "@/services/exam-correction";
+import { getExamPrintRoster } from "@/services/exam-print-roster";
 import {
   appendAuditEvent,
   getTeacherCorrectionAccess,
@@ -57,10 +57,13 @@ export async function POST(request: Request) {
     const exam = data.exams.find((item) => item.id === input.examId);
     if (!exam || (exam.status !== "publicada" && exam.status !== "aplicada")) return NextResponse.json({ error: "Publique a prova antes de iniciar a correção." }, { status: 400 });
     const student = data.students.find((item) => item.id === input.studentId);
-    if (teacherAccess?.classIds && (!student || !canCorrectAssignedStudent(teacherAccess.classIds, student.turma))) {
+    if (teacher && (!student || !teacherAccess || !canCorrectAssignedStudent(teacherAccess.classIds, student.turma))) {
       return NextResponse.json({ error: "Este aluno não pertence a uma turma atribuída a você." }, { status: 403 });
     }
-    if (!student || (!teacherAccess?.classIds && !getStudentsForExam(exam, data.students, data.classes).some((item) => item.id === student.id))) {
+    const institutionalRoster = !teacher
+      ? await getExamPrintRoster({ actorId: validation.session.id, examId: input.examId, institutionalView: true })
+      : null;
+    if (!student || (!teacher && !institutionalRoster?.students.some((item) => item.id === student.id))) {
       return NextResponse.json({ error: "O aluno selecionado não pertence ao público desta prova." }, { status: 400 });
     }
     const answerKey = data.answerKeys.filter((item) => item.provaId === exam.id).sort((a, b) => a.questao - b.questao);

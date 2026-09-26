@@ -44,7 +44,7 @@ assert.match(managedUserRoute, /export async function DELETE/);
 assert.match(managedUserRoute, /setManagedUserTemporaryPassword/);
 assert.match(correctionsRoute, /getTeacherCorrectionAccess/);
 assert.match(correctionsRoute, /canCorrectAssignedStudent/);
-assert.match(correctionsRoute, /getStudentsForExam/);
+assert.match(correctionsRoute, /getExamPrintRoster/);
 assert.match(printRosterRoute, /getExamSession/);
 assert.match(printRosterRoute, /getExamPrintRoster/);
 assert.match(printRosterService, /getTeacherExam\(\{ \.\.\.input, allowAssignedRead: true \}\)/);
