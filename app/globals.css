@@ -1118,8 +1118,11 @@ textarea { padding-block: 10px !important; }
   .dashboard-sidebar__workspace { height: 36px; flex: 0 0 36px; overflow: hidden; margin: 0 16px; padding-bottom: 12px; white-space: nowrap; }
   .dashboard-sidebar__navigation { align-items: stretch; margin: 14px 8px; padding: 0; }
   .dashboard-sidebar__support { padding: 8px 12px 14px; }
+  .dashboard-sidebar__logout { padding: 0 10px; }
   .dashboard-sidebar--compact { width: var(--dashboard-sidebar-compact-width); }
+  .dashboard-sidebar--compact .dashboard-sidebar__header { padding: 12px 16px; }
   .dashboard-sidebar--compact .dashboard-sidebar__workspace { visibility: hidden; }
+  .dashboard-sidebar--compact .dashboard-sidebar__navigation { padding: 0; }
   .dashboard-sidebar--compact .dashboard-sidebar__item,
   .dashboard-sidebar--compact .dashboard-sidebar__support-button,
   .dashboard-sidebar--compact .dashboard-sidebar__logout { width: 100%; justify-content: flex-start; padding: 0 10px; }
