@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { Command, LoaderCircle, Menu, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import DashboardLoading from "@/app/dashboard/loading";
 import { useAppData } from "@/components/app-data-provider";
 import { MotionPageTransition } from "@/components/motion-page-transition";
@@ -12,6 +12,26 @@ import { canAccessSensitiveSettings } from "@/lib/access-control";
 
 const DIALOG_TRANSITION_MS = 200;
 const TABLET_SIDEBAR_TRANSITION_MS = 280;
+const SIDEBAR_PREFERENCE_EVENT = "provascan:sidebar-preference";
+const sidebarPreferenceFallback = new Map<string, boolean>();
+
+function subscribeSidebarPreference(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(SIDEBAR_PREFERENCE_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(SIDEBAR_PREFERENCE_EVENT, callback);
+  };
+}
+
+function getSidebarPinned(userId?: string) {
+  if (!userId) return true;
+  try {
+    return window.localStorage.getItem(`provascan:sidebar-pinned:${userId}`) !== "false";
+  } catch {
+    return sidebarPreferenceFallback.get(userId) ?? true;
+  }
+}
 
 export function DashboardShell({
   children,
@@ -27,6 +47,9 @@ export function DashboardShell({
   const [dialogReady, setDialogReady] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
   const [tabletSidebarClosing, setTabletSidebarClosing] = useState(false);
+  const sidebarPinned = useSyncExternalStore(subscribeSidebarPreference, () => getSidebarPinned(session?.id), () => true);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sidebarKeyboardFocus, setSidebarKeyboardFocus] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ label: string; path: string } | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
@@ -40,6 +63,20 @@ export function DashboardShell({
   const activeLabel = session?.role === "professor" && active === "/dashboard"
     ? "Início"
     : dashboardNavigationItems.find((item) => item.href === active)?.label ?? "Painel";
+  const desktopSidebarOpen = sidebarPinned || sidebarHovered || sidebarKeyboardFocus;
+
+  const toggleSidebarPinned = () => {
+    const next = !sidebarPinned;
+    if (!next) setSidebarHovered(true);
+    if (!session?.id) return;
+    try {
+      window.localStorage.setItem(`provascan:sidebar-pinned:${session.id}`, String(next));
+      sidebarPreferenceFallback.delete(session.id);
+    } catch {
+      sidebarPreferenceFallback.set(session.id, next);
+    }
+    window.dispatchEvent(new Event(SIDEBAR_PREFERENCE_EVENT));
+  };
 
   const summary = useMemo(
     () =>
@@ -236,7 +273,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="dashboard-shell">
+    <div className={`dashboard-shell ${sidebarPinned ? "dashboard-shell--sidebar-pinned" : ""}`}>
       {pendingNavigation && pendingNavigation.path !== pathname ? (
         <div
           className="dashboard-navigation-feedback fixed inset-0 z-[80] grid place-items-center bg-[rgb(4_3_7_/_66%)] p-5 backdrop-blur-[2px]"
@@ -267,11 +304,28 @@ export function DashboardShell({
       <div className="dashboard-shell__sidebar-slot">
         <DashboardSidebar
           active={active}
-          compact={!tabletExpanded}
+          compact={!tabletExpanded && !desktopSidebarOpen}
           expanded={tabletExpanded}
           closing={tabletSidebarClosing}
+          desktopOpen={desktopSidebarOpen}
+          pinned={sidebarPinned}
           onNavigate={requestTabletClose}
           onToggleCompact={toggleTabletSidebar}
+          onTogglePinned={toggleSidebarPinned}
+          onPointerEnter={(event) => { if (event.pointerType === "mouse") setSidebarHovered(true); }}
+          onPointerLeave={() => setSidebarHovered(false)}
+          onFocusCapture={(event) => {
+            if ((event.target as HTMLElement).matches(":focus-visible")) setSidebarKeyboardFocus(true);
+          }}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSidebarKeyboardFocus(false);
+          }}
+          onKeyDownCapture={(event) => {
+            if (event.key === "Escape" && !sidebarPinned) {
+              setSidebarHovered(false);
+              setSidebarKeyboardFocus(false);
+            }
+          }}
         />
       </div>
 
