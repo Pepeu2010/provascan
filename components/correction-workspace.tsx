@@ -1286,8 +1286,7 @@ function QuestionEvidenceCrop({ answer, src, imageWidth, imageHeight }: {
     <figure className="mb-4">
       <figcaption className="mb-2 text-xs font-semibold text-[var(--foreground)]">Questão {answer.question} na foto, antes do filtro preto e branco</figcaption>
       <div className="relative overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-white" style={{ aspectRatio: `${rect.width * imageWidth} / ${rect.height * imageHeight}` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={`Recorte da questão ${answer.question} para conferência visual`} className="absolute max-w-none" style={{ width: `${100 / rect.width}%`, height: `${100 / rect.height}%`, left: `${-rect.x / rect.width * 100}%`, top: `${-rect.y / rect.height * 100}%` }} />
+        <NextImage unoptimized src={src} alt={`Recorte da questão ${answer.question} para conferência visual`} width={imageWidth} height={imageHeight} className="absolute max-w-none" style={{ width: `${100 / rect.width}%`, height: `${100 / rect.height}%`, left: `${-rect.x / rect.width * 100}%`, top: `${-rect.y / rect.height * 100}%` }} />
       </div>
       <p className="mt-2 text-xs text-[var(--muted-foreground)]">{answer.status === "MULTIPLE" ? "Há mais de uma marcação possível." : answer.status === "BLANK" ? "Nenhuma alternativa foi identificada com segurança." : answer.status === "LOW_CONFIDENCE" ? "As alternativas estão difíceis de distinguir." : "Confira a marcação antes de confirmar."}</p>
     </figure>
@@ -1402,10 +1401,12 @@ function PreviewPane({
       </div>
       <div className="relative grid min-h-[220px] place-items-center overflow-hidden rounded-[20px] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <NextImage
+            unoptimized
             src={src}
             alt={label}
+            width={794}
+            height={1123}
             className="max-h-[420px] w-full origin-center object-contain transition-transform duration-300"
             style={{ transform: `rotate(${rotation}deg) scale(${zoom})` }}
           />
