@@ -55,6 +55,7 @@ export type BubbleAnswerDetection = {
   confidence: number;
   markedAnswers: string[];
   question: number;
+  evidenceRect?: { height: number; width: number; x: number; y: number };
   scores: AnswerBubbleScore[];
   status: AnswerReadStatus;
 };
@@ -382,6 +383,7 @@ function analyzeProvaScanCard(params: {
     confidence: Math.round(row.marks.confidence * 100),
     markedAnswers: row.marks.markedIndexes.map((index) => alternatives[index]).filter(Boolean),
     question: row.question,
+    evidenceRect: getEvidenceRect(row.bubbles.map((bubble) => ({ cx: bubble.x, cy: bubble.y, radius: Math.max(bubble.width, bubble.height) / 2 })), imageData),
     scores: row.bubbles.map((bubble, index) => ({ alternative: alternatives[index], score: bubble.fillScore })),
     status: row.marks.status === "marked"
       ? "MARKED" as const
@@ -396,9 +398,16 @@ function analyzeProvaScanCard(params: {
     : [standardAnswers, compactPrintAnswers, templateAnswers].reduce((best, candidate) =>
       scoreProvaScanCardAnswers(candidate) > scoreProvaScanCardAnswers(best) ? candidate : best,
     );
-  const answers = officialGridAnswers.length === answerKeyLength && !alignedToTemplate
+  const selectedAnswers = officialGridAnswers.length === answerKeyLength && !alignedToTemplate
     ? officialGridAnswers
     : legacyAnswers;
+  const comparisonAnswers = selectedAnswers === legacyAnswers ? officialGridAnswers : legacyAnswers;
+  const answers = selectedAnswers.map((answer, index) => {
+    const comparison = comparisonAnswers[index];
+    const conflictingClearMarks = comparison && answer.markedAnswers.length === 1 && comparison.markedAnswers.length === 1 &&
+      answer.markedAnswers[0] !== comparison.markedAnswers[0] && answer.confidence >= 75 && comparison.confidence >= 75;
+    return conflictingClearMarks ? { ...answer, confidence: Math.min(answer.confidence, 55), status: "LOW_CONFIDENCE" as const } : answer;
+  });
 
   return {
     answers,
@@ -625,7 +634,8 @@ function readProvaScanCardAnswers(params: {
 }) {
   const { answerKeyLength, getBounds, imageData } = params;
   return Array.from({ length: answerKeyLength }, (_, questionIndex) => {
-    const scores = getBounds(questionIndex).map((bound) => ({
+    const bounds = getBounds(questionIndex);
+    const scores = bounds.map((bound) => ({
       alternative: bound.alternative,
       score: getBubbleSignal(imageData, bound.cx, bound.cy, bound.radius),
     }));
@@ -635,10 +645,19 @@ function readProvaScanCardAnswers(params: {
       confidence: decision.confidence,
       markedAnswers: decision.markedAnswers,
       question: questionIndex + 1,
+      evidenceRect: getEvidenceRect(bounds, imageData),
       scores,
       status: decision.status,
     } satisfies BubbleAnswerDetection;
   });
+}
+
+function getEvidenceRect(bounds: Array<{ cx: number; cy: number; radius: number }>, imageData: ImageData) {
+  const left = Math.max(0, Math.min(...bounds.map((bound) => bound.cx - bound.radius)) - imageData.width * 0.025);
+  const right = Math.min(imageData.width, Math.max(...bounds.map((bound) => bound.cx + bound.radius)) + imageData.width * 0.025);
+  const top = Math.max(0, Math.min(...bounds.map((bound) => bound.cy - bound.radius)) - imageData.height * 0.009);
+  const bottom = Math.min(imageData.height, Math.max(...bounds.map((bound) => bound.cy + bound.radius)) + imageData.height * 0.009);
+  return { x: left / imageData.width, y: top / imageData.height, width: (right - left) / imageData.width, height: (bottom - top) / imageData.height };
 }
 
 function getCompactPrintBubbleBounds(params: {

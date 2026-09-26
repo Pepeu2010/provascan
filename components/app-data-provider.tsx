@@ -17,6 +17,7 @@ import {
   type AppDataState,
 } from "@/lib/app-data";
 import { normalizeClasses, normalizeExams } from "@/lib/exam-audience";
+import { formatReviewAudit } from "@/lib/correction-review-audit";
 import type { AuthSessionUser } from "@/types/auth";
 import {
   buildCorrectionSession,
@@ -66,6 +67,8 @@ type SaveCorrectionInput = {
   imageLabel: string;
   method: "qr" | "ocr" | "manual";
   notes: string[];
+  recorrectionReason?: string;
+  reviewAudit?: Array<{ question: number; before: string[]; after: string[] }>;
   studentId: string;
 };
 
@@ -632,6 +635,10 @@ export function AppDataProvider({
       if (!answerKey.length) {
         return { ok: false, message: "Esta prova ainda não possui gabarito salvo." };
       }
+      const earlierCorrections = data.corrections.filter((item) => item.correction.provaId === input.examId && item.correction.alunoId === input.studentId);
+      if (earlierCorrections.length && (input.recorrectionReason?.trim().length ?? 0) < 10) {
+        return { ok: false, message: "Esta prova já foi corrigida para o aluno. Informe o motivo da recorreção para preservar o histórico." };
+      }
 
       if (session?.role === "professor") {
         if (isPersistingRef.current) return { ok: false, message: "Uma correção já está sendo salva. Aguarde a conclusão." };
@@ -674,7 +681,7 @@ export function AppDataProvider({
         exams: data.exams,
         imageLabel: input.imageLabel,
         method: input.method,
-        notes: input.notes,
+        notes: [...input.notes, ...formatReviewAudit(input.reviewAudit), ...(input.recorrectionReason ? [`Recorreção: ${input.recorrectionReason.trim()}`] : [])],
         rules: data.correctionRules,
         student,
       });
