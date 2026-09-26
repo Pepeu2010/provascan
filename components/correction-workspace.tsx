@@ -51,6 +51,8 @@ type ReviewFilter = "all" | "divergences" | "review" | "blank";
 type ScanAnswer = {
   confidence: number;
   correctAnswer: string;
+  /** Defined only for manual entry; false means the teacher has not decided. */
+  explicitlyReviewed?: boolean;
   markedAnswers: string[];
   question: number;
 };
@@ -186,7 +188,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
 
     const acertos = review.answers.filter((item) => getAnswerState(item) === "acerto").length;
     const erros = review.answers.filter((item) => getAnswerState(item) === "erro").length;
-    const revisao = review.answers.filter((item) => item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1).length;
+    const revisao = review.answers.filter((item) => item.explicitlyReviewed === false || (item.explicitlyReviewed === undefined && item.confidence < MIN_CONFIDENCE_REVIEW) || item.markedAnswers.length > 1).length;
     const percentual = review.answers.length ? Math.round((acertos / review.answers.length) * 100) : 0;
     return { acertos, erros, percentual, revisao };
   }, [review]);
@@ -195,7 +197,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
     return review.answers.filter((item) => {
       if (reviewFilter === "divergences") return getAnswerState(item) === "erro";
       if (reviewFilter === "blank") return item.markedAnswers.length === 0;
-      return item.confidence < MIN_CONFIDENCE_REVIEW || item.markedAnswers.length !== 1;
+      return item.explicitlyReviewed === false || (item.explicitlyReviewed === undefined && item.confidence < MIN_CONFIDENCE_REVIEW) || item.markedAnswers.length > 1;
     });
   }, [review, reviewFilter]);
   if (!exam || !studentsForExam.length) {
@@ -378,16 +380,17 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
 
   const startManualReview = () => {
     setReview({
-      answers: answerKey.map((item, index) => ({
+      answers: answerKey.map((item) => ({
         confidence: 30,
         correctAnswer: item.respostaCorreta,
-        markedAnswers: index === 0 ? [item.respostaCorreta] : [],
+        explicitlyReviewed: false,
+        markedAnswers: [],
         question: item.questao,
       })),
       confidence: 30,
-      detectedName: selectedReviewStudent.nome,
+      detectedName: "",
       identificationMethod: "manual",
-      matchedStudentId: activePreferredStudentId,
+      matchedStudentId: "",
       notes: [
         "Fluxo aberto em modo manual.",
         "A imagem foi mantida para conferência visual.",
@@ -454,7 +457,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
         ? {
             ...previous,
             answers: previous.answers.map((item) =>
-              item.question === question ? { ...item, markedAnswers } : item,
+              item.question === question ? { ...item, explicitlyReviewed: true, markedAnswers } : item,
             ),
           }
         : previous,
@@ -506,9 +509,15 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
       return;
     }
 
-    const unanswered = review.answers.some((item) => !item.markedAnswers.length);
-    if (unanswered) {
-      setErrorMessage("Preencha todas as respostas ou marque explicitamente em branco antes de confirmar a correção.");
+    const undecided = review.answers.some((item) => item.explicitlyReviewed === false);
+    if (undecided) {
+      setErrorMessage("Revise cada questão: escolha uma alternativa ou marque explicitamente em branco.");
+      return;
+    }
+
+    const uncertainBlank = review.answers.some((item) => !item.markedAnswers.length && item.confidence < MIN_CONFIDENCE_REVIEW && item.explicitlyReviewed !== true);
+    if (uncertainBlank) {
+      setErrorMessage("Confira as questões sem marcação e confirme cada resposta em branco antes de salvar.");
       return;
     }
 
@@ -845,6 +854,7 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
                     }
                   }
                 >
+                  <option value="">Selecione o aluno</option>
                   {studentsForSelectedClass.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.nome}
@@ -874,7 +884,11 @@ function ProvaScanCorrectionWorkspace({ compact = false, onBack }: { compact?: b
 
             <div>
               <h4 className="text-xl font-semibold text-[var(--foreground)]">Respostas marcadas pelo aluno</h4>
-              <p className="mt-1 text-sm text-[var(--muted-foreground)]">{review.answers.length} questões detectadas. Cada cartão mostra uma questão e a resposta marcada.</p>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                {review.pageType === "MANUAL"
+                  ? `${review.answers.length} questões para preencher. Escolha uma alternativa ou marque Em branco em cada uma.`
+                  : `${review.answers.length} questões detectadas. Cada cartão mostra uma questão e a resposta marcada.`}
+              </p>
             </div>
 
             <AnswerSheetReviewOverlay
@@ -1023,9 +1037,11 @@ function AnswerReviewGrid({
               <h5 className="text-lg font-semibold text-[var(--foreground)]">Questão {answer.question}</h5>
               <div className="flex flex-wrap justify-end gap-2">
                 <Badge tone={isCorrect ? "success" : status === "erro" ? "error" : "warning"}>{getAnswerLabel(answer)}</Badge>
-                <Badge tone={answer.confidence >= 85 ? "success" : answer.confidence >= MIN_CONFIDENCE_REVIEW ? "warning" : "error"}>
-                  {answer.confidence >= 85 ? "Leitura forte" : answer.confidence >= MIN_CONFIDENCE_REVIEW ? "Revisar" : "Baixa confiança"}
-                </Badge>
+                {answer.explicitlyReviewed !== undefined ? <Badge tone="neutral">{answer.explicitlyReviewed ? "Conferida manualmente" : "Preenchimento manual"}</Badge> : (
+                  <Badge tone={answer.confidence >= 85 ? "success" : answer.confidence >= MIN_CONFIDENCE_REVIEW ? "warning" : "error"}>
+                    {answer.confidence >= 85 ? "Leitura forte" : answer.confidence >= MIN_CONFIDENCE_REVIEW ? "Revisar" : "Baixa confiança"}
+                  </Badge>
+                )}
               </div>
             </div>
 
@@ -1653,6 +1669,7 @@ function detectCropBounds(data: Uint8ClampedArray, width: number, height: number
 }
 
 function getDetectedAnswerLabel(answer: ScanAnswer) {
+  if (answer.explicitlyReviewed === false) return "Não preenchida";
   if (!answer.markedAnswers.length) {
     return "Em branco";
   }
@@ -1686,6 +1703,7 @@ function normalizePersonName(value: string) {
 }
 
 function getAnswerLabel(answer: ScanAnswer) {
+  if (answer.explicitlyReviewed === false) return "Pendente";
   const status = getAnswerState(answer);
   if (status === "acerto") return "Acerto";
   if (status === "erro") return "Erro";

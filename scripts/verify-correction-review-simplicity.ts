@@ -14,5 +14,11 @@ assert.match(source, /Para revisar/);
 assert.doesNotMatch(source, /Ver detalhes técnicos da leitura/);
 assert.doesNotMatch(source, /Filtros de revisão/);
 assert.doesNotMatch(source, /% de confiança/);
+assert.doesNotMatch(source, /markedAnswers: index === 0/);
+assert.match(source, /explicitlyReviewed: false,\s*markedAnswers: \[\]/);
+assert.match(source, /detectedName: "",\s*identificationMethod: "manual",\s*matchedStudentId: ""/);
+assert.match(source, /<option value="">Selecione o aluno<\/option>/);
+assert.match(source, /const undecided = review\.answers\.some\(\(item\) => item\.explicitlyReviewed === false\)/);
+assert.match(source, /const uncertainBlank = review\.answers\.some/);
 
 console.log("Correction review simplicity checks passed.");
