@@ -80,6 +80,7 @@ const examsCss = read("components/teacher-exams-workspace.css");
 assert.match(examsCss, /\.exam-card\.has-open-menu\s*\{[^}]*z-index:\s*40/);
 assert.match(examsCss, /\.answer-key-blocks \{ display: grid;/);
 assert.match(examsCss, /@media \(max-width: 390px\) \{/);
+assert.match(examsCss, /\.teacher-exams__command-actions \{ display: grid; min-width: 0; grid-template-columns: minmax\(0, 1fr\); \}/);
 assert.match(examsCss, /@media \(max-width: 1150px\) \{\s*\.exam-studio__layout \{ grid-template-columns: minmax\(0, 1fr\); \}/);
 assert.match(examsCss, /\.question-batch__controls \{ min-width: 0; flex: 1 1 360px; flex-wrap: wrap; \}/);
 const officialCss = read("components/answer-keys-workspace.css");
