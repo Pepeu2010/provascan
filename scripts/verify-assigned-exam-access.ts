@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { canCorrectAssignedStudent, selectActiveAssignedExamClasses } from "../lib/assigned-exam-access";
 import { getStudentsForExam } from "../lib/exam-audience";
+import { scopeAllowsExam } from "../lib/pedagogical-scope-match";
 import type { Exam, Student } from "../types/domain";
 
 const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
@@ -33,6 +34,14 @@ assert.equal(allowed.has("exam-draft"), false);
 assert.equal(canCorrectAssignedStudent(allowed.get("exam-public")!, "class-a"), true);
 assert.equal(canCorrectAssignedStudent(allowed.get("exam-public")!, "class-b"), false);
 assert.equal(selectActiveAssignedExamClasses(assignments, scopes.map((scope) => ({ ...scope, active: false })), exams).size, 0);
+const classOnly = { class_id: "class-b", subject_id: null, active: true, archived_at: null };
+assert.equal(scopeAllowsExam(classOnly, "class-b", null), true);
+assert.equal(scopeAllowsExam(classOnly, "class-b", "math"), false);
+assert.equal(scopeAllowsExam(classOnly, "class-a", null), false);
+assert.equal(scopeAllowsExam({ ...classOnly, active: false }, "class-b", null), false);
+assert.equal(scopeAllowsExam({ ...classOnly, archived_at: "2026-01-01" }, "class-b", null), false);
+assert.deepEqual([...selectActiveAssignedExamClasses(assignments, [classOnly], exams).get("exam-free") ?? []], ["class-b"]);
+assert.equal(selectActiveAssignedExamClasses(assignments, [classOnly], exams).has("exam-public"), false);
 
 const students: Student[] = [
   { id: "a", nome: "A", turma: "class-a", status: "Ativo" },

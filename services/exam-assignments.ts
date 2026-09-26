@@ -106,7 +106,7 @@ export async function getAssignableAudience(input: { actorId: string; actorRole:
   const classes = (classRows ?? []).map((row) => ({ id: String(row.id), name: String(row.name) }));
   const allowedClassIds = new Set(classes.map((item) => item.id));
   const teachers = (userRows ?? []).map((user) => ({
-    classIds: eligibleRows.filter((row) => row.userId === String(user.legacy_id) && allowedClassIds.has(row.classId)).map((row) => row.classId),
+    classIds: [...new Set(eligibleRows.filter((row) => row.userId === String(user.legacy_id) && allowedClassIds.has(row.classId)).map((row) => row.classId))],
     id: String(user.legacy_id), name: String(user.full_name),
   }));
   return { classes, teachers };

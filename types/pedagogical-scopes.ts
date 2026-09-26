@@ -9,6 +9,6 @@ export type PedagogicalScope = {
   archivedAt: string | null;
   classId: string;
   id: string;
-  subjectId: string;
+  subjectId: string | null;
   userId: string;
 };
