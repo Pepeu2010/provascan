@@ -13,6 +13,7 @@ const tests = [
   "verify-api-authorization",
   "verify-fanucchi-answer-sheet",
   "verify-exam-printing",
+  "verify-exam-print-readiness",
   "verify-exam-roster-scope",
   "verify-print-preflight",
   "verify-omr-ground-truth",

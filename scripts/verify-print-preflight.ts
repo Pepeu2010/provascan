@@ -8,6 +8,8 @@ assert.match(unsafe.warnings.join(" "), /A4/);
 assert.match(unsafe.warnings.join(" "), /100%/);
 const html = buildCalibrationSheetHtml();
 assert.match(html, /100mm/);
+assert.match(html, /box-sizing:border-box;width:210mm/);
+assert.match(html, /box-sizing:border-box;width:100mm;height:100mm/);
 assert.match(html, /Não.*ajustar.*página/i);
 assert.match(html, /régua/i);
 assert.match(buildPrintInstructionSheetHtml(), /folha inteira/i);

@@ -9,7 +9,7 @@ import {
   Copy, Download, Eye, FileText, FileUp, Filter, GripVertical, Image as ImageIcon, MoreHorizontal,
   Pencil, Plus, Printer, RotateCcw, Save, Search, Sparkles, Trash2, UploadCloud, X,
 } from "lucide-react";
-import { ExamPresentationControls, openExamPrint, PrintStudio } from "@/components/print-studio";
+import { ExamPresentationControls, PrintStudio } from "@/components/print-studio";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -97,10 +97,6 @@ function formatDate(value: string) {
 function formatUpdatedAt(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(date);
-}
-
-export function openPrint(exam: TeacherExam, answerSheet = false) {
-  return openExamPrint(exam, answerSheet ? "cartao" : "prova");
 }
 
 export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: boolean }) {
@@ -216,10 +212,10 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
     todas: exams.length,
   }), [exams]);
 
-  function openEditor(exam: TeacherExam) {
+  function openEditor(exam: TeacherExam, destination?: EditorStep) {
     setActive(exam);
     setDraft(toDraft(exam));
-    setStep(exam.needsReview ? "questoes" : "informacoes");
+    setStep(destination ?? (exam.needsReview ? "questoes" : "informacoes"));
     setMode("editor");
     setMessage("");
   }
@@ -337,7 +333,7 @@ export function TeacherExamsWorkspace({ libraryOnly = false }: { libraryOnly?: b
         <label><span className="sr-only">Filtrar por origem</span><Select value={originFilter} onChange={(event) => setOriginFilter(event.target.value)}><option value="todas">Todas as origens</option><option value="manual">Criação manual</option><option value="pdf">PDF</option><option value="doc">Word .doc</option><option value="docx">Word .docx</option><option value="imagem">Imagem</option></Select></label>
       </Card>
 
-      {loading ? <ExamListSkeleton /> : filtered.length ? <section className="teacher-exams__grid" aria-label="Provas encontradas">{filtered.map((exam) => <ExamRow key={exam.id} exam={exam} busy={busy} readOnly={!canCreateExam || exam.creatorId !== viewerId} onAction={action} onEdit={() => openEditor(exam)} onMessage={setMessage} />)}</section> : <EmptyLibrary filtered={exams.length > 0} readOnly={!canCreateExam} onCreate={() => setMode("escolha")} />}
+      {loading ? <ExamListSkeleton /> : filtered.length ? <section className="teacher-exams__grid" aria-label="Provas encontradas">{filtered.map((exam) => <ExamRow key={exam.id} exam={exam} busy={busy} readOnly={!canCreateExam || exam.creatorId !== viewerId} onAction={action} onEdit={() => openEditor(exam)} onPreparePrint={() => openEditor(exam, "revisao")} />)}</section> : <EmptyLibrary filtered={exams.length > 0} readOnly={!canCreateExam} onCreate={() => setMode("escolha")} />}
     </div>
   );
 }
@@ -613,7 +609,7 @@ function auditEventLabel(event: string) {
 
 function SectionHeading({ eyebrow, title, detail }: { eyebrow: string; title: string; detail: string }) { return <header className="section-heading"><p>{eyebrow}</p><h2>{title}</h2><span>{detail}</span></header>; }
 
-function ExamRow({ exam, busy, readOnly, onAction, onEdit, onMessage }: { exam: TeacherExam; busy: boolean; readOnly: boolean; onAction: (exam: TeacherExam, action: "duplicar" | "arquivar" | "restaurar" | "excluir") => Promise<void>; onEdit: () => void; onMessage: (message: string) => void }) {
+function ExamRow({ exam, busy, readOnly, onAction, onEdit, onPreparePrint }: { exam: TeacherExam; busy: boolean; readOnly: boolean; onAction: (exam: TeacherExam, action: "duplicar" | "arquivar" | "restaurar" | "excluir") => Promise<void>; onEdit: () => void; onPreparePrint: () => void }) {
   const [menu, setMenu] = useState(false);
   const originIcon = exam.sourceType === "pdf" || exam.sourceType === "doc" || exam.sourceType === "docx" ? <FileText className="size-5" /> : exam.sourceType === "imagem" ? <ImageIcon className="size-5" /> : <Pencil className="size-5" />;
   return <Card className={`exam-card ${exam.status === "arquivada" ? "is-archived" : ""} ${menu ? "has-open-menu" : ""}`}>
@@ -633,8 +629,7 @@ function ExamRow({ exam, busy, readOnly, onAction, onEdit, onMessage }: { exam: 
       <div className="relative">
         <button type="button" className="exam-card__menu-button" aria-label={`Mais ações para ${exam.title}`} aria-expanded={menu} onClick={() => setMenu((value) => !value)}><MoreHorizontal className="size-5" /></button>
         {menu ? <div className="exam-card__menu">
-          <button type="button" onClick={() => { setMenu(false); onMessage(openPrint(exam) ? "Prova aberta para impressão." : "Permita pop-ups para imprimir."); }}><Printer className="size-4" />Imprimir prova</button>
-          <button type="button" onClick={() => { setMenu(false); onMessage(openPrint(exam, true) ? "Cartão-resposta aberto para impressão." : "Permita pop-ups para gerar o cartão."); }}><FileText className="size-4" />Gerar cartão-resposta</button>
+          <button type="button" onClick={() => { setMenu(false); onPreparePrint(); }}><Printer className="size-4" />Preparar impressão</button>
           {exam.originalFileName ? <a href={`/api/teacher-exams/${exam.id}/original-file`} target="_blank" rel="noreferrer"><Download className="size-4" />Arquivo original</a> : null}
           {!readOnly ? <>
             <button type="button" disabled={busy} onClick={() => void onAction(exam, "duplicar")}><Copy className="size-4" />Duplicar prova</button>

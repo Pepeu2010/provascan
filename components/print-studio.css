@@ -44,6 +44,18 @@
 .print-studio__roster strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .print-studio__roster small { color: var(--muted-foreground); font-size: 11px; }
 .print-studio__empty { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; }
+.print-studio__preflight { display: grid; gap: 13px; border-top: 1px solid var(--border); padding-top: 18px; }
+.print-studio__preflight h3 { margin: 0; color: var(--foreground); font-size: 15px; }
+.print-studio__preflight p { margin: 3px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+.print-studio__issues { display: grid; gap: 5px; margin: 0; border: 1px solid var(--error-border); border-radius: var(--radius-sm); background: var(--error-soft); padding: 11px 12px 11px 30px; color: var(--foreground); font-size: 13px; line-height: 1.45; }
+.print-studio__ready { border-left: 3px solid var(--success); padding-left: 10px; }
+.print-studio__checks { display: grid; gap: 8px; }
+.print-studio__checks label { display: flex; min-height: 44px; align-items: center; gap: 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 11px; color: var(--foreground); font-size: 13px; font-weight: 650; cursor: pointer; }
+.print-studio__checks input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.print-studio__checks input:focus-visible, .print-studio__references button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.print-studio__references { display: flex; flex-wrap: wrap; gap: 9px 18px; }
+.print-studio__references button { min-height: 42px; color: var(--accent); font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.print-studio__preflight .print-studio__fineprint { font-size: 11px; }
 .print-studio footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .print-studio footer p { margin: 0; color: var(--muted-foreground); font-size: 12px; }
 @media (max-width: 760px) { .print-studio__controls--three { grid-template-columns: 1fr; } }
