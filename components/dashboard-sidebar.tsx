@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type FocusEventHandler, type KeyboardEventHandler, type PointerEventHandler } from "react";
 import {
   BarChart3,
   BookCheck,
@@ -12,6 +12,8 @@ import {
   Heart,
   LayoutDashboard,
   LogOut,
+  Pin,
+  PinOff,
   ScanLine,
   Settings,
   Users,
@@ -40,9 +42,17 @@ type DashboardSidebarProps = {
   expanded?: boolean;
   closing?: boolean;
   modal?: boolean;
+  desktopOpen?: boolean;
+  pinned?: boolean;
   onNavigate: () => void;
   onToggleCompact?: () => void;
+  onTogglePinned?: () => void;
   onRequestClose?: () => void;
+  onPointerEnter?: PointerEventHandler<HTMLElement>;
+  onPointerLeave?: PointerEventHandler<HTMLElement>;
+  onFocusCapture?: FocusEventHandler<HTMLElement>;
+  onBlurCapture?: FocusEventHandler<HTMLElement>;
+  onKeyDownCapture?: KeyboardEventHandler<HTMLElement>;
 };
 
 export function DashboardSidebar({
@@ -51,9 +61,17 @@ export function DashboardSidebar({
   expanded = false,
   closing = false,
   modal = false,
+  desktopOpen = false,
+  pinned = false,
   onNavigate,
   onToggleCompact,
+  onTogglePinned,
   onRequestClose,
+  onPointerEnter,
+  onPointerLeave,
+  onFocusCapture,
+  onBlurCapture,
+  onKeyDownCapture,
 }: DashboardSidebarProps) {
   const router = useRouter();
   const { data, logoutTeacher, session } = useAppData();
@@ -77,13 +95,25 @@ export function DashboardSidebar({
         "dashboard-sidebar",
         compact && "dashboard-sidebar--compact",
         expanded && "dashboard-sidebar--expanded",
+        desktopOpen && "dashboard-sidebar--desktop-open",
+        pinned && "dashboard-sidebar--pinned",
         closing && "dashboard-sidebar--closing",
         modal && "dashboard-sidebar--modal",
       )}
       aria-label="Navegação do dashboard"
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
+      onKeyDownCapture={onKeyDownCapture}
     >
       <header className="dashboard-sidebar__header">
-        <ProvaScanLogo variant="sidebar" compact={compact} className="dashboard-sidebar__logo" />
+        <ProvaScanLogo variant="sidebar" compact={compact || desktopOpen} className="dashboard-sidebar__logo" />
+        {!modal && onTogglePinned ? (
+          <button type="button" onClick={onTogglePinned} className="dashboard-sidebar__icon-button dashboard-sidebar__pin" aria-label={pinned ? "Desafixar barra lateral" : "Fixar barra lateral aberta"} aria-pressed={pinned} title={pinned ? "Desafixar barra lateral" : "Fixar barra lateral aberta"}>
+            {pinned ? <PinOff className="size-4" aria-hidden="true" /> : <Pin className="size-4" aria-hidden="true" />}
+          </button>
+        ) : null}
         {modal ? (
           <button type="button" onClick={onRequestClose} className="dashboard-sidebar__icon-button dashboard-sidebar__close" aria-label="Fechar menu">
             <X className="size-5" aria-hidden="true" />
