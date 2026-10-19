@@ -5,14 +5,11 @@ import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
 import { teacherExamInputSchema } from "@/lib/teacher-exam-validation";
-import { isMissingExamQuestionTopicSchema } from "@/lib/supabase-schema-compat";
+import { withOperationalWriteLock } from "@/lib/operational-lock";
 import type { UserRole } from "@/types/auth";
 import type { TeacherExam, TeacherExamContentVersion, TeacherExamInput, TeacherExamQuestion } from "@/types/teacher-exams";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
   return createSheetsClient();
 }
 
@@ -23,17 +20,7 @@ function ensure(error: { message?: string } | null, fallback = "Erro ao acessar 
 async function upsertExamQuestions(rows: Array<Record<string, unknown>>) {
   if (!rows.length) return;
   const client = db();
-  const result = await client.from("exam_questions").upsert(rows, { onConflict: "id" });
-  if (!isMissingExamQuestionTopicSchema(result.error)) {
-    ensure(result.error);
-    return;
-  }
-
-  const legacyRows = rows.map(({ topic: _topic, ...row }) => {
-    void _topic;
-    return row;
-  });
-  ensure((await client.from("exam_questions").upsert(legacyRows, { onConflict: "id" })).error);
+  ensure((await client.from("exam_questions").upsert(rows, { onConflict: "id" })).error);
 }
 
 function mapQuestion(row: Record<string, unknown>): TeacherExamQuestion {
@@ -292,11 +279,44 @@ async function createPublishedTeacherExam(input: {
     voided_questions: questions.filter((question) => question.annulled).map((question) => question.position),
     weights_by_question: questions.filter((question) => Number(question.weight) !== 1).map((question) => ({ peso: question.weight, questao: question.position })),
   };
-  const { data, error } = await db().rpc("create_teacher_exam_transaction", { p_payload: payload });
-  ensure(error, "Não foi possível publicar a prova.");
-  if (String(data || "") !== examId) throw new Error("A publicação não foi confirmada.");
-  await upsertExamQuestions(questions.map((question) => ({ ...question, exam_id: examId })));
-  await saveExamContentVersion({ actorId: input.actorId, examId, reason: "publicada", snapshot: normalizedExam, version: 1 });
+  const client = db();
+  await withOperationalWriteLock(process.env.GOOGLE_SHEET_ID ?? "unconfigured", async () => {
+    try {
+      ensure((await client.from("exams").insert(payload.exam)).error, "Não foi possível publicar a prova.");
+      ensure((await client.from("exam_sections").insert({
+        exam_id: examId, id: payload.section_id, question_count: questions.length || 1,
+        question_start: 1, subject: normalizedExam.subject || "Geral", teacher_id: input.actorId,
+        teacher_name: payload.creator_name,
+      })).error, "Não foi possível publicar a prova.");
+      if (payload.assignments.length) ensure((await client.from("exam_assignments").insert(payload.assignments.map((assignment) => ({
+        ...assignment, active: true, assigned_at: new Date().toISOString(), assigned_by: input.actorId,
+        archived_at: null, exam_id: examId,
+      })))).error, "Não foi possível publicar a prova.");
+      ensure((await client.from("correction_rules").upsert({
+        default_weight: 1, exam_id: examId, max_score: payload.max_score, rounding_places: 1,
+        voided_question_mode: "full-credit", voided_questions: payload.voided_questions,
+        weights_by_question: payload.weights_by_question,
+      }, { onConflict: "exam_id" })).error, "Não foi possível publicar a prova.");
+      const answerKeys = questions.map((question) => ({
+        correct_answer: question.annulled ? "ANULADA" : String(question.correct_answers[0] || "CORRECAO_MANUAL"),
+        exam_id: examId, question_number: question.position,
+      }));
+      if (answerKeys.length) ensure((await client.from("answer_keys").insert(answerKeys)).error, "Não foi possível publicar a prova.");
+      ensure((await client.from("audit_log_internal").insert({
+        id: payload.audit_id, occurred_at: new Date().toISOString(), actor_id: input.actorId,
+        event: payload.audit_event, target_id: examId, ip_hash: "",
+        metadata: payload.audit_metadata,
+      })).error, "Não foi possível registrar a publicação.");
+      await upsertExamQuestions(questions.map((question) => ({ ...question, exam_id: examId })));
+      await saveExamContentVersion({ actorId: input.actorId, examId, reason: "publicada", snapshot: normalizedExam, version: 1 });
+    } catch (error) {
+      for (const table of ["audit_log_internal", "exam_content_versions", "exam_questions", "answer_keys", "correction_rules", "exam_assignments", "exam_sections", "exams"]) {
+        const key = table === "audit_log_internal" ? "target_id" : table === "correction_rules" ? "exam_id" : table === "exams" ? "id" : "exam_id";
+        await client.from(table).delete().eq(key, examId);
+      }
+      throw error;
+    }
+  });
   return examId;
 }
 
@@ -438,25 +458,62 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
     type: question.type,
     weight: question.weight,
   }));
-  const { data, error } = await db().rpc("restore_teacher_exam_content_transaction", {
-    p_payload: {
-      actor_id: input.actorId,
-      exam: changes,
-      exam_id: input.examId,
-      expected_version: current.version,
-      max_score: questions.reduce((sum, question) => sum + Number(question.weight), 0) || 10,
-      next_version: current.version + 1,
-      questions,
-      snapshot: versionSnapshot(restored),
-      version_id: crypto.randomUUID(),
-      voided_questions: questions.filter((question) => question.annulled).map((question) => question.position),
-      weights_by_question: questions.filter((question) => Number(question.weight) !== 1).map((question) => ({ peso: question.weight, questao: question.position })),
-    },
+  const client = db();
+  const nextVersion = current.version + 1;
+  const nextVersionId = crypto.randomUUID();
+  await withOperationalWriteLock(process.env.GOOGLE_SHEET_ID ?? "unconfigured", async () => {
+    const latest = await client.from("exams").select("version").eq("id", input.examId).eq("creator_id", input.actorId).maybeSingle();
+    ensure(latest.error, "Não foi possível restaurar esta versão.");
+    if (!latest.data || Number(latest.data.version) !== current.version) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de restaurar.");
+
+    const previousQuestions = await client.from("exam_questions").select("*").eq("exam_id", input.examId);
+    const previousKeys = await client.from("answer_keys").select("*").eq("exam_id", input.examId);
+    const previousRules = await client.from("correction_rules").select("*").eq("exam_id", input.examId).maybeSingle();
+    const previousSections = await client.from("exam_sections").select("*").eq("exam_id", input.examId).eq("teacher_id", input.actorId).maybeSingle();
+    const previousExam = await client.from("exams").select("*").eq("id", input.examId).eq("creator_id", input.actorId).maybeSingle();
+    [previousQuestions, previousKeys, previousRules, previousSections, previousExam].forEach((result) => ensure(result.error, "Não foi possível preparar a restauração."));
+    if (!previousExam.data) throw new Error("Prova não encontrada ou não pertence a você.");
+
+    try {
+      ensure((await client.from("exams").update(changes).eq("id", input.examId).eq("creator_id", input.actorId).eq("version", current.version)).error, "Não foi possível restaurar esta versão.");
+      ensure((await client.from("exam_questions").delete().eq("exam_id", input.examId)).error);
+      if (questions.length) ensure((await client.from("exam_questions").insert(questions.map((question) => ({ ...question, exam_id: input.examId })))).error);
+      ensure((await client.from("answer_keys").delete().eq("exam_id", input.examId)).error);
+      const answerKeys = questions.map((question) => ({
+        exam_id: input.examId, question_number: question.position,
+        correct_answer: question.annulled ? "ANULADA" : String(question.correct_answers[0] || "CORRECAO_MANUAL"),
+      }));
+      if (answerKeys.length) ensure((await client.from("answer_keys").insert(answerKeys)).error);
+      ensure((await client.from("correction_rules").upsert({
+        default_weight: 1, exam_id: input.examId,
+        max_score: questions.reduce((sum, question) => sum + Number(question.weight), 0) || 10,
+        rounding_places: 1, voided_question_mode: "full-credit",
+        voided_questions: questions.filter((question) => question.annulled).map((question) => question.position),
+        weights_by_question: questions.filter((question) => Number(question.weight) !== 1).map((question) => ({ peso: question.weight, questao: question.position })),
+      }, { onConflict: "exam_id" })).error);
+      ensure((await client.from("exam_sections").update({ question_count: Math.max(questions.length, 1), subject: restored.subject || "Geral" }).eq("exam_id", input.examId).eq("teacher_id", input.actorId)).error);
+      ensure((await client.from("exam_content_versions").insert({
+        id: nextVersionId, exam_id: input.examId, version: nextVersion, created_by: input.actorId,
+        reason: "restaurada", snapshot: versionSnapshot(restored),
+      })).error, "Não foi possível registrar a versão restaurada.");
+    } catch (error) {
+      try {
+        await client.from("exam_content_versions").delete().eq("id", nextVersionId).eq("exam_id", input.examId);
+        await client.from("exams").update(previousExam.data).eq("id", input.examId).eq("creator_id", input.actorId);
+        await client.from("exam_questions").delete().eq("exam_id", input.examId);
+        if (previousQuestions.data?.length) await client.from("exam_questions").insert(previousQuestions.data);
+        await client.from("answer_keys").delete().eq("exam_id", input.examId);
+        if (previousKeys.data?.length) await client.from("answer_keys").insert(previousKeys.data);
+        if (previousRules.data) await client.from("correction_rules").upsert(previousRules.data, { onConflict: "exam_id" });
+        else await client.from("correction_rules").delete().eq("exam_id", input.examId);
+        if (previousSections.data) await client.from("exam_sections").update(previousSections.data).eq("exam_id", input.examId).eq("teacher_id", input.actorId);
+      } catch (rollbackError) {
+        console.error("Google Sheets exam restore rollback failed", { message: rollbackError instanceof Error ? rollbackError.message : "unknown" });
+      }
+      throw error;
+    }
   });
-  ensure(error, "Não foi possível restaurar esta versão.");
-  if (Number(data) !== current.version + 1) throw new Error("A restauração não foi confirmada.");
-  await upsertExamQuestions(questions.map((question) => ({ ...question, exam_id: input.examId })));
-  return Number(data);
+  return nextVersion;
 }
 
 export async function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {

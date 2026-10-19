@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getExamSession } from "@/lib/teacher-exam-session";
 import { hasSameOriginRequest } from "@/lib/request-security";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 import { getTeacherExam } from "@/services/teacher-exams";
 
 const schema = z.object({ kind: z.enum(["prova", "gabarito", "cartao", "cartoes_individuais", "etiquetas"]) });

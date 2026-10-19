@@ -5,7 +5,7 @@ import { canManageUsers } from "@/lib/access-control";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent, getOperationalSnapshot } from "@/services/supabase-data";
+import { appendAuditEvent, getOperationalSnapshot } from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 

@@ -27,7 +27,7 @@ Never commit `.env.local`, service-role keys, authentication secrets, MFA secret
 - Keep OCR/OMR uncertainty visible to the user instead of silently accepting ambiguous results.
 - Preserve accessibility, responsive behavior and keyboard navigation when changing UI.
 - Add or update tests when changing authentication, authorization, OCR, collaborative exams or database behavior.
-- Keep database migrations versioned in `supabase/migrations/`.
+- Keep spreadsheet schema and data changes documented, reviewed and compatible with existing school records.
 
 ## Validation
 

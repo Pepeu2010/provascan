@@ -7,7 +7,7 @@ import { hashPassword, validateNewPassword } from "@/lib/passwords";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent, createManagedUser, listUsersForAdmin, SupabaseConnectionError, SupabaseSchemaError } from "@/services/supabase-data";
+import { appendAuditEvent, createManagedUser, listUsersForAdmin, GoogleSheetsConnectionError, GoogleSheetsSchemaError } from "@/services/google-sheets-data";
 
 const roles = z.enum(["admin", "vice_diretor", "coordenador", "professor"]);
 const createSchema = z.object({ nome: z.string().trim().min(3).max(120), acesso: z.string().trim().min(3).max(120), perfil: roles, senhaTemporaria: z.string().min(10).max(160) });
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Pessoa cadastrada. A troca de senha será obrigatória no primeiro acesso." }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "Revise os dados da nova pessoa." }, { status: 400 });
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) return NextResponse.json({ error: "Não foi possível cadastrar esta pessoa. Verifique se o acesso já está em uso." }, { status: 400 });
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) return NextResponse.json({ error: "Não foi possível cadastrar esta pessoa. Verifique se o acesso já está em uso." }, { status: 400 });
     return NextResponse.json({ error: "Não foi possível cadastrar esta pessoa." }, { status: 500 });
   }
 }

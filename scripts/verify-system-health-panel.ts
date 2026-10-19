@@ -10,6 +10,6 @@ assert.match(workspace, /fetch\("\/api\/dashboard"/);
 assert.match(workspace, /Banco conectado/);
 assert.match(workspace, /Arquivamento mensal pronto/);
 assert.match(route, /getSystemSnapshot\(\)/);
-const dataService = readFileSync(join(process.cwd(), "services", "supabase-data.ts"), "utf8");
+const dataService = readFileSync(join(process.cwd(), "services", "google-sheets-data.ts"), "utf8");
 assert.match(dataService, /cronConfigured: Boolean\(process\.env\.CRON_SECRET\)/);
 console.log("System health panel verification passed.");

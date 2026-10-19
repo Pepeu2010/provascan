@@ -7,9 +7,6 @@ import type { UserRole } from "@/types/auth";
 import type { PedagogicalScope, Subject } from "@/types/pedagogical-scopes";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
   return createSheetsClient();
 }
 
@@ -60,7 +57,12 @@ export async function canActOnExamScope(input: { classId: string; role: UserRole
     .eq("active", true)
     .is("archived_at", null);
   ensure(error, "Não foi possível validar o escopo pedagógico.");
-  return (data ?? []).some((row) => scopeAllowsExam(row, input.classId, input.subjectId));
+  return (data ?? []).some((row) => scopeAllowsExam({
+    active: Boolean(row.active),
+    archived_at: row.archived_at == null ? null : String(row.archived_at),
+    class_id: String(row.class_id),
+    subject_id: row.subject_id == null ? null : String(row.subject_id),
+  }, input.classId, input.subjectId));
 }
 
 /**

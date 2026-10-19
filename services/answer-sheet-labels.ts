@@ -5,9 +5,6 @@ import { createSheetsClient } from "@/lib/sheets-compat";
 import { getExamPrintRoster } from "@/services/exam-print-roster";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
   return createSheetsClient();
 }
 function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }

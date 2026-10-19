@@ -6,7 +6,7 @@
 
 **Architecture:** `lib/access-control.ts` expõe a política pura `canCreateExam`. A sessão do servidor a resolve em `getExamSession`; a rota devolve a capacidade explicitamente e aplica a mesma política no POST. O cliente inicia sem capacidade, reserva o espaço de comando com um skeleton semânticamente neutro enquanto o carregamento estiver pendente e renderiza ações somente após a resposta autorizada.
 
-**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Zod, Supabase service client e scripts TypeScript com `tsx`.
+**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Zod, Google Sheets service layer e scripts TypeScript com `tsx`.
 
 **Spec:** `docs/exam-system-v2.md`
 

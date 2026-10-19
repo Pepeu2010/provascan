@@ -7,7 +7,7 @@ autorização de recursos no servidor.
 
 1. Adicione o domínio próprio à Cloudflare e mantenha SSL/TLS em **Full
    (strict)**. O origin continua sendo a Vercel.
-2. Ative proxy apenas para o domínio público; não exponha endpoints Supabase ou
+2. Ative proxy apenas para o domínio público; não exponha endpoints internos ou
    o painel de administração como origins alternativos.
 3. Crie regras de rate limit para `POST /api/auth/login`,
    `POST /api/auth/password` e `POST /api/scan`. Elas são uma segunda camada;

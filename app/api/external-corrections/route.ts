@@ -8,7 +8,7 @@ import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-lim
 import { validateSessionToken } from "@/lib/server-session";
 import { getExternalExamTemplate, listExternalCorrections, saveExternalCorrections } from "@/services/external-exams";
 import { gradeWithRules } from "@/services/universal-grading-rules";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 

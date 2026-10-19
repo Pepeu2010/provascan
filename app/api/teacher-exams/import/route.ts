@@ -3,7 +3,7 @@ import { getExamSession } from "@/lib/teacher-exam-session";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { importTeacherExam } from "@/services/exam-import";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;

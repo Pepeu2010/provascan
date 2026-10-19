@@ -7,12 +7,12 @@ import { canManageTargetUser, canManageUsers } from "@/lib/access-control";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { clearInvalidSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
-  SupabaseConnectionError,
-  SupabaseSchemaError,
+  GoogleSheetsConnectionError,
+  GoogleSheetsSchemaError,
   listUsersForAdmin,
   updateAllUsersPasswordChangeFlag,
   updateUserPasswordChangeFlag,
-} from "@/services/supabase-data";
+} from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 
@@ -61,7 +61,7 @@ export async function GET() {
     const users = await listUsersForAdmin();
     return NextResponse.json({ users }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });
     }
 
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 

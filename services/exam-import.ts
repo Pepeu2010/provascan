@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { parseImportedExamText } from "@/lib/exam-import-parser";
 import type { ExamSourceType, TeacherExamInput } from "@/types/teacher-exams";
+import { downloadPrivateFile } from "@/lib/google-sheets";
 import { createTeacherExam, getTeacherExam, teacherExamClient, updateTeacherExam } from "@/services/teacher-exams";
 
 export const MAX_EXAM_FILE_SIZE = 15 * 1024 * 1024;
@@ -177,12 +178,14 @@ export async function importTeacherExam(input: { actorId: string; creatorName: s
 export async function createOriginalFileDownload(actorId: string, examId: string, institutionalView = false) {
   const exam = await getTeacherExam({ actorId, examId, institutionalView });
   if (!exam) throw new Error("Arquivo não encontrado ou sem permissão de acesso.");
-  let query = teacherExamClient().from("exam_files").select("storage_path,original_name").eq("exam_id", examId);
+  let query = teacherExamClient().from("exam_files").select("storage_path,original_name,mime_type").eq("exam_id", examId);
   if (!institutionalView) query = query.eq("owner_id", actorId);
   const { data, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Esta prova não possui arquivo original associado.");
-  const signed = await teacherExamClient().storage.from("exam-imports").createSignedUrl(String(data.storage_path), 60, { download: String(data.original_name) });
-  if (signed.error) throw new Error("Não foi possível preparar o download seguro.");
-  return signed.data.signedUrl;
+  return {
+    bytes: await downloadPrivateFile(String(data.storage_path)),
+    mimeType: String(data.mime_type || "application/octet-stream"),
+    name: String(data.original_name || "arquivo-original"),
+  };
 }

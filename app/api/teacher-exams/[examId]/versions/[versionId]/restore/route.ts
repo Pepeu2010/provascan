@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getExamSession } from "@/lib/teacher-exam-session";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 import { restoreTeacherExamContentVersion } from "@/services/teacher-exams";
 
 const restoreSchema = z.object({ expectedVersion: z.number().int().min(1).nullable().optional() }).strict();

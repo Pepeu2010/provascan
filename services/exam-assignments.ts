@@ -8,9 +8,6 @@ import type { UserRole } from "@/types/auth";
 import type { ExamAssignment } from "@/types/exam-assignments";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
   return createSheetsClient();
 }
 function ensure(error: { message?: string } | null, fallback: string) { if (error) throw new Error(error.message || fallback); }

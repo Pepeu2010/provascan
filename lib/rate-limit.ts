@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import { consumePersistentRateLimit } from "@/services/supabase-data";
 
 type RateLimitOptions = { bucket: string; key: string; limit: number; windowMs: number };
 type HeadersLike = { get(name: string): string | null };
+const localWindows = new Map<string, { count: number; resetAt: number }>();
 
 function getRedis() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -31,8 +31,19 @@ export async function consumeRateLimit(options: RateLimitOptions) {
     return { ok: result.success, remaining: result.remaining, retryAfterSeconds, resetAt: result.reset };
   }
 
-  const result = await consumePersistentRateLimit(options);
-  const retryAfterSeconds = Math.max(1, Math.ceil((result.resetAt - Date.now()) / 1000));
-  console.info(JSON.stringify({ event: "rate_limit", provider: "supabase", bucket: options.bucket, key: options.key, allowed: result.allowed }));
-  return { ok: result.allowed, remaining: result.remaining, retryAfterSeconds, resetAt: result.resetAt };
+  const now = Date.now();
+  const windowKey = `${options.bucket}:${options.key}`;
+  let current = localWindows.get(windowKey);
+  if (!current || current.resetAt <= now) {
+    current = { count: 0, resetAt: now + options.windowMs };
+    localWindows.set(windowKey, current);
+  }
+  current.count += 1;
+  const allowed = current.count <= options.limit;
+  const retryAfterSeconds = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+  console.info(JSON.stringify({ event: "rate_limit", provider: "memory", bucket: options.bucket, key: options.key, allowed }));
+  if (localWindows.size > 10_000) {
+    for (const [key, window] of localWindows) if (window.resetAt <= now) localWindows.delete(key);
+  }
+  return { ok: allowed, remaining: Math.max(0, options.limit - current.count), retryAfterSeconds, resetAt: current.resetAt };
 }

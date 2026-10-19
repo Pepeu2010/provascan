@@ -7,7 +7,6 @@ const correction = fs.readFileSync(path.join(root, "components", "correction-wor
 const external = fs.readFileSync(path.join(root, "components", "external-correction-workspace.tsx"), "utf8");
 const reports = fs.readFileSync(path.join(root, "components", "management-workspace.tsx"), "utf8");
 const correctionApi = fs.readFileSync(path.join(root, "app", "api", "external-corrections", "route.ts"), "utf8");
-const migration = fs.readFileSync(path.join(root, "supabase", "migrations", "20260914180000_universal_external_exams.sql"), "utf8");
 
 for (const contract of ["Prova do ProvaScan", "Prova externa", "ExternalCorrectionWorkspace"]) {
   assert.match(correction, new RegExp(contract), `Modo obrigatório ausente: ${contract}`);
@@ -35,7 +34,6 @@ assert.match(external, /processDocumentPages/);
 assert.match(correctionApi, /export async function GET/);
 assert.match(reports, /Histórico de correções externas/);
 assert.match(external, /analyzeUniversalPage/);
-assert.match(migration, /enable row level security/i);
-assert.match(migration, /revoke all/i);
+assert.match(correctionApi, /createSheetsClient/);
 
 console.log("Fluxo universal, PDF multipágina, revisão e persistência estão conectados.");

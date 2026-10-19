@@ -33,7 +33,7 @@ Turn the current universal correction flow into a guided, recoverable workflow t
 
 - Per-student QR or ID generation, because it is being implemented separately.
 - Fabricating a student match when OCR confidence is insufficient.
-- Remote Supabase migration execution without valid project credentials.
+- Remote migration execution without valid project credentials.
 - Offline OCR libraries or remote API responses that have not already been cached.
 
 ## Acceptance criteria

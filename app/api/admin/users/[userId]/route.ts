@@ -7,7 +7,7 @@ import { hashPassword, validateNewPassword } from "@/lib/passwords";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent, deleteManagedUser, listUsersForAdmin, resetManagedUserMfa, setManagedUserActive, setManagedUserTemporaryPassword, SupabaseConnectionError, SupabaseSchemaError, updateManagedUser } from "@/services/supabase-data";
+import { appendAuditEvent, deleteManagedUser, listUsersForAdmin, resetManagedUserMfa, setManagedUserActive, setManagedUserTemporaryPassword, GoogleSheetsConnectionError, GoogleSheetsSchemaError, updateManagedUser } from "@/services/google-sheets-data";
 
 const roles = z.enum(["admin", "vice_diretor", "coordenador", "professor"]);
 const schema = z.discriminatedUnion("action", [
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
     return NextResponse.json({ message: input.action === "set-active" ? (input.active ? "Acesso reativado. A pessoa deverá trocar a senha no próximo login." : "Acesso desativado e sessões encerradas.") : input.action === "reset-mfa" ? "MFA removido. A pessoa deverá configurar novamente no próximo acesso." : input.action === "set-password" ? "Senha temporária definida e sessões anteriores encerradas." : "Dados da pessoa atualizados." });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "Revise os dados informados." }, { status: 400 });
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) return NextResponse.json({ error: error.message || "Não foi possível atualizar esta pessoa." }, { status: 400 });
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) return NextResponse.json({ error: error.message || "Não foi possível atualizar esta pessoa." }, { status: 400 });
     return NextResponse.json({ error: "Não foi possível atualizar esta pessoa." }, { status: 500 });
   }
 }
@@ -68,7 +68,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ u
     await appendAuditEvent({ actorId: validation.session.id, event: "managed_user_deleted", targetId: userId, metadata: { role: target.perfil } });
     return NextResponse.json({ message: `${target.nome} foi excluído. Provas e correções históricas foram preservadas.` });
   } catch (error) {
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) return NextResponse.json({ error: error.message || "Não foi possível excluir esta pessoa." }, { status: 400 });
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) return NextResponse.json({ error: error.message || "Não foi possível excluir esta pessoa." }, { status: 400 });
     return NextResponse.json({ error: "Não foi possível excluir esta pessoa." }, { status: 500 });
   }
 }

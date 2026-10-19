@@ -10,13 +10,13 @@ import { buildAuthSessionUser, createUserSession } from "@/lib/auth-flow-server"
 import { createPreAuthToken } from "@/lib/pre-auth";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import {
-  SupabaseConfigError,
-  SupabaseConnectionError,
-  SupabaseSchemaError,
+  GoogleSheetsConfigError,
+  GoogleSheetsConnectionError,
+  GoogleSheetsSchemaError,
   getUserByEmail,
   isActiveUser,
   shouldForcePasswordChange,
-} from "@/services/supabase-data";
+} from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 
@@ -102,11 +102,11 @@ export async function POST(request: Request) {
       return invalidCredentialsResponse(400);
     }
 
-    if (error instanceof SupabaseConfigError) {
+    if (error instanceof GoogleSheetsConfigError) {
       return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 

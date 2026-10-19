@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Redis } from "@upstash/redis";
 
 export class OperationalLockUnavailableError extends Error {}
 export class OperationalLockBusyError extends Error {}
+const activeLock = new AsyncLocalStorage<boolean>();
 
 function redis() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -12,12 +14,13 @@ function redis() {
 }
 
 export async function withOperationalWriteLock<T>(spreadsheetId: string, operation: () => Promise<T>) {
+  if (activeLock.getStore()) return operation();
   const client = redis();
   const key = `provascan:lock:${spreadsheetId}`;
   const owner = randomUUID();
   const acquired = await client.set(key, owner, { nx: true, px: 30_000 });
   if (acquired !== "OK") throw new OperationalLockBusyError("Outra alteração está sendo salva. Tente novamente.");
-  try { return await operation(); }
+  try { return await activeLock.run(true, operation); }
   finally {
     if ((await client.get<string>(key)) === owner) await client.del(key);
   }
