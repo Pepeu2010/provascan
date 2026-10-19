@@ -74,6 +74,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.42.2",
+    "googleapis": "150.0.1",
     "gsap": "^3.15.0",
     "jose": "^6.2.3",
     "jsqr": "^1.4.0",

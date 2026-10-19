@@ -1,14 +1,14 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
 import { getExamPrintRoster } from "@/services/exam-print-roster";
 
 function db() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Banco de dados não configurado.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createSheetsClient();
 }
 function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
 function opaqueToken() { return `PSA1.${randomBytes(32).toString("base64url")}`; }

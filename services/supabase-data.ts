@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
+import { sheetsTable } from "@/lib/google-sheets";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
@@ -12,10 +13,7 @@ import { withExamQuestionTopicFallback, withTeacherExamSchemaFallback } from "@/
 import type { ClassRoom, CorrectionSession, Exam, ExamCorrectionRule, Student, TeacherProfile } from "@/types/domain";
 import type { UserRecord } from "@/types/auth";
 
-const envSchema = z.object({
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
-});
+const envSchema = z.object({ GOOGLE_SHEET_ID: z.string().min(10), GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email(), GOOGLE_PRIVATE_KEY: z.string().min(20) });
 
 export class SupabaseConfigError extends Error {}
 export class SupabaseConnectionError extends Error {}
@@ -28,11 +26,9 @@ export type PersistentRateLimitResult = {
 };
 
 function client() {
-  const parsed = envSchema.safeParse({ SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY });
+  const parsed = envSchema.safeParse({ GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY: process.env.GOOGLE_PRIVATE_KEY });
   if (!parsed.success) throw new SupabaseConfigError("Supabase não configurado.");
-  return createClient(parsed.data.SUPABASE_URL, parsed.data.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return createSheetsClient();
 }
 
 function dbError(error: { message?: string } | null) {
@@ -401,11 +397,16 @@ export async function saveCorrectionSession(session: CorrectionSession) {
   dbError(examError);
 }
 export async function saveOperationalAppData(data: AppDataState, metadata?: { actorId: string; revision: string }) {
-  const { data: revision, error } = await client().rpc("replace_operational_state", { payload: data, actor_id: metadata?.actorId ?? "system", expected_revision: Number(metadata?.revision ?? 0) });
-  dbError(error); return String(revision);
+  const revision = Number(metadata?.revision ?? 0) + 1;
+  const classRows = data.classes.map((item) => ({ id: item.id, name: item.nome, academic_year: item.ano, audience_id: item.audienceId ?? "", audience_label: item.audienceLabel ?? "", group_type: item.groupType ?? "", year_segment: item.yearSegment ?? "" }));
+  const studentRows = data.students.map((item) => ({ id: item.id, name: item.nome, class_id: item.turma, status: item.status }));
+  await (await sheetsTable("classes")).replace(classRows);
+  await (await sheetsTable("students")).replace(studentRows);
+  await (await sheetsTable("operational_meta_internal")).replace([{ singleton: true, revision }]);
+  return String(revision);
 }
 export async function getSchoolRoster() { const data = await getOperationalAppData(); return { classes: data.classes, students: data.students }; }
 export async function getUsersSheetHealth() { const { count, error } = await client().from("app_users").select("legacy_id", { count: "exact", head: true }); dbError(error); return { usersCount: count ?? 0, status: { configured: true, mode: "supabase" as const, studentsTab: "Supabase", usersTab: "Supabase" } }; }
 export async function getSystemSnapshot() { const [health, data] = await Promise.all([getUsersSheetHealth(), getOperationalAppData()]); return { retention: { cronConfigured: Boolean(process.env.CRON_SECRET) }, status: health.status, totals: { alunos: data.students.length, turmas: data.classes.length, provas: data.exams.length, correcoes: data.corrections.length, usuarios: health.usersCount } }; }
-export function getSheetsStatus() { return { configured: Boolean(process.env.SUPABASE_URL), mode: "supabase" as const, studentsTab: "Supabase", usersTab: "Supabase" }; }
+export function getSheetsStatus() { return { configured: Boolean(process.env.GOOGLE_SHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY), mode: "google-sheets" as const, studentsTab: "students", usersTab: "app_users" }; }
 export const fallbackTotals = { alunos: students.length, turmas: classes.length, provas: exams.length, correcoes: correctionSessions.length };

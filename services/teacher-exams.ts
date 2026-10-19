@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
@@ -13,7 +13,7 @@ function db() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Banco de dados não configurado.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createSheetsClient();
 }
 
 function ensure(error: { message?: string } | null, fallback = "Erro ao acessar as provas.") {

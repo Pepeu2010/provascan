@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
 import { canActInPedagogicalScope } from "@/lib/pedagogical-scope-policy";
 import { scopeAllowsExam } from "@/lib/pedagogical-scope-match";
 import type { UserRole } from "@/types/auth";
@@ -10,7 +10,7 @@ function db() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Banco de dados não configurado.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createSheetsClient();
 }
 
 function ensure(error: { message?: string } | null, fallback: string) {
