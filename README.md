@@ -152,7 +152,7 @@ Abra [http://localhost:3000](http://localhost:3000). Para outros shells, crie `.
 
 ### Google Sheets e Drive
 
-Configure as abas e cabeçalhos exigidos pela aplicação na planilha antes do primeiro uso. A conta de serviço precisa ter permissão de edição na planilha e na pasta privada do Drive. O projeto verifica cabeçalhos ao gravar e interrompe a operação se uma coluna usada pela gravação estiver ausente; não cria nem limpa abas automaticamente. A conexão e o esquema ainda precisam ser validados com as credenciais do ambiente de deploy.
+Configure as abas e cabeçalhos exigidos pela aplicação na planilha antes do primeiro uso. A conta de serviço precisa ter permissão de edição na planilha e na pasta privada do Drive. O projeto verifica cabeçalhos e tipos das colunas antes de gravar; não cria nem limpa abas automaticamente. A conexão e o esquema ainda precisam ser validados com as credenciais do ambiente de deploy. O lock distribuído coordena os escritores do app, mas não impede edições externas e não oferece transações entre abas. Veja [GOOGLE_SHEETS_SECURITY.md](./GOOGLE_SHEETS_SECURITY.md) para o fluxo de validação isolado, backup restaurável e limites de Drive/Sheets.
 
 ## Comandos
 

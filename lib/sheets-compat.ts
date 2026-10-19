@@ -22,7 +22,7 @@ class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
   private mode: "select" | "insert" | "update" | "delete" | "upsert" = "select";
   private payload: Row | Row[] = {};
   private one: "maybe" | "single" | null = null;
-  private conflictKeys = ["id"];
+  private conflictKeys: string[] = [];
   private ignoreDuplicates = false;
 
   constructor(private readonly table: string) {}
@@ -43,7 +43,7 @@ class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
   upsert(payload: Row | Row[], options?: { onConflict?: string; ignoreDuplicates?: boolean }) {
     this.mode = "upsert";
     this.payload = payload;
-    this.conflictKeys = options?.onConflict?.split(",").map((key) => key.trim()).filter(Boolean) ?? ["id"];
+    this.conflictKeys = options?.onConflict?.split(",").map((key) => key.trim()).filter(Boolean) ?? [];
     this.ignoreDuplicates = options?.ignoreDuplicates ?? false;
     return this;
   }

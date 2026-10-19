@@ -1,7 +1,10 @@
 import "server-only";
 import { google, sheets_v4 } from "googleapis";
 import { Readable } from "node:stream";
-import { withOperationalWriteLock } from "@/lib/operational-lock";
+import { assertOperationalWriteLock, withOperationalWriteLock } from "@/lib/operational-lock";
+import { decodeGoogleSheetsCell, encodeGoogleSheetsCell } from "@/lib/google-sheets-codec";
+import { GOOGLE_SHEETS_SCHEMA } from "@/lib/google-sheets-schema";
+import { assertUniqueGoogleSheetsKeys, mergeGoogleSheetsUpsert } from "@/lib/google-sheets-row-integrity";
 
 const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -25,26 +28,35 @@ function driveApi() {
   const auth = new google.auth.JWT({ email, key: privateKey, scopes: ["https://www.googleapis.com/auth/drive.file"] });
   return google.drive({ version: "v3", auth });
 }
-function encode(value: unknown): string | number | boolean { return value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : value as string | number | boolean; }
-function decode(value: string): unknown { const v = value.trim(); if (!v) return null; if (v === "true") return true; if (v === "false") return false; try { return JSON.parse(v); } catch { return v; } }
+function definition(table: string) {
+  const schema = GOOGLE_SHEETS_SCHEMA[table];
+  if (!schema) throw new GoogleSheetsConnectionError(`A tabela ${table} não está no esquema do Google Sheets.`);
+  return schema;
+}
 function validateRowsAgainstHeaders(table: string, headers: string[], rows: Row[]) {
   if (!headers.length) throw new GoogleSheetsConnectionError(`A aba ${table} não possui uma linha de cabeçalho.`);
+  if (new Set(headers).size !== headers.length) throw new GoogleSheetsConnectionError(`A aba ${table} contém cabeçalhos repetidos.`);
   const known = new Set(headers);
   const missing = [...new Set(rows.flatMap((row) => Object.keys(row).filter((key) => !known.has(key))))];
   if (missing.length) throw new GoogleSheetsConnectionError(`A aba ${table} não possui as colunas: ${missing.join(", ")}.`);
+  const schema = definition(table);
+  for (const header of headers) if (!schema.columns[header]) throw new GoogleSheetsConnectionError(`A aba ${table} contém coluna fora do esquema.`);
 }
-function cell(value: unknown): sheets_v4.Schema$CellData {
-  const encoded = encode(value);
+function cell(value: unknown, column: import("@/lib/google-sheets-schema").GoogleSheetsColumnDefinition): sheets_v4.Schema$CellData {
+  const encoded = encodeGoogleSheetsCell(value, column);
   if (typeof encoded === "boolean") return { userEnteredValue: { boolValue: encoded } };
   if (typeof encoded === "number") return { userEnteredValue: { numberValue: encoded } };
   return { userEnteredValue: { stringValue: encoded } };
 }
 async function readTable(table: string): Promise<{ headers: string[]; rows: Row[] }> {
   try {
-    const response = await api().spreadsheets.values.get({ spreadsheetId, range: `'${table.replace(/'/g, "''")}'` });
+    const schema = definition(table);
+    const response = await api().spreadsheets.values.get({ spreadsheetId, range: `'${table.replace(/'/g, "''")}'`, valueRenderOption: "UNFORMATTED_VALUE" });
     const values = response.data.values ?? [];
     const headers = (values[0] ?? []).map(String);
-    const rows = values.slice(1).map((line) => Object.fromEntries(headers.map((header, index) => [header, decode(String(line[index] ?? ""))])));
+    validateRowsAgainstHeaders(table, headers, []);
+    const rows = values.slice(1).filter((line) => line.some((value) => value !== "" && value !== undefined)).map((line) => Object.fromEntries(headers.map((header, index) => [header, decodeGoogleSheetsCell(line[index], schema.columns[header])])));
+    assertUniqueGoogleSheetsKeys(rows, [...schema.primaryKey], table);
     return { headers, rows };
   } catch (error) { console.error("Google Sheets request failed", { table, message: error instanceof Error ? error.message : "unknown" }); throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema."); }
 }
@@ -55,31 +67,37 @@ export async function sheetsTable(table: string) {
     headers: source.headers,
     append: async (rows: Row[]) => withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
       if (!rows.length) return;
-      validateRowsAgainstHeaders(table, source.headers, rows);
-      await api().spreadsheets.values.append({
-        spreadsheetId,
-        range: `'${table.replace(/'/g, "''")}'`,
-        valueInputOption: "RAW",
-        insertDataOption: "INSERT_ROWS",
-        requestBody: { values: rows.map((row) => source.headers.map((header) => encode(row[header]))) },
-      });
+      const current = await readTable(table);
+      validateRowsAgainstHeaders(table, current.headers, rows);
+      const schema = definition(table);
+      const next = [...current.rows, ...rows];
+      assertUniqueGoogleSheetsKeys(next, [...schema.primaryKey], table);
+      await replaceRows(table, current.headers, next);
     }),
     replace: async (rows: Row[]) => withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
       validateRowsAgainstHeaders(table, source.headers, rows);
-      const spreadsheet = await api().spreadsheets.get({ spreadsheetId, fields: "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))" });
-      const sheet = spreadsheet.data.sheets?.find((item) => item.properties?.title === table)?.properties;
-      if (sheet?.sheetId == null) throw new GoogleSheetsConnectionError(`A aba ${table} não existe na planilha.`);
-      const rowCount = Math.max(1, Number(sheet.gridProperties?.rowCount ?? rows.length + 1));
-      const columnCount = Math.max(source.headers.length, Number(sheet.gridProperties?.columnCount ?? source.headers.length));
-      await api().spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: { requests: [
-          { repeatCell: { range: { sheetId: sheet.sheetId, startRowIndex: 0, endRowIndex: rowCount, startColumnIndex: 0, endColumnIndex: columnCount }, cell: {}, fields: "userEnteredValue" } },
-          { updateCells: { start: { sheetId: sheet.sheetId, rowIndex: 0, columnIndex: 0 }, rows: [source.headers, ...rows.map((row) => source.headers.map((header) => row[header]))].map((line) => ({ values: line.map(cell) })), fields: "userEnteredValue" } },
-        ] },
-      });
+      const schema = definition(table);
+      assertUniqueGoogleSheetsKeys(rows, [...schema.primaryKey], table);
+      await replaceRows(table, source.headers, rows);
     }),
   };
+}
+async function replaceRows(table: string, headers: string[], rows: Row[]) {
+  assertOperationalWriteLock();
+  const spreadsheet = await api().spreadsheets.get({ spreadsheetId, fields: "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))" });
+  const sheet = spreadsheet.data.sheets?.find((item) => item.properties?.title === table)?.properties;
+  if (sheet?.sheetId == null) throw new GoogleSheetsConnectionError(`A aba ${table} não existe na planilha.`);
+  const rowCount = Math.max(1, Number(sheet.gridProperties?.rowCount ?? rows.length + 1));
+  const columnCount = Math.max(headers.length, Number(sheet.gridProperties?.columnCount ?? headers.length));
+  const schema = definition(table);
+  assertOperationalWriteLock();
+  await api().spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [
+      { repeatCell: { range: { sheetId: sheet.sheetId, startRowIndex: 0, endRowIndex: rowCount, startColumnIndex: 0, endColumnIndex: columnCount }, cell: {}, fields: "userEnteredValue" } },
+      { updateCells: { start: { sheetId: sheet.sheetId, rowIndex: 0, columnIndex: 0 }, rows: [headers, ...rows.map((row) => headers.map((header) => row[header]))].map((line) => ({ values: line.map((value, index) => cell(value, schema.columns[headers[index]])) })), fields: "userEnteredValue" } },
+    ] },
+  });
 }
 export async function findRows(table: string, predicate?: (row: Row) => boolean, limit = 500) { return (await readTable(table)).rows.filter(predicate ?? (() => true)).slice(0, limit); }
 export async function updateRows(table: string, predicate: (row: Row) => boolean, changes: Row) { return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => { const target = await sheetsTable(table); const rows = target.all(); let count = 0; const next = rows.map((row) => predicate(row) ? (++count, { ...row, ...changes }) : row); if (count) await target.replace(next); return count; }); }
@@ -87,20 +105,11 @@ export async function deleteRows(table: string, predicate: (row: Row) => boolean
 export async function upsertRows(table: string, incoming: Row[], conflictKeys: string[], ignoreDuplicates: boolean) {
   return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
     const target = await sheetsTable(table);
-    const next = [...target.all()];
-    const returned: Row[] = [];
-    for (const item of incoming) {
-      const index = next.findIndex((row) => conflictKeys.every((key) => String(row[key] ?? "") === String(item[key] ?? "")));
-      if (index >= 0) {
-        if (!ignoreDuplicates) next[index] = { ...next[index], ...item };
-        returned.push(next[index]);
-      } else {
-        next.push(item);
-        returned.push(item);
-      }
-    }
+    const schema = definition(table);
+    const keys = conflictKeys.length ? conflictKeys : [...schema.primaryKey];
+    const next = mergeGoogleSheetsUpsert(target.all(), incoming, keys, ignoreDuplicates, table);
     await target.replace(next);
-    return returned;
+    return incoming.map((item) => next.find((row) => keys.every((key) => row[key] === item[key])) as Row);
   });
 }
 
@@ -118,7 +127,10 @@ export async function uploadPrivateFile(name: string, bytes: Uint8Array, mimeTyp
     return response.data.id;
     });
   } catch (error) {
-    console.error("Google Drive upload failed", { message: error instanceof Error ? error.message : "unknown" });
+    const raw = error as { code?: number; message?: string; errors?: Array<{ reason?: string }> };
+    const quotaBlocked = raw.code === 403 && (raw.errors?.some((item) => item.reason === "storageQuotaExceeded") || /storage.?quota/i.test(raw.message ?? ""));
+    if (quotaBlocked) throw new GoogleSheetsConfigError("A conta de serviço não pode gravar nesta pasta por limite de propriedade/cota. Use uma pasta privada de Shared Drive com permissão de inclusão ou OAuth delegado a uma conta humana.");
+    console.error("Google Drive upload failed", { code: raw.code ?? "unknown", reason: raw.errors?.[0]?.reason ?? "unknown" });
     throw new GoogleSheetsConnectionError("Não foi possível armazenar o arquivo original.");
   }
 }
