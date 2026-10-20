@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readGoogleSheetsTableBatch } from "../lib/google-sheets-batching";
+import { createGoogleSheetsReadBatcher, readGoogleSheetsTableBatch } from "../lib/google-sheets-batching";
 
 async function main() {
   let apiCalls = 0;
@@ -30,7 +30,48 @@ async function main() {
   const empty = await readGoogleSheetsTableBatch([], async () => { apiCalls += 1; return []; }, () => null);
   assert.equal(apiCalls, 0, "nenhuma aba não deve fazer chamada à API");
   assert.equal(empty.size, 0);
-  console.log("Google Sheets batching: uma chamada para várias abas, remoção de duplicadas, escape de nomes e conjunto vazio verificados.");
+
+  const queuedBatches: string[][] = [];
+  const read = createGoogleSheetsReadBatcher(async (tables) => {
+    queuedBatches.push(tables);
+    return new Map(tables.map((table) => [table, { table }]));
+  });
+  const [examRead, studentRead, repeatedExamRead] = await Promise.all([read("exams"), read("students"), read("exams")]);
+  assert.deepEqual(queuedBatches, [["exams", "students"]], "leituras concorrentes e duplicadas devem compartilhar um único batchGet");
+  assert.deepEqual(examRead, { table: "exams" });
+  assert.deepEqual(studentRead, { table: "students" });
+  assert.deepEqual(repeatedExamRead, examRead, "a mesma leitura concorrente deve receber o mesmo resultado");
+
+  queuedBatches.length = 0;
+  const queryLikeReads = ["classes", "students", "classes"].map((table) => ({
+    then: (resolve: (value: { table: string }) => unknown, reject?: (reason: unknown) => unknown) => read(table).then(resolve, reject),
+  }));
+  await Promise.all(queryLikeReads as PromiseLike<{ table: string }>[]);
+  assert.deepEqual(queuedBatches, [["classes", "students"]], "thenable queries inside Promise.all must be coalesced before batchGet");
+
+  let finishInFlight: ((result: Map<string, string>) => void) | undefined;
+  let inFlightCalls = 0;
+  const readDuringRequest = createGoogleSheetsReadBatcher((tables) => {
+    inFlightCalls += 1;
+    return new Promise<Map<string, string>>((resolve) => { finishInFlight = resolve; }).then((results) => new Map(tables.map((table) => [table, results.get(table) ?? "missing"])));
+  });
+  const firstRead = readDuringRequest("app_users");
+  await Promise.resolve();
+  const secondRead = readDuringRequest("app_users");
+  finishInFlight?.(new Map([["app_users", "users"]]));
+  assert.deepEqual(await Promise.all([firstRead, secondRead]), ["users", "users"], "leitores que chegam durante batchGet devem ser atendidos pelo mesmo pedido");
+  assert.equal(inFlightCalls, 1);
+
+  let attempts = 0;
+  const retryingRead = createGoogleSheetsReadBatcher(async (tables) => {
+    attempts += 1;
+    if (attempts === 1) throw new Error("temporary quota error");
+    return new Map(tables.map((table) => [table, table]));
+  });
+  await assert.rejects(retryingRead("app_users"), /temporary quota error/);
+  assert.equal(await retryingRead("app_users"), "app_users", "falhas de uma chamada não devem bloquear as leituras seguintes");
+  assert.equal(attempts, 2);
+  console.log("Google Sheets batching: batchGet de múltiplas abas, dedupe concorrente e durante voo, falha e recuperação verificados.");
 }
 
 void main();

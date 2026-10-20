@@ -3,7 +3,7 @@ import { google, sheets_v4 } from "googleapis";
 import { Readable } from "node:stream";
 import { assertOperationalWriteLock, getOperationalWriteCacheValue, setOperationalWriteCacheValue, withOperationalWriteLock } from "@/lib/operational-lock";
 import { decodeGoogleSheetsCell, encodeGoogleSheetsTableValues } from "@/lib/google-sheets-codec";
-import { readGoogleSheetsTableBatch } from "@/lib/google-sheets-batching";
+import { createGoogleSheetsReadBatcher, readGoogleSheetsTableBatch } from "@/lib/google-sheets-batching";
 import { GOOGLE_SHEETS_SCHEMA } from "@/lib/google-sheets-schema";
 import { assertUniqueGoogleSheetsKeys, mergeGoogleSheetsUpsert } from "@/lib/google-sheets-row-integrity";
 
@@ -76,14 +76,12 @@ async function readTables(tables: string[]) {
     throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema.");
   }
 }
+const readTableBatcher = createGoogleSheetsReadBatcher(readTables);
 async function readTable(table: string): Promise<{ headers: string[]; rows: Row[] }> {
   const cacheKey = `google-sheets:${spreadsheetId ?? "unconfigured"}:table:${table}`;
   const cached = getOperationalWriteCacheValue<{ headers: string[]; rows: Row[] }>(cacheKey);
   if (cached) return cached;
-  const results = await readTables([table]);
-  const result = results.get(table);
-  if (!result) throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema.");
-  return result;
+  return readTableBatcher(table);
 }
 export async function sheetsTable(table: string) {
   const source = await readTable(table);

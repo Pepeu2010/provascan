@@ -83,10 +83,10 @@ export function DashboardShell({
       [
         `${data.classes.length} turmas`,
         `${data.students.length} alunos`,
-        `${data.exams.length} provas`,
+        ...(session?.role === "professor" ? [] : [`${data.exams.length} provas`]),
         `${data.corrections.length} correções`,
       ].join(" • "),
-    [data.classes.length, data.corrections.length, data.exams.length, data.students.length],
+    [data.classes.length, data.corrections.length, data.exams.length, data.students.length, session?.role],
   );
   const commandItems = useMemo(
     () => (session?.role === "professor"
