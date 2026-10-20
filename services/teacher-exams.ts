@@ -4,6 +4,7 @@ import { createSheetsClient } from "@/lib/sheets-compat";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
+import { buildTeacherExamRow } from "@/lib/teacher-exam-row";
 import { teacherExamInputSchema } from "@/lib/teacher-exam-validation";
 import { withOperationalWriteLock } from "@/lib/operational-lock";
 import type { UserRole } from "@/types/auth";
@@ -143,43 +144,14 @@ export async function getTeacherExam(input: { actorId: string; examId: string; i
   return assigned ? (await hydrate([assigned as unknown as Record<string, unknown>]))[0] ?? null : null;
 }
 
-function examRow(actorId: string, creatorName: string, examId: string, input: TeacherExamInput, intent: "rascunho" | "publicar", source?: Partial<Record<string, unknown>>) {
-  const published = intent === "publicar";
-  const now = new Date().toISOString();
-  return {
-    alternatives: [...new Set(input.questions.flatMap((question) => question.alternatives))].slice(0, 10),
-    audience_id: input.audienceId,
-    audience_label: input.audienceLabel,
-    code: `${input.title.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 12) || "PROVA"}-${input.examDate.slice(0, 4) || new Date().getFullYear()}`,
-    creator_id: actorId,
-    description: input.description,
-    estimated_duration: input.estimatedDuration,
-    exam_date: input.examDate,
-    group_type: input.groupType || "GERAL",
-    id: examId,
-    instructions: input.instructions,
-    period: input.period,
-    print_options: normalizeExamPrintOptions(input.printOptions),
-    published_at: published ? now : null,
-    question_count: input.questions.length,
-    released_at: published ? now : null,
-    status: published ? "publicada" : "rascunho",
-    subject: input.subject,
-    subject_id: input.subjectId || null,
-    template_version: normalizeExamPrintOptions(input.printOptions).answerSheetModel === "fanucchi" ? "FANUCCHI-OMR-V1" : "PS-CARD-4",
-    title: input.title || "Prova sem título",
-    year_segment: input.yearSegment || "OUTROS",
-    ...source,
-    _creatorName: creatorName,
-  };
-}
-
 async function replaceExamContent(examId: string, input: TeacherExamInput) {
   const client = db();
+  const now = new Date().toISOString();
   const questions = input.questions.map((question, index) => ({
     alternatives: question.alternatives,
     annulled: question.annulled,
     correct_answers: question.correctAnswers,
+    created_at: now,
     correction_criteria: question.correctionCriteria,
     correction_notes: question.correctionNotes,
     exam_id: examId,
@@ -190,6 +162,7 @@ async function replaceExamContent(examId: string, input: TeacherExamInput) {
     prompt: question.prompt,
     topic: question.topic.trim(),
     type: question.type,
+    updated_at: now,
     weight: question.weight,
   }));
   const answerKeys = questions.map((question) => ({
@@ -208,6 +181,7 @@ async function replaceExamContent(examId: string, input: TeacherExamInput) {
     exam_id: examId,
     max_score: questions.reduce((sum, question) => sum + question.weight, 0) || 10,
     rounding_places: 1,
+    updated_at: now,
     voided_question_mode: "full-credit",
     voided_questions: annulled,
     weights_by_question: weights,
@@ -229,18 +203,20 @@ export async function createTeacherExam(input: {
   const client = db();
   const examId = crypto.randomUUID();
   const freeSubjectExam = { ...input.exam, printOptions: normalizeExamPrintOptions(input.exam.printOptions), subject: input.exam.subject.trim(), subjectId: null };
-  const row = examRow(input.actorId, input.creatorName, examId, freeSubjectExam, input.intent, input.source);
+  const row = buildTeacherExamRow(input.actorId, input.creatorName, examId, freeSubjectExam, input.intent, input.source);
   const { _creatorName, ...storedRow } = row;
   ensure((await client.from("exams").insert(storedRow)).error);
   try {
     ensure((await client.from("exam_sections").insert({
       exam_id: examId,
       id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
       question_count: Math.max(input.exam.questions.length, 1),
       question_start: 1,
       subject: freeSubjectExam.subject || "Geral",
       teacher_id: input.actorId,
       teacher_name: _creatorName,
+      updated_at: new Date().toISOString(),
     })).error);
     await replaceExamContent(examId, freeSubjectExam);
     await saveExamContentVersion({ actorId: input.actorId, examId, reason: "criada", snapshot: freeSubjectExam, version: 1 });
@@ -262,13 +238,14 @@ async function createPublishedTeacherExam(input: {
   const pairs = await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups });
   const examId = crypto.randomUUID();
   const normalizedExam = { ...input.exam, printOptions: normalizeExamPrintOptions(input.exam.printOptions), subject: input.exam.subject.trim(), subjectId: null };
-  const row = examRow(input.actorId, input.creatorName, examId, normalizedExam, "publicar", input.source);
+  const row = buildTeacherExamRow(input.actorId, input.creatorName, examId, normalizedExam, "publicar", input.source);
   const { _creatorName, ...storedRow } = row;
   const questions = normalizedExam.questions.map((question, index) => ({
     alternatives: question.alternatives, annulled: question.annulled, correct_answers: question.correctAnswers,
+    created_at: new Date().toISOString(),
     correction_criteria: question.correctionCriteria, correction_notes: question.correctionNotes,
     id: question.id?.trim() || crypto.randomUUID(), image_path: question.imagePath || null,
-    needs_review: question.needsReview, position: index + 1, prompt: question.prompt, topic: question.topic.trim(), type: question.type, weight: question.weight,
+    needs_review: question.needsReview, position: index + 1, prompt: question.prompt, topic: question.topic.trim(), type: question.type, updated_at: new Date().toISOString(), weight: question.weight,
   }));
   const payload = {
     audit_event: "teacher_exam_published", audit_id: crypto.randomUUID(),
@@ -285,8 +262,10 @@ async function createPublishedTeacherExam(input: {
       ensure((await client.from("exams").insert(payload.exam)).error, "Não foi possível publicar a prova.");
       ensure((await client.from("exam_sections").insert({
         exam_id: examId, id: payload.section_id, question_count: questions.length || 1,
+        created_at: new Date().toISOString(),
         question_start: 1, subject: normalizedExam.subject || "Geral", teacher_id: input.actorId,
         teacher_name: payload.creator_name,
+        updated_at: new Date().toISOString(),
       })).error, "Não foi possível publicar a prova.");
       if (payload.assignments.length) ensure((await client.from("exam_assignments").insert(payload.assignments.map((assignment) => ({
         ...assignment, active: true, assigned_at: new Date().toISOString(), assigned_by: input.actorId,
@@ -294,6 +273,7 @@ async function createPublishedTeacherExam(input: {
       })))).error, "Não foi possível publicar a prova.");
       ensure((await client.from("correction_rules").upsert({
         default_weight: 1, exam_id: examId, max_score: payload.max_score, rounding_places: 1,
+        updated_at: new Date().toISOString(),
         voided_question_mode: "full-credit", voided_questions: payload.voided_questions,
         weights_by_question: payload.weights_by_question,
       }, { onConflict: "exam_id" })).error, "Não foi possível publicar a prova.");
@@ -353,6 +333,7 @@ async function saveExamContentVersion(input: { actorId: string; examId: string; 
     id: crypto.randomUUID(),
     reason: input.reason,
     snapshot: versionSnapshot(input.snapshot),
+    created_at: new Date().toISOString(),
     version: input.version,
   });
   ensure(error, "A prova foi salva, mas o histórico não pôde ser registrado.");
@@ -424,8 +405,9 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
   const parsed = teacherExamInputSchema.safeParse(stored.snapshot);
   if (!parsed.success) throw new Error("Esta versão antiga não está em um formato que pode ser restaurado com segurança.");
   const restored = versionSnapshot(parsed.data);
-  const row = examRow(input.actorId, current.creatorName, input.examId, restored, current.status === "publicada" ? "publicar" : "rascunho", {
+  const row = buildTeacherExamRow(input.actorId, current.creatorName, input.examId, restored, current.status === "publicada" ? "publicar" : "rascunho", {
     applied_at: current.appliedAt,
+    created_at: current.createdAt,
     import_processing_error: current.importProcessingError,
     import_processing_status: current.importProcessingStatus,
     imported_at: current.importedAt,
@@ -449,6 +431,7 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
     correction_criteria: question.correctionCriteria,
     correction_notes: question.correctionNotes,
     correct_answers: question.correctAnswers,
+    created_at: new Date().toISOString(),
     id: question.id?.trim() || crypto.randomUUID(),
     image_path: question.imagePath || null,
     needs_review: question.needsReview,
@@ -456,6 +439,7 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
     prompt: question.prompt,
     topic: question.topic.trim(),
     type: question.type,
+    updated_at: new Date().toISOString(),
     weight: question.weight,
   }));
   const client = db();
@@ -488,13 +472,14 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
         default_weight: 1, exam_id: input.examId,
         max_score: questions.reduce((sum, question) => sum + Number(question.weight), 0) || 10,
         rounding_places: 1, voided_question_mode: "full-credit",
+        updated_at: new Date().toISOString(),
         voided_questions: questions.filter((question) => question.annulled).map((question) => question.position),
         weights_by_question: questions.filter((question) => Number(question.weight) !== 1).map((question) => ({ peso: question.weight, questao: question.position })),
       }, { onConflict: "exam_id" })).error);
       ensure((await client.from("exam_sections").update({ question_count: Math.max(questions.length, 1), subject: restored.subject || "Geral" }).eq("exam_id", input.examId).eq("teacher_id", input.actorId)).error);
       ensure((await client.from("exam_content_versions").insert({
         id: nextVersionId, exam_id: input.examId, version: nextVersion, created_by: input.actorId,
-        reason: "restaurada", snapshot: versionSnapshot(restored),
+        reason: "restaurada", snapshot: versionSnapshot(restored), created_at: new Date().toISOString(),
       })).error, "Não foi possível registrar a versão restaurada.");
     } catch (error) {
       try {
@@ -529,8 +514,9 @@ export async function updateTeacherExam(input: { actorId: string; actorRole?: Us
     if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
     await validateNewExamAssignmentPairs({ actorId: input.actorId, actorRole: input.actorRole, groups: freeSubjectExam.assignmentGroups ?? [] });
   }
-  const row = examRow(input.actorId, current.creatorName, input.examId, freeSubjectExam, input.intent, {
+  const row = buildTeacherExamRow(input.actorId, current.creatorName, input.examId, freeSubjectExam, input.intent, {
     applied_at: current.appliedAt,
+    created_at: current.createdAt,
     import_processing_error: current.importProcessingError,
     import_processing_status: current.importProcessingStatus,
     imported_at: current.importedAt,
