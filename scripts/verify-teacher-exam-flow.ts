@@ -4,7 +4,7 @@ import { parseImportedExamText } from "../lib/exam-import-parser";
 import { defaultQuestion, validateExamForPublication } from "../lib/teacher-exam-validation";
 import { encodeGoogleSheetsTableValues } from "../lib/google-sheets-codec";
 import { GOOGLE_SHEETS_SCHEMA } from "../lib/google-sheets-schema";
-import { buildTeacherExamRow } from "../lib/teacher-exam-row";
+import { buildTeacherExamContentVersionRow, buildTeacherExamRow } from "../lib/teacher-exam-row";
 
 const imported = parseImportedExamText(`Avaliação de Ciências
 Disciplina: Ciências
@@ -60,6 +60,24 @@ assert.equal(draftRow.created_at, "2026-10-19T12:00:00.000Z");
 assert.equal(draftRow.updated_at, "2026-10-19T12:00:00.000Z");
 assert.equal(draftRow.version, 1);
 
+const contentVersionRow = buildTeacherExamContentVersionRow({
+  actorId: "teacher-test",
+  examId: "exam-test",
+  id: "version-test",
+  reason: "salva",
+  snapshot: validExam,
+  version: 2,
+  createdAt: "2026-10-19T12:00:00.000Z",
+});
+const contentVersionsSchema = GOOGLE_SHEETS_SCHEMA.exam_content_versions;
+assert.ok(contentVersionsSchema);
+assert.equal(
+  encodeGoogleSheetsTableValues(Object.keys(contentVersionsSchema.columns), [contentVersionRow], contentVersionsSchema.columns)[1].length,
+  Object.keys(contentVersionsSchema.columns).length,
+  "preservar uma versão anterior deve preencher todas as colunas exigidas da aba exam_content_versions",
+);
+assert.equal(contentVersionRow.created_at, "2026-10-19T12:00:00.000Z");
+
 const collectionRoute = readFileSync(new URL("../app/api/teacher-exams/route.ts", import.meta.url), "utf8");
 const itemRoute = readFileSync(new URL("../app/api/teacher-exams/[examId]/route.ts", import.meta.url), "utf8");
 const service = readFileSync(new URL("../services/teacher-exams.ts", import.meta.url), "utf8");
@@ -106,6 +124,9 @@ assert.match(assignments, /getAssignableAudience\(input: \{ actorId: string; act
 assert.doesNotMatch(service, /throw new Error\("Selecione uma disciplina válida\."\)/);
 assert.doesNotMatch(service, /Defina pelo menos uma turma responsável/);
 assert.match(service, /withOperationalWriteLock/);
+assert.match(service, /export function updateTeacherExam[\s\S]*?return withOperationalWriteLock/);
+assert.match(service, /function preserveCurrentExamContentVersion[\s\S]*?buildTeacherExamContentVersionRow/);
+assert.match(service, /exam_sections"\)\.update\(\{ question_count:[^}]*updated_at:/);
 assert.match(service, /exam_assignments/);
 assert.match(service, /audit_log_internal/);
 assert.doesNotMatch(service, /\.rpc\(/);

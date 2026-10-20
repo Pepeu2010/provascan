@@ -1,5 +1,5 @@
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
-import type { TeacherExamInput } from "@/types/teacher-exams";
+import type { TeacherExamContentVersion, TeacherExamInput } from "@/types/teacher-exams";
 
 export function buildTeacherExamRow(
   actorId: string,
@@ -49,5 +49,25 @@ export function buildTeacherExamRow(
     year_segment: input.yearSegment || "OUTROS",
     ...source,
     _creatorName: creatorName,
+  };
+}
+
+export function buildTeacherExamContentVersionRow(
+  input: Pick<TeacherExamContentVersion, "reason" | "version"> & {
+    actorId: string;
+    examId: string;
+    snapshot: TeacherExamInput;
+    id?: string;
+    createdAt?: string;
+  },
+) {
+  return {
+    created_at: input.createdAt ?? new Date().toISOString(),
+    created_by: input.actorId,
+    exam_id: input.examId,
+    id: input.id ?? crypto.randomUUID(),
+    reason: input.reason,
+    snapshot: input.snapshot,
+    version: input.version,
   };
 }
