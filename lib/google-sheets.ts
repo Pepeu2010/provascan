@@ -2,7 +2,7 @@ import "server-only";
 import { google, sheets_v4 } from "googleapis";
 import { Readable } from "node:stream";
 import { assertOperationalWriteLock, withOperationalWriteLock } from "@/lib/operational-lock";
-import { decodeGoogleSheetsCell, encodeGoogleSheetsCell } from "@/lib/google-sheets-codec";
+import { decodeGoogleSheetsCell, encodeGoogleSheetsTableValues } from "@/lib/google-sheets-codec";
 import { GOOGLE_SHEETS_SCHEMA } from "@/lib/google-sheets-schema";
 import { assertUniqueGoogleSheetsKeys, mergeGoogleSheetsUpsert } from "@/lib/google-sheets-row-integrity";
 
@@ -42,8 +42,7 @@ function validateRowsAgainstHeaders(table: string, headers: string[], rows: Row[
   const schema = definition(table);
   for (const header of headers) if (!schema.columns[header]) throw new GoogleSheetsConnectionError(`A aba ${table} contém coluna fora do esquema.`);
 }
-function cell(value: unknown, column: import("@/lib/google-sheets-schema").GoogleSheetsColumnDefinition): sheets_v4.Schema$CellData {
-  const encoded = encodeGoogleSheetsCell(value, column);
+function encodedCell(encoded: string | number | boolean): sheets_v4.Schema$CellData {
   if (typeof encoded === "boolean") return { userEnteredValue: { boolValue: encoded } };
   if (typeof encoded === "number") return { userEnteredValue: { numberValue: encoded } };
   return { userEnteredValue: { stringValue: encoded } };
@@ -90,12 +89,13 @@ async function replaceRows(table: string, headers: string[], rows: Row[]) {
   const rowCount = Math.max(1, Number(sheet.gridProperties?.rowCount ?? rows.length + 1));
   const columnCount = Math.max(headers.length, Number(sheet.gridProperties?.columnCount ?? headers.length));
   const schema = definition(table);
+  const values = encodeGoogleSheetsTableValues(headers, rows, schema.columns);
   assertOperationalWriteLock();
   await api().spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: { requests: [
       { repeatCell: { range: { sheetId: sheet.sheetId, startRowIndex: 0, endRowIndex: rowCount, startColumnIndex: 0, endColumnIndex: columnCount }, cell: {}, fields: "userEnteredValue" } },
-      { updateCells: { start: { sheetId: sheet.sheetId, rowIndex: 0, columnIndex: 0 }, rows: [headers, ...rows.map((row) => headers.map((header) => row[header]))].map((line) => ({ values: line.map((value, index) => cell(value, schema.columns[headers[index]])) })), fields: "userEnteredValue" } },
+      { updateCells: { start: { sheetId: sheet.sheetId, rowIndex: 0, columnIndex: 0 }, rows: values.map((line) => ({ values: line.map(encodedCell) })), fields: "userEnteredValue" } },
     ] },
   });
 }
