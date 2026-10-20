@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseImportedExamText } from "../lib/exam-import-parser";
 import { defaultQuestion, validateExamForPublication } from "../lib/teacher-exam-validation";
+import { encodeGoogleSheetsTableValues } from "../lib/google-sheets-codec";
+import { GOOGLE_SHEETS_SCHEMA } from "../lib/google-sheets-schema";
+import { buildTeacherExamRow } from "../lib/teacher-exam-row";
 
 const imported = parseImportedExamText(`Avaliação de Ciências
 Disciplina: Ciências
@@ -42,6 +45,20 @@ assert.deepEqual(validateExamForPublication(validExam), []);
 assert.deepEqual(validateExamForPublication({ ...validExam, title: "" }), []);
 assert.match(validateExamForPublication({ ...validExam, questions: [{ ...validExam.questions[0], correctAnswers: [] }] })[0], /resposta correta/i);
 assert.deepEqual(validateExamForPublication({ ...validExam, subject: "", subjectId: null, audienceId: "", audienceLabel: "", assignmentGroups: [] }), []);
+
+const draftRow = buildTeacherExamRow("teacher-test", "Professor Teste", "exam-test", validExam, "rascunho", {}, "2026-10-19T12:00:00.000Z");
+const examsSchema = GOOGLE_SHEETS_SCHEMA.exams;
+assert.ok(examsSchema);
+assert.deepEqual(
+  encodeGoogleSheetsTableValues(Object.keys(examsSchema.columns), [draftRow], examsSchema.columns)[1].length,
+  Object.keys(examsSchema.columns).length,
+  "a criação manual precisa preencher todas as colunas exigidas da aba exams",
+);
+assert.equal(draftRow.source_type, "manual");
+assert.equal(draftRow.import_processing_status, "nao_aplicavel");
+assert.equal(draftRow.created_at, "2026-10-19T12:00:00.000Z");
+assert.equal(draftRow.updated_at, "2026-10-19T12:00:00.000Z");
+assert.equal(draftRow.version, 1);
 
 const collectionRoute = readFileSync(new URL("../app/api/teacher-exams/route.ts", import.meta.url), "utf8");
 const itemRoute = readFileSync(new URL("../app/api/teacher-exams/[examId]/route.ts", import.meta.url), "utf8");
