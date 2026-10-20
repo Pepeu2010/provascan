@@ -4,7 +4,7 @@ import { createSheetsClient } from "@/lib/sheets-compat";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
-import { buildTeacherExamRow } from "@/lib/teacher-exam-row";
+import { buildTeacherExamContentVersionRow, buildTeacherExamRow } from "@/lib/teacher-exam-row";
 import { teacherExamInputSchema } from "@/lib/teacher-exam-validation";
 import { withOperationalWriteLock } from "@/lib/operational-lock";
 import type { UserRole } from "@/types/auth";
@@ -327,15 +327,15 @@ function versionSnapshot(input: TeacherExamInput): TeacherExamInput {
 }
 
 async function saveExamContentVersion(input: { actorId: string; examId: string; reason: TeacherExamContentVersion["reason"]; snapshot: TeacherExamInput; version: number }) {
-  const { error } = await db().from("exam_content_versions").insert({
-    created_by: input.actorId,
-    exam_id: input.examId,
+  const row = buildTeacherExamContentVersionRow({
+    actorId: input.actorId,
+    examId: input.examId,
     id: crypto.randomUUID(),
     reason: input.reason,
     snapshot: versionSnapshot(input.snapshot),
-    created_at: new Date().toISOString(),
     version: input.version,
   });
+  const { error } = await db().from("exam_content_versions").insert(row);
   ensure(error, "A prova foi salva, mas o histórico não pôde ser registrado.");
 }
 
@@ -360,14 +360,15 @@ function inputFromExam(exam: TeacherExam): TeacherExamInput {
 }
 
 async function preserveCurrentExamContentVersion(actorId: string, exam: TeacherExam) {
-  const { error } = await db().from("exam_content_versions").upsert({
-    created_by: actorId,
-    exam_id: exam.id,
+  const row = buildTeacherExamContentVersionRow({
+    actorId,
+    examId: exam.id,
     id: crypto.randomUUID(),
     reason: "salva",
     snapshot: versionSnapshot(inputFromExam(exam)),
     version: exam.version,
-  }, { ignoreDuplicates: true, onConflict: "exam_id,version" });
+  });
+  const { error } = await db().from("exam_content_versions").upsert(row, { ignoreDuplicates: true, onConflict: "exam_id,version" });
   ensure(error, "Não foi possível preservar a versão atual da prova.");
 }
 
@@ -501,7 +502,7 @@ export async function restoreTeacherExamContentVersion(input: { actorId: string;
   return nextVersion;
 }
 
-export async function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
+async function updateTeacherExamUnderLock(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
   const current = await getTeacherExam({ actorId: input.actorId, examId: input.examId });
   if (!current) throw new Error("Prova não encontrada ou não pertence a você.");
   if (input.expectedVersion && current.version !== input.expectedVersion) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de salvar.");
@@ -534,13 +535,17 @@ export async function updateTeacherExam(input: { actorId: string; actorRole?: Us
   ensure(error);
   if (!data) throw new Error("Esta prova foi alterada em outra sessão. Recarregue antes de salvar.");
   if (!current.hasResults) await replaceExamContent(input.examId, freeSubjectExam);
-  await db().from("exam_sections").update({ question_count: Math.max(freeSubjectExam.questions.length, 1), subject: freeSubjectExam.subject || "Geral" }).eq("exam_id", input.examId).eq("teacher_id", input.actorId);
+  ensure((await db().from("exam_sections").update({ question_count: Math.max(freeSubjectExam.questions.length, 1), subject: freeSubjectExam.subject || "Geral", updated_at: new Date().toISOString() }).eq("exam_id", input.examId).eq("teacher_id", input.actorId)).error);
   if (input.intent === "publicar") {
     if (!input.actorRole) throw new Error("Não foi possível validar seu perfil de acesso.");
     await syncExamAssignments({ actorId: input.actorId, actorRole: input.actorRole, examId: input.examId, groups: freeSubjectExam.assignmentGroups ?? [] });
   }
   await saveExamContentVersion({ actorId: input.actorId, examId: input.examId, reason: input.intent === "publicar" ? "publicada" : "salva", snapshot: freeSubjectExam, version: current.version + 1 });
   return current.version + 1;
+}
+
+export function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
+  return withOperationalWriteLock(process.env.GOOGLE_SHEET_ID ?? "unconfigured", () => updateTeacherExamUnderLock(input));
 }
 
 export async function duplicateTeacherExam(actorId: string, creatorName: string, examId: string) {
