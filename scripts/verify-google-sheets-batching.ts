@@ -42,6 +42,13 @@ async function main() {
   assert.deepEqual(studentRead, { table: "students" });
   assert.deepEqual(repeatedExamRead, examRead, "a mesma leitura concorrente deve receber o mesmo resultado");
 
+  queuedBatches.length = 0;
+  const queryLikeReads = ["classes", "students", "classes"].map((table) => ({
+    then: (resolve: (value: { table: string }) => unknown, reject?: (reason: unknown) => unknown) => read(table).then(resolve, reject),
+  }));
+  await Promise.all(queryLikeReads as PromiseLike<{ table: string }>[]);
+  assert.deepEqual(queuedBatches, [["classes", "students"]], "thenable queries inside Promise.all must be coalesced before batchGet");
+
   let finishInFlight: ((result: Map<string, string>) => void) | undefined;
   let inFlightCalls = 0;
   const readDuringRequest = createGoogleSheetsReadBatcher((tables) => {
