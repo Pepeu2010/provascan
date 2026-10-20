@@ -76,6 +76,18 @@ export function encodeGoogleSheetsCell(value: unknown, column: GoogleSheetsColum
   }
 }
 
+/** Keeps table headers textual while encoding each data cell by its schema. */
+export function encodeGoogleSheetsTableValues(
+  headers: string[],
+  rows: Array<Record<string, unknown>>,
+  columns: Readonly<Record<string, GoogleSheetsColumnDefinition>>,
+): GoogleSheetsCellValue[][] {
+  return [
+    headers,
+    ...rows.map((row) => headers.map((header) => encodeGoogleSheetsCell(row[header], columns[header]))),
+  ];
+}
+
 export function decodeGoogleSheetsCell(value: unknown, column: GoogleSheetsColumnDefinition): unknown {
   if (value === undefined || value === null || value === "") {
     if (column.type === "text" && !column.nullable) return "";
