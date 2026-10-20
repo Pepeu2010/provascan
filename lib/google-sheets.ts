@@ -3,6 +3,7 @@ import { google, sheets_v4 } from "googleapis";
 import { Readable } from "node:stream";
 import { assertOperationalWriteLock, getOperationalWriteCacheValue, setOperationalWriteCacheValue, withOperationalWriteLock } from "@/lib/operational-lock";
 import { decodeGoogleSheetsCell, encodeGoogleSheetsTableValues } from "@/lib/google-sheets-codec";
+import { readGoogleSheetsTableBatch } from "@/lib/google-sheets-batching";
 import { GOOGLE_SHEETS_SCHEMA } from "@/lib/google-sheets-schema";
 import { assertUniqueGoogleSheetsKeys, mergeGoogleSheetsUpsert } from "@/lib/google-sheets-row-integrity";
 
@@ -56,14 +57,17 @@ function decodeTableValues(table: string, values: unknown[][]): { headers: strin
   return { headers, rows };
 }
 async function readTables(tables: string[]) {
-  const results = new Map<string, { headers: string[]; rows: Row[] }>();
-  if (!tables.length) return results;
+  if (!tables.length) return new Map<string, { headers: string[]; rows: Row[] }>();
   try {
-    const response = await api().spreadsheets.values.batchGet({ spreadsheetId, ranges: tables.map((table) => `'${table.replace(/'/g, "''")}'`), valueRenderOption: "UNFORMATTED_VALUE" });
-    const valuesByTable = response.data.valueRanges ?? [];
-    tables.forEach((table, index) => {
-      const result = decodeTableValues(table, valuesByTable[index]?.values ?? []);
-      results.set(table, result);
+    const results = await readGoogleSheetsTableBatch(
+      tables,
+      async (ranges) => {
+        const response = await api().spreadsheets.values.batchGet({ spreadsheetId, ranges, valueRenderOption: "UNFORMATTED_VALUE" });
+        return response.data.valueRanges ?? [];
+      },
+      decodeTableValues,
+    );
+    results.forEach((result, table) => {
       setOperationalWriteCacheValue(`google-sheets:${spreadsheetId ?? "unconfigured"}:table:${table}`, result);
     });
     return results;
