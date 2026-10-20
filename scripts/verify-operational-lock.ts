@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { OperationalLockBusyError, OperationalLockUnavailableError, assertOperationalWriteLock, runWithOperationalLease } from "../lib/operational-lock";
+import { OperationalLockBusyError, OperationalLockUnavailableError, assertOperationalWriteLock, getOperationalWriteCacheValue, runWithOperationalLease, setOperationalWriteCacheValue } from "../lib/operational-lock";
 
 class FakeRedis {
   private values = new Map<string, { owner: string; expires: number }>();
@@ -58,6 +58,16 @@ async function main() {
   await assert.rejects(runWithOperationalLease(redis, "table", "owner-g", async () => {}, { ttlMs: 100, renewEveryMs: 20, acquireTimeoutMs: 20, retryEveryMs: 2 }), OperationalLockBusyError);
   await held;
   assert.equal(redis.owner("table"), undefined, "lock não recuperou após contenção/timeout");
+
+  assert.equal(getOperationalWriteCacheValue("sheets:table"), undefined, "cache de escrita vazou para fora do lease");
+  await runWithOperationalLease(redis, "table", "owner-cache-a", async () => {
+    setOperationalWriteCacheValue("sheets:table", { rows: [1] });
+    assert.deepEqual(getOperationalWriteCacheValue("sheets:table"), { rows: [1] }, "cache não ficou disponível dentro do lease");
+  });
+  assert.equal(getOperationalWriteCacheValue("sheets:table"), undefined, "cache do primeiro lease vazou para o próximo request");
+  await runWithOperationalLease(redis, "table", "owner-cache-b", async () => {
+    assert.equal(getOperationalWriteCacheValue("sheets:table"), undefined, "lease novo reutilizou cache de outro request");
+  });
   console.log("Lock operacional: concorrência serializada, renovação, timeout, perda de lease, owner-only release e recuperação verificados.");
 }
 

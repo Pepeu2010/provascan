@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createSheetsClient } from "@/lib/sheets-compat";
+import { preloadGoogleSheetsWriteContext } from "@/lib/google-sheets";
 import { syncExamAssignments, validateNewExamAssignmentPairs } from "@/services/exam-assignments";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { normalizeExamPrintOptions } from "@/lib/exam-print-options";
@@ -545,7 +546,13 @@ async function updateTeacherExamUnderLock(input: { actorId: string; actorRole?: 
 }
 
 export function updateTeacherExam(input: { actorId: string; actorRole?: UserRole; examId: string; exam: TeacherExamInput; expectedVersion?: number | null; intent: "rascunho" | "publicar" }) {
-  return withOperationalWriteLock(process.env.GOOGLE_SHEET_ID ?? "unconfigured", () => updateTeacherExamUnderLock(input));
+  return withOperationalWriteLock(process.env.GOOGLE_SHEET_ID ?? "unconfigured", async () => {
+    await preloadGoogleSheetsWriteContext([
+      "app_users", "answer_keys", "audit_log_internal", "classes", "correction_rules", "corrections",
+      "exam_assignments", "exam_content_versions", "exam_questions", "exam_sections", "exams", "pedagogical_scopes", "subjects",
+    ]);
+    return updateTeacherExamUnderLock(input);
+  });
 }
 
 export async function duplicateTeacherExam(actorId: string, creatorName: string, examId: string) {

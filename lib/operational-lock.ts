@@ -4,7 +4,8 @@ import { Redis } from "@upstash/redis";
 
 export class OperationalLockUnavailableError extends Error {}
 export class OperationalLockBusyError extends Error {}
-const activeLock = new AsyncLocalStorage<{ lost: boolean }>();
+type OperationalLeaseContext = { lost: boolean; requestCache: Map<string, unknown> };
+const activeLock = new AsyncLocalStorage<OperationalLeaseContext>();
 const LOCK_TTL_MS = 30_000;
 const RENEW_SCRIPT = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end";
 const RELEASE_SCRIPT = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
@@ -22,6 +23,15 @@ export function assertOperationalWriteLock(): void {
   if (activeLock.getStore()?.lost) throw new OperationalLockUnavailableError("O bloqueio de gravação foi perdido; alteração cancelada com segurança.");
 }
 
+/** Request-scoped memoization that exists only while the distributed write lease is held. */
+export function getOperationalWriteCacheValue<T>(key: string): T | undefined {
+  return activeLock.getStore()?.requestCache.get(key) as T | undefined;
+}
+
+export function setOperationalWriteCacheValue<T>(key: string, value: T): void {
+  activeLock.getStore()?.requestCache.set(key, value);
+}
+
 export async function runWithOperationalLease<T>(client: LeaseClient, key: string, owner: string, operation: () => Promise<T>, options: { ttlMs?: number; renewEveryMs?: number; acquireTimeoutMs?: number; retryEveryMs?: number } = {}): Promise<T> {
   const ttlMs = options.ttlMs ?? LOCK_TTL_MS;
   const renewEveryMs = options.renewEveryMs ?? Math.floor(ttlMs / 3);
@@ -35,7 +45,7 @@ export async function runWithOperationalLease<T>(client: LeaseClient, key: strin
     await new Promise((resolve) => setTimeout(resolve, Math.min(retryEveryMs, Math.max(1, deadline - Date.now()))));
   } while (Date.now() <= deadline);
   if (!acquired) throw new OperationalLockBusyError("Outra alteração está sendo salva. Tente novamente.");
-  const lease = { lost: false };
+  const lease: OperationalLeaseContext = { lost: false, requestCache: new Map() };
   let renewing = false;
   const timer = setInterval(() => {
     if (renewing || lease.lost) return;

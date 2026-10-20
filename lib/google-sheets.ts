@@ -1,7 +1,7 @@
 import "server-only";
 import { google, sheets_v4 } from "googleapis";
 import { Readable } from "node:stream";
-import { assertOperationalWriteLock, withOperationalWriteLock } from "@/lib/operational-lock";
+import { assertOperationalWriteLock, getOperationalWriteCacheValue, setOperationalWriteCacheValue, withOperationalWriteLock } from "@/lib/operational-lock";
 import { decodeGoogleSheetsCell, encodeGoogleSheetsTableValues } from "@/lib/google-sheets-codec";
 import { GOOGLE_SHEETS_SCHEMA } from "@/lib/google-sheets-schema";
 import { assertUniqueGoogleSheetsKeys, mergeGoogleSheetsUpsert } from "@/lib/google-sheets-row-integrity";
@@ -47,17 +47,39 @@ function encodedCell(encoded: string | number | boolean): sheets_v4.Schema$CellD
   if (typeof encoded === "number") return { userEnteredValue: { numberValue: encoded } };
   return { userEnteredValue: { stringValue: encoded } };
 }
-async function readTable(table: string): Promise<{ headers: string[]; rows: Row[] }> {
+function decodeTableValues(table: string, values: unknown[][]): { headers: string[]; rows: Row[] } {
+  const schema = definition(table);
+  const headers = (values[0] ?? []).map(String);
+  validateRowsAgainstHeaders(table, headers, []);
+  const rows = values.slice(1).filter((line) => line.some((value) => value !== "" && value !== undefined)).map((line) => Object.fromEntries(headers.map((header, index) => [header, decodeGoogleSheetsCell(line[index], schema.columns[header])])));
+  assertUniqueGoogleSheetsKeys(rows, [...schema.primaryKey], table);
+  return { headers, rows };
+}
+async function readTables(tables: string[]) {
+  const results = new Map<string, { headers: string[]; rows: Row[] }>();
+  if (!tables.length) return results;
   try {
-    const schema = definition(table);
-    const response = await api().spreadsheets.values.get({ spreadsheetId, range: `'${table.replace(/'/g, "''")}'`, valueRenderOption: "UNFORMATTED_VALUE" });
-    const values = response.data.values ?? [];
-    const headers = (values[0] ?? []).map(String);
-    validateRowsAgainstHeaders(table, headers, []);
-    const rows = values.slice(1).filter((line) => line.some((value) => value !== "" && value !== undefined)).map((line) => Object.fromEntries(headers.map((header, index) => [header, decodeGoogleSheetsCell(line[index], schema.columns[header])])));
-    assertUniqueGoogleSheetsKeys(rows, [...schema.primaryKey], table);
-    return { headers, rows };
-  } catch (error) { console.error("Google Sheets request failed", { table, message: error instanceof Error ? error.message : "unknown" }); throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema."); }
+    const response = await api().spreadsheets.values.batchGet({ spreadsheetId, ranges: tables.map((table) => `'${table.replace(/'/g, "''")}'`), valueRenderOption: "UNFORMATTED_VALUE" });
+    const valuesByTable = response.data.valueRanges ?? [];
+    tables.forEach((table, index) => {
+      const result = decodeTableValues(table, valuesByTable[index]?.values ?? []);
+      results.set(table, result);
+      setOperationalWriteCacheValue(`google-sheets:${spreadsheetId ?? "unconfigured"}:table:${table}`, result);
+    });
+    return results;
+  } catch (error) {
+    console.error("Google Sheets request failed", { tables, message: error instanceof Error ? error.message : "unknown" });
+    throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema.");
+  }
+}
+async function readTable(table: string): Promise<{ headers: string[]; rows: Row[] }> {
+  const cacheKey = `google-sheets:${spreadsheetId ?? "unconfigured"}:table:${table}`;
+  const cached = getOperationalWriteCacheValue<{ headers: string[]; rows: Row[] }>(cacheKey);
+  if (cached) return cached;
+  const results = await readTables([table]);
+  const result = results.get(table);
+  if (!result) throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema.");
+  return result;
 }
 export async function sheetsTable(table: string) {
   const source = await readTable(table);
@@ -81,10 +103,39 @@ export async function sheetsTable(table: string) {
     }),
   };
 }
+
+export async function preloadGoogleSheetsWriteContext(tables: string[]) {
+  assertOperationalWriteLock();
+  const uncached = [...new Set(tables)].filter((table) => !getOperationalWriteCacheValue(`google-sheets:${spreadsheetId ?? "unconfigured"}:table:${table}`));
+  await readTables(uncached);
+  const metadataCacheKey = `google-sheets:${spreadsheetId ?? "unconfigured"}:spreadsheet-metadata`;
+  if (!getOperationalWriteCacheValue<sheets_v4.Schema$Spreadsheet>(metadataCacheKey)) {
+    const response = await api().spreadsheets.get({ spreadsheetId, fields: "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))" });
+    setOperationalWriteCacheValue(metadataCacheKey, response.data);
+  }
+}
+
+export async function appendRows(table: string, rows: Row[]) {
+  return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
+    if (!rows.length) return;
+    const current = await readTable(table);
+    validateRowsAgainstHeaders(table, current.headers, rows);
+    const schema = definition(table);
+    const next = [...current.rows, ...rows];
+    assertUniqueGoogleSheetsKeys(next, [...schema.primaryKey], table);
+    await replaceRows(table, current.headers, next);
+  });
+}
 async function replaceRows(table: string, headers: string[], rows: Row[]) {
   assertOperationalWriteLock();
-  const spreadsheet = await api().spreadsheets.get({ spreadsheetId, fields: "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))" });
-  const sheet = spreadsheet.data.sheets?.find((item) => item.properties?.title === table)?.properties;
+  const metadataCacheKey = `google-sheets:${spreadsheetId ?? "unconfigured"}:spreadsheet-metadata`;
+  let spreadsheet = getOperationalWriteCacheValue<sheets_v4.Schema$Spreadsheet>(metadataCacheKey);
+  if (!spreadsheet) {
+    const response = await api().spreadsheets.get({ spreadsheetId, fields: "sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))" });
+    spreadsheet = response.data;
+    setOperationalWriteCacheValue(metadataCacheKey, spreadsheet);
+  }
+  const sheet = spreadsheet.sheets?.find((item) => item.properties?.title === table)?.properties;
   if (sheet?.sheetId == null) throw new GoogleSheetsConnectionError(`A aba ${table} não existe na planilha.`);
   const rowCount = Math.max(1, Number(sheet.gridProperties?.rowCount ?? rows.length + 1));
   const columnCount = Math.max(headers.length, Number(sheet.gridProperties?.columnCount ?? headers.length));
@@ -98,10 +149,40 @@ async function replaceRows(table: string, headers: string[], rows: Row[]) {
       { updateCells: { start: { sheetId: sheet.sheetId, rowIndex: 0, columnIndex: 0 }, rows: values.map((line) => ({ values: line.map(encodedCell) })), fields: "userEnteredValue" } },
     ] },
   });
+  setOperationalWriteCacheValue(`google-sheets:${spreadsheetId ?? "unconfigured"}:table:${table}`, { headers, rows });
 }
 export async function findRows(table: string, predicate?: (row: Row) => boolean, limit = 500) { return (await readTable(table)).rows.filter(predicate ?? (() => true)).slice(0, limit); }
-export async function updateRows(table: string, predicate: (row: Row) => boolean, changes: Row) { return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => { const target = await sheetsTable(table); const rows = target.all(); let count = 0; const next = rows.map((row) => predicate(row) ? (++count, { ...row, ...changes }) : row); if (count) await target.replace(next); return count; }); }
-export async function deleteRows(table: string, predicate: (row: Row) => boolean) { return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => { const target = await sheetsTable(table); const rows = target.all(); const next = rows.filter((row) => !predicate(row)); const count = rows.length - next.length; if (count) await target.replace(next); return count; }); }
+export async function updateRowsReturning(table: string, predicate: (row: Row) => boolean, changes: Row) {
+  return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
+    const target = await sheetsTable(table);
+    const rows = target.all();
+    const changed: Row[] = [];
+    const next = rows.map((row) => {
+      if (!predicate(row)) return row;
+      const updated = { ...row, ...changes };
+      changed.push(updated);
+      return updated;
+    });
+    if (changed.length) await target.replace(next);
+    return changed;
+  });
+}
+export async function updateRows(table: string, predicate: (row: Row) => boolean, changes: Row) { return (await updateRowsReturning(table, predicate, changes)).length; }
+export async function deleteRowsReturning(table: string, predicate: (row: Row) => boolean) {
+  return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
+    const target = await sheetsTable(table);
+    const rows = target.all();
+    const removed: Row[] = [];
+    const kept = rows.filter((row) => {
+      if (!predicate(row)) return true;
+      removed.push(row);
+      return false;
+    });
+    if (removed.length) await target.replace(kept);
+    return removed;
+  });
+}
+export async function deleteRows(table: string, predicate: (row: Row) => boolean) { return (await deleteRowsReturning(table, predicate)).length; }
 export async function upsertRows(table: string, incoming: Row[], conflictKeys: string[], ignoreDuplicates: boolean) {
   return withOperationalWriteLock(spreadsheetId ?? "unconfigured", async () => {
     const target = await sheetsTable(table);
