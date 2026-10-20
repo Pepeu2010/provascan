@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, PRE_AUTH_COOKIE_NAME, applyAuthCookie, buildSessionUser, clearPreAuthCookie, createSessionToken } from "@/lib/auth";
 import { createPasswordStamp } from "@/lib/passwords";
 import { parsePreAuthToken } from "@/lib/pre-auth";
-import { getUserByAccess, isActiveUser, updateLastLogin } from "@/services/supabase-data";
+import { getUserByAccess, isActiveUser, updateLastLogin } from "@/services/google-sheets-data";
 import type { AuthSessionUser, UserRecord } from "@/types/auth";
 
 export async function requirePreAuth() {

@@ -53,7 +53,8 @@ flowchart LR
   B[Browser] --> N[Next.js App Router]
   N --> A[Rotas e guardas de acesso]
   A --> S[Serviços server-only]
-  S --> DB[(Supabase/Postgres)]
+  S --> DB[(Google Sheets API)]
+  S --> G[Google Drive privado: arquivos originais]
   A --> R[Upstash Redis]
   B --> D[Document decoder: imagem e PDF]
   D --> C[Canvas: orientação, perspectiva, layout e OMR]
@@ -67,7 +68,7 @@ flowchart LR
 
 O frontend usa o App Router do Next.js. As páginas protegidas verificam a sessão no servidor e o `proxy` bloqueia áreas privadas antes da navegação. As rotas de API ainda validam permissões específicas, origem da requisição, dados recebidos e limites de uso.
 
-O acesso ao Supabase por chave de serviço fica em módulos marcados como `server-only`; o navegador não recebe essa chave. As migrations em [`supabase/migrations`](./supabase/migrations) definem o esquema, revogações e políticas de acesso direto ao banco.
+O acesso ao Google Sheets e ao Google Drive usa uma conta de serviço em módulos `server-only`. A planilha e a pasta privada do Drive precisam ser compartilhadas com o e-mail dessa conta. As imagens do fluxo de correção continuam no navegador; apenas arquivos de provas importados são guardados no Drive.
 
 ## OCR e correção por foto
 
@@ -93,8 +94,9 @@ O gabarito pode ser digitado ou lido de outra folha. Depois, várias folhas usam
 
 - [Next.js 16](https://nextjs.org/) com React 19 e TypeScript.
 - Tailwind CSS para estilos e componentes utilitários do projeto.
-- Supabase/Postgres para dados operacionais e limitação persistente de requisições.
-- Upstash Redis para limitação distribuída quando configurado.
+- Google Sheets para dados operacionais.
+- Google Drive privado para os arquivos originais importados.
+- Upstash Redis para serializar gravações e aplicar limites distribuídos.
 - `jose`, `bcryptjs` e `otpauth` para sessão, senhas e MFA TOTP.
 - `jsQR`, `tesseract.js`, `pdfjs-dist` e Canvas para QR, OCR, PDF e leitura de marcações.
 - `qrcode` para QR de autenticação e impressão; Vercel Speed Insights para métricas reais de navegação.
@@ -107,15 +109,17 @@ O gabarito pode ser digitado ou lido de outra folha. Depois, várias folhas usam
 - Autorização no servidor por perfil e por recurso, com validação adicional nas rotas de API.
 - Validação de entrada com Zod, verificação de mesma origem em operações sensíveis e resposta sem cache para APIs.
 - Cabeçalhos CSP, `X-Frame-Options: DENY`, `nosniff`, política de referências e política de permissões.
-- Limitação de requisições por Redis quando disponível, com persistência no Supabase como alternativa.
+- Limitação de requisições distribuída via Redis Upstash, com fallback em memória apenas no processo local.
 
-Antes de publicar, configure as variáveis do ambiente na Vercel e mantenha `.env.local`, chaves privadas, tokens e credenciais de serviço fora do Git. Consulte também [OCR_SECURITY.md](./OCR_SECURITY.md), [SUPABASE_SECURITY.md](./SUPABASE_SECURITY.md), [RLS_POLICIES.md](./RLS_POLICIES.md) e [VERCEL_SECURITY.md](./VERCEL_SECURITY.md).
+Antes de publicar, configure as variáveis do ambiente na Vercel e mantenha `.env.local`, chaves privadas, tokens e credenciais de serviço fora do Git. Consulte também [OCR_SECURITY.md](./OCR_SECURITY.md), [GOOGLE_SHEETS_SECURITY.md](./GOOGLE_SHEETS_SECURITY.md) e [VERCEL_SECURITY.md](./VERCEL_SECURITY.md).
 
 ## Requisitos e instalação
 
 - Node.js `>= 20.9.0`.
 - npm (o repositório inclui `package-lock.json`).
-- Um projeto Supabase com as migrations aplicadas.
+- Uma planilha Google com abas e cabeçalhos definidos para as tabelas do sistema.
+- Uma pasta privada do Google Drive compartilhada com a conta de serviço para arquivos originais.
+- Um banco Upstash Redis para locks de gravação e limites distribuídos.
 
 ```powershell
 git clone https://github.com/Pepeu2010/provascan.git
@@ -131,22 +135,24 @@ Abra [http://localhost:3000](http://localhost:3000). Para outros shells, crie `.
 
 | Variável | Uso | Necessidade |
 | --- | --- | --- |
-| `SUPABASE_URL` | URL do projeto Supabase usada no servidor. | Obrigatória |
-| `SUPABASE_SERVICE_ROLE_KEY` | Acesso de serviço ao Supabase; nunca exponha ao navegador. | Obrigatória |
+| `GOOGLE_SHEET_ID` | ID da planilha operacional compartilhada com a conta de serviço. | Obrigatória |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | E-mail da conta de serviço com acesso de editor à planilha. | Obrigatória |
+| `GOOGLE_PRIVATE_KEY` | Chave privada da conta de serviço; apenas no servidor. | Obrigatória |
+| `GOOGLE_DRIVE_FOLDER_ID` | Pasta privada compartilhada com a conta de serviço para arquivos originais. | Obrigatória para importação de arquivos |
 | `AUTH_SECRET` | Segredo de sessão com pelo menos 32 caracteres. | Obrigatória |
 | `MFA_ENCRYPTION_KEY` | Chave Base64 de exatamente 32 bytes para cifrar segredos TOTP. | Obrigatória para MFA |
 | `MFA_REQUIRED` | Define a política de MFA; `true` é o padrão recomendado. | Recomendada |
-| `UPSTASH_REDIS_REST_URL` | Endpoint REST do Redis Upstash. | Recomendada em produção |
-| `UPSTASH_REDIS_REST_TOKEN` | Token do Redis Upstash. | Recomendada em produção |
+| `UPSTASH_REDIS_REST_URL` | Endpoint REST do Redis Upstash usado pelo lock distribuído. | Obrigatória para gravações |
+| `UPSTASH_REDIS_REST_TOKEN` | Token do Redis Upstash usado pelo lock distribuído. | Obrigatória para gravações |
 | `NEXT_PUBLIC_SUPPORT_PIX_KEY` | Chave PIX exibida na área de apoio. | Opcional |
 | `NEXT_PUBLIC_SUPPORT_PIX_NAME` | Nome do recebedor exibido. | Opcional |
 | `NEXT_PUBLIC_SUPPORT_PIX_CITY` | Cidade do recebedor exibida. | Opcional |
 
 `AUTH_SESSION_SECRET` é aceito apenas como nome alternativo de compatibilidade; use `AUTH_SECRET` em novas instalações. Não há uma variável para ativar o Tesseract: ele é carregado dinamicamente pelo fluxo de correção no navegador.
 
-### Banco de dados
+### Google Sheets e Drive
 
-Revise e aplique as migrations de [`supabase/migrations`](./supabase/migrations) no projeto Supabase antes do primeiro uso. Elas incluem fundação do esquema, políticas de segurança, limites persistentes e tabelas de avaliações colaborativas. O repositório não fornece um comando npm para executar migrations automaticamente.
+Configure as abas e cabeçalhos exigidos pela aplicação na planilha antes do primeiro uso. A conta de serviço precisa ter permissão de edição na planilha e na pasta privada do Drive. O projeto verifica cabeçalhos e tipos das colunas antes de gravar; não cria nem limpa abas automaticamente. A conexão e o esquema ainda precisam ser validados com as credenciais do ambiente de deploy. O lock distribuído coordena os escritores do app, mas não impede edições externas e não oferece transações entre abas. Veja [GOOGLE_SHEETS_SECURITY.md](./GOOGLE_SHEETS_SECURITY.md) para o fluxo de validação isolado, backup restaurável e limites de Drive/Sheets.
 
 ## Comandos
 
@@ -170,7 +176,6 @@ Revise e aplique as migrations de [`supabase/migrations`](./supabase/migrations)
 | Autorização de API | `npm run test:api-authorization` |
 | Estabilidade de carregamento | `npm run test:dashboard-loading-stability` |
 | Hardening de segurança | `npm run test:security-hardening` |
-| Migrations em schema novo | `npm run test:fresh-schema-migrations` |
 | Fallback WebGL | `npm run test:webgl-fallback` |
 
 Os testes de OCR usam imagens de referência controladas. Eles confirmam o comportamento esperado das fixtures, não uma garantia universal para qualquer fotografia.
@@ -182,7 +187,7 @@ app/                 Páginas App Router e rotas de API
 components/          Interfaces e fluxos interativos
 lib/                 Autenticação, autorização, validações e utilitários
 services/            Persistência, OCR/OMR e regras de domínio
-supabase/migrations/ Evolução do banco e políticas de acesso
+services/            Integrações Google Sheets/Drive, OCR/OMR e regras de domínio
 scripts/             Verificações de segurança e fixtures
 fixtures/            Arquivos de referência para testes de correção
 public/              Recursos estáticos
@@ -190,7 +195,7 @@ public/              Recursos estáticos
 
 ## Deploy
 
-A aplicação publicada está em [provascan-app.vercel.app](https://provascan-app.vercel.app). Para um novo deploy na Vercel, conecte o repositório, informe as variáveis de ambiente acima e aplique as migrations no Supabase correspondente. O build é executado com `npm run build`.
+A aplicação publicada está em [provascan-app.vercel.app](https://provascan-app.vercel.app). Para um novo deploy na Vercel, conecte o repositório e configure as variáveis de ambiente acima. O build é executado com `npm run build`.
 
 ## Limitações conhecidas
 
@@ -199,7 +204,7 @@ A aplicação publicada está em [provascan-app.vercel.app](https://provascan-ap
 - A fixture de fotografia difícil recupera atualmente 40 das 45 linhas no modo estrutural genérico; por segurança, divergências de quantidade interrompem a correção e pedem nova imagem ou ajuste, sem inventar respostas.
 - O processamento local de OCR pode ser mais lento em aparelhos de menor capacidade.
 - A abertura da janela de impressão depende de o navegador permitir pop-ups para o site.
-- Não existe um script npm de provisionamento automático do Supabase.
+- O projeto não cria nem altera abas automaticamente; a estrutura deve estar preparada na planilha.
 
 ## Roadmap
 

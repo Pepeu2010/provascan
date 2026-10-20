@@ -4,11 +4,11 @@ import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { isPrivilegedRole } from "@/lib/access-control";
 import { clearInvalidSessionCookie, syncValidatedSessionCookie, validateSessionToken } from "@/lib/server-session";
 import {
-  SupabaseConfigError,
-  SupabaseConnectionError,
-  SupabaseSchemaError,
+  GoogleSheetsConfigError,
+  GoogleSheetsConnectionError,
+  GoogleSheetsSchemaError,
   getSchoolRoster,
-} from "@/services/supabase-data";
+} from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 
@@ -49,11 +49,11 @@ export async function GET() {
 
     return response;
   } catch (error) {
-    if (error instanceof SupabaseConfigError) {
+    if (error instanceof GoogleSheetsConfigError) {
       return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao carregar alunos e turmas." }, { status: 503 });
     }
 

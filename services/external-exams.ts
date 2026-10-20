@@ -1,15 +1,12 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
 import type { ExternalCorrectionInput, ExternalTemplateInput } from "@/lib/universal-exam-validation";
 import type { ExternalCorrectionRecord, ExternalExamTemplate } from "@/types/universal-exams";
 import { DEFAULT_UNIVERSAL_GRADING_RULES } from "@/services/universal-grading-rules";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createSheetsClient();
 }
 
 function ensure(error: { message?: string } | null) {

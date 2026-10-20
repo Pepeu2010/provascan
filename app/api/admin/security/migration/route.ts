@@ -5,7 +5,7 @@ import { canManageUsers } from "@/lib/access-control";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent, migrateUsersSecuritySchema } from "@/services/supabase-data";
+import { appendAuditEvent, verifyUsersSheetSchema } from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 
@@ -16,8 +16,8 @@ export async function POST(request: Request) {
   const rateLimit = await consumeRateLimit({ bucket: "admin-security-migration", key: buildRateLimitKey(getClientIp(request.headers), validation.session.id), limit: 3, windowMs: 60 * 60 * 1000 });
   if (!rateLimit.ok) return NextResponse.json({ error: "Muitas tentativas de migração. Aguarde antes de tentar novamente." }, { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rateLimit.retryAfterSeconds) } });
   try {
-    const report = await migrateUsersSecuritySchema();
-    await appendAuditEvent({ actorId: validation.session.id, event: "USERS_SECURITY_SCHEMA_MIGRATED", metadata: { addedHeaders: report.addedHeaders.length, auditCreated: report.auditCreated } });
+    const report = await verifyUsersSheetSchema();
+    await appendAuditEvent({ actorId: validation.session.id, event: "USERS_SHEET_SCHEMA_VERIFIED", metadata: { missingHeaders: report.missingHeaders.length } });
     return NextResponse.json({ report });
-  } catch { return NextResponse.json({ error: "Não foi possível migrar a estrutura de segurança." }, { status: 503 }); }
+  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Não foi possível verificar a aba de usuários." }, { status: 503 }); }
 }

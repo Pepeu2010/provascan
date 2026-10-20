@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getExamSession } from "@/lib/teacher-exam-session";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 import { issueAnswerSheetLabels } from "@/services/answer-sheet-labels";
 
 export const runtime = "nodejs";

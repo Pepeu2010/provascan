@@ -3,7 +3,7 @@ import { teacherExamSaveSchema, validateExamForPublication } from "@/lib/teacher
 import { getExamSession } from "@/lib/teacher-exam-session";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 import { createTeacherExam, listTeacherExams } from "@/services/teacher-exams";
 
 export const runtime = "nodejs";

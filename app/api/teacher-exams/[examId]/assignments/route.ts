@@ -4,7 +4,7 @@ import { getExamSession } from "@/lib/teacher-exam-session";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { expandAssignmentGroups } from "@/lib/exam-assignment-policy";
 import { syncExamAssignments } from "@/services/exam-assignments";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 
 const schema = z.object({
   groups: z.array(z.object({

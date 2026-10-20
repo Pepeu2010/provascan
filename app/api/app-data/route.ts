@@ -9,11 +9,11 @@ import {
   getOperationalSnapshot,
   getOperationalRevision,
   getTeacherCorrectionSnapshot,
-  SupabaseConfigError,
-  SupabaseConnectionError,
-  SupabaseSchemaError,
+  GoogleSheetsConfigError,
+  GoogleSheetsConnectionError,
+  GoogleSheetsSchemaError,
   saveOperationalAppData,
-} from "@/services/supabase-data";
+} from "@/services/google-sheets-data";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
 import { canAccessOperationalData } from "@/lib/access-control";
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -82,11 +82,11 @@ export async function GET() {
 
     return finalResponse;
   } catch (error) {
-    if (error instanceof SupabaseConfigError) {
+    if (error instanceof GoogleSheetsConfigError) {
       return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao carregar dados operacionais." }, { status: 503 });
     }
 
@@ -133,10 +133,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Revisão obrigatória para salvar." }, { status: 400 });
     }
 
-    const revision = await withOperationalWriteLock(process.env.SUPABASE_URL ?? "unconfigured", async () => {
+    const revision = await withOperationalWriteLock(process.env.GOOGLE_SHEET_ID ?? "unconfigured", async () => {
       const currentRevision = await getOperationalRevision();
       if (currentRevision !== payload.revision) {
-        throw new SupabaseSchemaError("CONFLICT");
+        throw new GoogleSheetsSchemaError("CONFLICT");
       }
       return saveOperationalAppData(parsedData.data as AppDataState, { actorId: validation.session.id, revision: currentRevision });
     });
@@ -157,17 +157,17 @@ export async function PUT(request: Request) {
 
     return response;
   } catch (error) {
-    if (error instanceof SupabaseSchemaError && error.message === "CONFLICT") {
+    if (error instanceof GoogleSheetsSchemaError && error.message === "CONFLICT") {
       return NextResponse.json({ error: "Os dados foram alterados em outra sessão. Recarregue antes de salvar.", code: "REVISION_CONFLICT" }, { status: 409 });
     }
     if (error instanceof OperationalLockBusyError || error instanceof OperationalLockUnavailableError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    if (error instanceof SupabaseConfigError) {
+    if (error instanceof GoogleSheetsConfigError) {
       return NextResponse.json({ error: "Banco de dados não configurado." }, { status: 500 });
     }
 
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao salvar dados operacionais." }, { status: 503 });
     }
 

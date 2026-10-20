@@ -10,17 +10,20 @@
   `SameSite=Lax` e têm expiração limitada.
 - Mutação de dados valida origem, sessão, papel e schema no servidor.
 - Login, senha, MFA, OCR e mutações administrativas/colaborativas usam rate
-  limit por IP e identidade, com Redis Upstash quando configurado e fallback
-  persistente no Supabase.
+  limit por IP e identidade, com Redis Upstash em produção e fallback local
+  em memória para desenvolvimento.
 
 ## Variáveis de ambiente obrigatórias
 
 - `AUTH_SECRET` (mínimo de 32 caracteres aleatórios)
 - `MFA_ENCRYPTION_KEY` (chave AES válida)
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `GOOGLE_SHEET_ID`
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_PRIVATE_KEY`
+- `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` para gravações
+- `GOOGLE_DRIVE_FOLDER_ID` para importação e download de arquivos originais
 
-Marque as três chaves secretas como Production/Preview conforme a necessidade.
+Marque as chaves secretas como Production/Preview conforme a necessidade.
 Nunca use `NEXT_PUBLIC_` para elas. Rotacione qualquer segredo exibido em log,
 commit, captura de tela ou ferramenta de terceiros.
 

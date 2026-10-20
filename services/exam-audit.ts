@@ -1,12 +1,9 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createSheetsClient();
 }
 
 export type ExamAuditEntry = { at: string; actorName: string; event: string; metadata: Record<string, unknown> };

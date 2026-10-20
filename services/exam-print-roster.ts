@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
 import { getTeacherExam } from "@/services/teacher-exams";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { restrictRosterClassIds, selectLegacyRosterClassIds } from "@/lib/exam-roster-scope";
@@ -8,10 +8,7 @@ import { scopeAllowsExam } from "@/lib/pedagogical-scope-match";
 import type { ExamPrintStudent } from "@/lib/exam-print-document";
 
 function db() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Banco de dados não configurado.");
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createSheetsClient();
 }
 
 function ensure(error: { message?: string } | null, fallback: string) {
@@ -55,7 +52,12 @@ export async function getExamPrintRoster(input: { actorId: string; examId: strin
       .is("archived_at", null);
     ensure(scopeError, "Não foi possível validar as turmas autorizadas.");
     const allowed = new Set((scopeRows ?? [])
-      .filter((item) => scopeAllowsExam(item, String(item.class_id), exam.subjectId ?? null))
+      .filter((item) => scopeAllowsExam({
+        active: Boolean(item.active),
+        archived_at: item.archived_at == null ? null : String(item.archived_at),
+        class_id: String(item.class_id),
+        subject_id: item.subject_id == null ? null : String(item.subject_id),
+      }, String(item.class_id), exam.subjectId ?? null))
       .map((item) => String(item.class_id)));
     classIds = restrictRosterClassIds(classIds, allowed);
   }

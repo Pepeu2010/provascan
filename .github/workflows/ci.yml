@@ -20,8 +20,6 @@ jobs:
     timeout-minutes: 20
 
     env:
-      SUPABASE_URL: https://example.supabase.co
-      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
       AUTH_SECRET: ci-placeholder-auth-secret-with-at-least-32-characters
       MFA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       MFA_REQUIRED: "true"

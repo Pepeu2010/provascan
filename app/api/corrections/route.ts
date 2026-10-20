@@ -15,7 +15,7 @@ import {
   getTeacherCorrectionAccess,
   getOperationalAppData,
   saveCorrectionSession,
-} from "@/services/supabase-data";
+} from "@/services/google-sheets-data";
 
 const schema = z.object({
   answers: z.array(z.object({

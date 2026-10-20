@@ -5,7 +5,7 @@ import { isAcademicManagementRole } from "@/lib/access-control";
 import { externalTemplateActionSchema } from "@/lib/universal-exam-validation";
 import { hasSameOriginRequest } from "@/lib/request-security";
 import { validateSessionToken } from "@/lib/server-session";
-import { appendAuditEvent } from "@/services/supabase-data";
+import { appendAuditEvent } from "@/services/google-sheets-data";
 import { createExternalExamTemplate, getExternalExamTemplate, updateExternalExamTemplate } from "@/services/external-exams";
 
 export const runtime = "nodejs";

@@ -8,10 +8,10 @@ import { hashPassword, validateNewPassword, verifyPassword } from "@/lib/passwor
 import { buildRateLimitKey, consumeRateLimit, getClientIp } from "@/lib/rate-limit";
 import { buildAuthSessionUser, createFinalSession, requirePreAuth } from "@/lib/auth-flow-server";
 import {
-  SupabaseConnectionError,
-  SupabaseSchemaError,
+  GoogleSheetsConnectionError,
+  GoogleSheetsSchemaError,
   updateUserPassword,
-} from "@/services/supabase-data";
+} from "@/services/google-sheets-data";
 
 export const runtime = "nodejs";
 
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });
     }
 
-    if (error instanceof SupabaseConnectionError || error instanceof SupabaseSchemaError) {
+    if (error instanceof GoogleSheetsConnectionError || error instanceof GoogleSheetsSchemaError) {
       return NextResponse.json({ error: "Erro ao acessar o banco de dados." }, { status: 503 });
     }
 

@@ -9,15 +9,9 @@ assert.equal(canActInPedagogicalScope("coordenador", false), false);
 assert.equal(canActInPedagogicalScope("professor", true), true);
 assert.equal(canActInPedagogicalScope("professor", false), false);
 
-const migration = readFileSync(new URL("../supabase/migrations/20260917113000_exam_subjects_and_pedagogical_scopes.sql", import.meta.url), "utf8");
-assert.match(migration, /create table if not exists public\.subjects/);
-assert.match(migration, /add column if not exists subject_id text references public\.subjects\(id\) on delete restrict/);
-assert.match(migration, /create table if not exists public\.pedagogical_scopes/);
-assert.match(migration, /on delete restrict/);
-assert.match(migration, /pedagogical_scopes_active_unique_idx/);
-assert.match(migration, /where active/);
-assert.match(migration, /server_only_subjects/);
-assert.match(migration, /server_only_pedagogical_scopes/);
-assert.doesNotMatch(migration, /update public\.exams/i);
+const subjects = readFileSync(new URL("../services/pedagogical-scopes.ts", import.meta.url), "utf8");
+assert.match(subjects, /\.from\("subjects"\)/);
+assert.match(subjects, /\.from\("pedagogical_scopes"\)/);
+assert.match(subjects, /scopeAllowsExam/);
 
 console.log("Exam subject and pedagogical scope foundation checks passed.");

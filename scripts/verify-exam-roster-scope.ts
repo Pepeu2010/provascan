@@ -37,7 +37,7 @@ assert.match(service, /selectLegacyRosterClassIds\(exam,/);
 assert.match(service, /\.from\("pedagogical_scopes"\)/);
 assert.match(service, /restrictRosterClassIds\(classIds, allowed\)/);
 assert.match(service, /\.in\("class_id", classIds\)/);
-const correctionService = readFileSync(new URL("../services/supabase-data.ts", import.meta.url), "utf8");
+const correctionService = readFileSync(new URL("../services/google-sheets-data.ts", import.meta.url), "utf8");
 assert.match(correctionService, /selectTeacherCorrectionClassIds/);
 assert.match(correctionService, /corrections: snapshot\.data\.corrections\.filter\([\s\S]*allowedClassesByExam/);
 assert.doesNotMatch(correctionService, /if \(exam\) return \{ classIds: null \}/);

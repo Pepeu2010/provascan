@@ -28,10 +28,10 @@ A useful report contains:
 
 ## Scope
 
-Reports are especially useful for issues involving authentication, authorization, IDOR/BOLA, MFA, session handling, rate limiting, Supabase access, file/image processing, XSS, CSRF, SSRF, sensitive-data exposure and leaked credentials.
+Reports are especially useful for issues involving authentication, authorization, IDOR/BOLA, MFA, session handling, rate limiting, Google Sheets/Drive access, file/image processing, XSS, CSRF, SSRF, sensitive-data exposure and leaked credentials.
 
 ## Sensitive data
 
 Never attach real student data, production credentials, service-role keys, authentication secrets, MFA secrets, private keys or `.env` files to an issue or pull request.
 
-Additional implementation notes are available in `SECURITY_AUDIT.md`, `OCR_SECURITY.md`, `SUPABASE_SECURITY.md`, `RLS_POLICIES.md` and `VERCEL_SECURITY.md`.
+Additional implementation notes are available in `SECURITY_AUDIT.md`, `OCR_SECURITY.md`, `GOOGLE_SHEETS_SECURITY.md` and `VERCEL_SECURITY.md`.

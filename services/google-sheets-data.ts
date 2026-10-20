@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { createSheetsClient } from "@/lib/sheets-compat";
+import { sheetsTable } from "@/lib/google-sheets";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { cloneDefaultAppData, type AppDataState } from "@/lib/app-data";
@@ -8,37 +9,25 @@ import { normalizeClasses } from "@/lib/exam-audience";
 import { selectTeacherCorrectionClassIds } from "@/lib/exam-roster-scope";
 import { getActiveAssignedExamClasses } from "@/services/assigned-exam-access";
 import { classes, correctionSessions, exams, students } from "@/lib/mock-data";
-import { withExamQuestionTopicFallback, withTeacherExamSchemaFallback } from "@/lib/supabase-schema-compat";
 import type { ClassRoom, CorrectionSession, Exam, ExamCorrectionRule, Student, TeacherProfile } from "@/types/domain";
 import type { UserRecord } from "@/types/auth";
 
-const envSchema = z.object({
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
-});
+const envSchema = z.object({ GOOGLE_SHEET_ID: z.string().min(10), GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email(), GOOGLE_PRIVATE_KEY: z.string().min(20) });
 
-export class SupabaseConfigError extends Error {}
-export class SupabaseConnectionError extends Error {}
-export class SupabaseSchemaError extends Error {}
-
-export type PersistentRateLimitResult = {
-  allowed: boolean;
-  remaining: number;
-  resetAt: number;
-};
+export class GoogleSheetsConfigError extends Error {}
+export class GoogleSheetsConnectionError extends Error {}
+export class GoogleSheetsSchemaError extends Error {}
 
 function client() {
-  const parsed = envSchema.safeParse({ SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY });
-  if (!parsed.success) throw new SupabaseConfigError("Supabase não configurado.");
-  return createClient(parsed.data.SUPABASE_URL, parsed.data.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const parsed = envSchema.safeParse({ GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY: process.env.GOOGLE_PRIVATE_KEY });
+  if (!parsed.success) throw new GoogleSheetsConfigError("Google Sheets não configurado. Configure o ID da planilha, o e-mail da conta de serviço e a chave privada no ambiente do servidor.");
+  return createSheetsClient();
 }
 
 function dbError(error: { message?: string } | null) {
   if (error) {
-    console.error("Supabase database request failed", { message: error.message ?? "unknown" });
-    throw new SupabaseConnectionError("Erro ao acessar os dados do sistema.");
+    console.error("Google Sheets request failed", { message: error.message ?? "unknown" });
+    throw new GoogleSheetsConnectionError("Erro ao acessar os dados do sistema.");
   }
 }
 
@@ -85,35 +74,6 @@ export async function getUserByEmail(access: string) {
   return data ? mapUser(data as DbUser) : null;
 }
 
-/**
- * Uses Postgres for rate limiting when an external Redis service is not
- * configured. The RPC increments atomically, so concurrent serverless
- * requests cannot bypass the configured window.
- */
-export async function consumePersistentRateLimit(input: {
-  bucket: string;
-  key: string;
-  limit: number;
-  windowMs: number;
-}): Promise<PersistentRateLimitResult> {
-  const { data, error } = await client()
-    .rpc("consume_request_rate_limit", {
-      p_bucket: input.bucket,
-      p_key: input.key,
-      p_limit: input.limit,
-      p_window_seconds: Math.max(1, Math.ceil(input.windowMs / 1000)),
-    })
-    .single();
-  dbError(error);
-
-  const row = data as { allowed?: unknown; remaining?: unknown; reset_at?: unknown } | null;
-  const resetAt = Date.parse(String(row?.reset_at ?? ""));
-  if (!row || typeof row.allowed !== "boolean" || !Number.isFinite(Number(row.remaining)) || !Number.isFinite(resetAt)) {
-    throw new SupabaseSchemaError("Resposta invÃ¡lida do limitador persistente.");
-  }
-
-  return { allowed: row.allowed, remaining: Number(row.remaining), resetAt };
-}
 export const getUserByAccess = getUserByEmail;
 export const getUserAuthState = getUserByEmail;
 
@@ -148,7 +108,13 @@ export async function consumeRecoveryCode(userId: string, code: string) {
 }
 export async function updateUserPasswordChangeFlag(userId: string, shouldForce: boolean) { await updateUser(userId, { force_password_change: shouldForce }); }
 export async function updateAllUsersPasswordChangeFlag(shouldForce: boolean) { const { data, error } = await client().from("app_users").update({ force_password_change: shouldForce }).select("legacy_id"); dbError(error); return { updated: data?.length ?? 0 }; }
-export async function migrateUsersSecuritySchema() { return { addedHeaders: [] as string[], auditCreated: true, usersTab: "Supabase" }; }
+export async function verifyUsersSheetSchema() {
+  const table = await sheetsTable("app_users");
+  const requiredHeaders = ["legacy_id", "access_key", "full_name", "role", "password_hash", "active", "force_password_change", "mfa_active", "mfa_exempt", "mfa_method", "mfa_secret_encrypted", "recovery_codes_hashes", "sessions_revoked_at"];
+  const missingHeaders = requiredHeaders.filter((header) => !table.headers.includes(header));
+  if (missingHeaders.length) throw new GoogleSheetsSchemaError(`A aba app_users não contém as colunas obrigatórias: ${missingHeaders.join(", ")}.`);
+  return { missingHeaders, usersTab: "app_users" };
+}
 export async function listUsersForAdmin() {
   const { data, error } = await client().from("app_users").select("legacy_id,access_key,full_name,role,active,force_password_change").order("full_name");
   dbError(error);
@@ -161,11 +127,11 @@ async function assertAdminContinuity(userId: string, nextRole: string, nextActiv
   const database = client();
   const { data: current, error: currentError } = await database.from("app_users").select("role,active").eq("legacy_id", userId).maybeSingle();
   dbError(currentError);
-  if (!current) throw new SupabaseSchemaError("Usuário não encontrado.");
+  if (!current) throw new GoogleSheetsSchemaError("Usuário não encontrado.");
   if (current.role !== "admin" || !current.active || (nextRole === "admin" && nextActive)) return;
   const { count, error: countError } = await database.from("app_users").select("legacy_id", { count: "exact", head: true }).eq("role", "admin").eq("active", true);
   dbError(countError);
-  if ((count ?? 0) <= 1) throw new SupabaseSchemaError("Mantenha ao menos uma conta admin ativa.");
+  if ((count ?? 0) <= 1) throw new GoogleSheetsSchemaError("Mantenha ao menos uma conta admin ativa.");
 }
 
 export async function createManagedUser(input: ManagedUserInput & { passwordHash: string }) {
@@ -185,7 +151,7 @@ export async function updateManagedUser(userId: string, input: ManagedUserInput)
 export async function setManagedUserActive(userId: string, active: boolean) {
   const { data: current, error: currentError } = await client().from("app_users").select("role").eq("legacy_id", userId).maybeSingle();
   dbError(currentError);
-  if (!current) throw new SupabaseSchemaError("Usuário não encontrado.");
+  if (!current) throw new GoogleSheetsSchemaError("Usuário não encontrado.");
   await assertAdminContinuity(userId, String(current.role), active);
   const { error } = await client().from("app_users").update(active ? { active: true, force_password_change: true, sessions_revoked_at: new Date().toISOString() } : { active: false, force_password_change: true, mfa_active: false, mfa_method: "", mfa_secret_encrypted: "", recovery_codes_hashes: [], sessions_revoked_at: new Date().toISOString() }).eq("legacy_id", userId);
   dbError(error);
@@ -209,7 +175,7 @@ export async function deleteManagedUser(userId: string) {
   await assertAdminContinuity(userId, "deleted", false);
   const { data, error } = await client().from("app_users").delete().eq("legacy_id", userId).select("legacy_id");
   dbError(error);
-  if (!data?.length) throw new SupabaseSchemaError("Usuário não encontrado.");
+  if (!data?.length) throw new GoogleSheetsSchemaError("Usuário não encontrado.");
 }
 
 export async function appendAuditEvent(input: { actorId: string; event: string; targetId?: string; ipHash?: string; metadata?: Record<string, string | number | boolean> }) {
@@ -225,14 +191,8 @@ function teacherProfile(rows: Array<{ key: string; value: string }>): TeacherPro
 
 export async function getOperationalAppData(): Promise<AppDataState> {
   const db = client();
-  const examQuery = withTeacherExamSchemaFallback(
-    async () => db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at,status,creator_id"),
-    async () => db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at"),
-  );
-  const questionQuery = withExamQuestionTopicFallback(
-    async () => db.from("exam_questions").select("exam_id,position,topic"),
-    async () => db.from("exam_questions").select("exam_id,position"),
-  );
+  const examQuery = db.from("exams").select("id,title,audience_id,audience_label,group_type,year_segment,question_count,alternatives,exam_date,code,template_version,released_at,status,creator_id");
+  const questionQuery = db.from("exam_questions").select("exam_id,position,topic");
   const [classResult, studentResult, examResult, questionResult, keyResult, ruleResult, correctionResult, settingsResult] = await Promise.all([
     db.from("classes").select("id,name,academic_year,audience_id,audience_label,group_type,year_segment"),
     db.from("students").select("id,name,class_id,status"),
@@ -273,10 +233,7 @@ export async function getOperationalSnapshot() { const [data, revision] = await 
 export async function getTeacherCorrectionSnapshot(teacherId: string) {
   const database = client();
   const [{ data: ownedRows, error: ownedError }, assignedClasses, snapshot, classResult, scopeResult] = await Promise.all([
-    withTeacherExamSchemaFallback(
-      async () => database.from("exams").select("id").eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]),
-      async () => database.from("exam_sections").select("exam_id").eq("teacher_id", teacherId),
-    ),
+    database.from("exams").select("id").eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]),
     getActiveAssignedExamClasses(teacherId),
     getOperationalSnapshot(),
     database.from("classes").select("id,audience_id,year_segment"),
@@ -333,16 +290,7 @@ export async function teacherCanCorrectExam(teacherId: string, examId: string) {
 /** Both authorship and assignment require an active, concrete class scope. */
 export async function getTeacherCorrectionAccess(teacherId: string, examId: string): Promise<{ classIds: Set<string> } | null> {
   const database = client();
-  const { data: exam, error } = await withTeacherExamSchemaFallback(
-    async () => database.from("exams").select("id,status").eq("id", examId).eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]).maybeSingle(),
-    async () => {
-      const [{ count, error: sectionError }, { data: legacyExam, error: examError }] = await Promise.all([
-        database.from("exam_sections").select("id", { count: "exact", head: true }).eq("teacher_id", teacherId).eq("exam_id", examId),
-        database.from("exams").select("released_at").eq("id", examId).maybeSingle(),
-      ]);
-      return { data: count && legacyExam?.released_at ? { id: examId } : null, error: sectionError ?? examError };
-    },
-  );
+  const { data: exam, error } = await database.from("exams").select("id,status").eq("id", examId).eq("creator_id", teacherId).in("status", ["publicada", "aplicada"]).maybeSingle();
   dbError(error);
   if (exam) {
     const [examResult, classResult, scopeResult, assignmentResult] = await Promise.all([
@@ -394,18 +342,20 @@ export async function saveCorrectionSession(session: CorrectionSession) {
     identification: item.identificacao,
   });
   dbError(error);
-  const { error: examError } = await withTeacherExamSchemaFallback(
-    async () => client().from("exams").update({ applied_at: new Date().toISOString(), status: "aplicada" }).eq("id", item.correction.provaId).in("status", ["publicada", "aplicada"]),
-    async () => ({ data: null, error: null }),
-  );
+  const { error: examError } = await client().from("exams").update({ applied_at: new Date().toISOString(), status: "aplicada" }).eq("id", item.correction.provaId).in("status", ["publicada", "aplicada"]);
   dbError(examError);
 }
 export async function saveOperationalAppData(data: AppDataState, metadata?: { actorId: string; revision: string }) {
-  const { data: revision, error } = await client().rpc("replace_operational_state", { payload: data, actor_id: metadata?.actorId ?? "system", expected_revision: Number(metadata?.revision ?? 0) });
-  dbError(error); return String(revision);
+  const revision = Number(metadata?.revision ?? 0) + 1;
+  const classRows = data.classes.map((item) => ({ id: item.id, name: item.nome, academic_year: item.ano, audience_id: item.audienceId ?? "", audience_label: item.audienceLabel ?? "", group_type: item.groupType ?? "", year_segment: item.yearSegment ?? "" }));
+  const studentRows = data.students.map((item) => ({ id: item.id, name: item.nome, class_id: item.turma, status: item.status }));
+  await (await sheetsTable("classes")).replace(classRows);
+  await (await sheetsTable("students")).replace(studentRows);
+  await (await sheetsTable("operational_meta_internal")).replace([{ singleton: true, revision }]);
+  return String(revision);
 }
 export async function getSchoolRoster() { const data = await getOperationalAppData(); return { classes: data.classes, students: data.students }; }
-export async function getUsersSheetHealth() { const { count, error } = await client().from("app_users").select("legacy_id", { count: "exact", head: true }); dbError(error); return { usersCount: count ?? 0, status: { configured: true, mode: "supabase" as const, studentsTab: "Supabase", usersTab: "Supabase" } }; }
+export async function getUsersSheetHealth() { const { count, error } = await client().from("app_users").select("legacy_id", { count: "exact", head: true }); dbError(error); return { usersCount: count ?? 0, status: { configured: true, mode: "google-sheets" as const, studentsTab: "students", usersTab: "app_users" } }; }
 export async function getSystemSnapshot() { const [health, data] = await Promise.all([getUsersSheetHealth(), getOperationalAppData()]); return { retention: { cronConfigured: Boolean(process.env.CRON_SECRET) }, status: health.status, totals: { alunos: data.students.length, turmas: data.classes.length, provas: data.exams.length, correcoes: data.corrections.length, usuarios: health.usersCount } }; }
-export function getSheetsStatus() { return { configured: Boolean(process.env.SUPABASE_URL), mode: "supabase" as const, studentsTab: "Supabase", usersTab: "Supabase" }; }
+export function getSheetsStatus() { return { configured: Boolean(process.env.GOOGLE_SHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY), mode: "google-sheets" as const, studentsTab: "students", usersTab: "app_users" }; }
 export const fallbackTotals = { alunos: students.length, turmas: classes.length, provas: exams.length, correcoes: correctionSessions.length };

@@ -8,7 +8,7 @@ import {
   parseSessionToken,
 } from "@/lib/auth";
 import { createPasswordStamp } from "@/lib/passwords";
-import { getUserByEmail, isActiveUser, shouldForcePasswordChange } from "@/services/supabase-data";
+import { getUserByEmail, isActiveUser, shouldForcePasswordChange } from "@/services/google-sheets-data";
 import type { AuthSessionUser, SafeAuthUser } from "@/types/auth";
 
 type ValidSessionResult =

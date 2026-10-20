@@ -10,14 +10,11 @@ assert.equal(canAssignPair({ actorId: "v1", actorRole: "vice_diretor", destinati
 assert.equal(canAssignPair({ actorId: "a1", actorRole: "admin", destinationTeacherId: "p2", hasScope: false, destinationHasScope: false, scopeException: true }), true);
 
 const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-const migration = read("supabase/migrations/20260917130000_exam_assignments.sql");
 const route = read("app/api/teacher-exams/[examId]/assignments/route.ts");
-assert.match(migration, /create table if not exists public\.exam_assignments/);
-assert.match(migration, /on delete restrict/);
-assert.match(migration, /exam_assignments_active_unique_idx/);
-assert.doesNotMatch(migration, /on delete cascade/i);
+const service = read("services/exam-assignments.ts");
 assert.match(route, /groups: z\.array/);
 assert.doesNotMatch(route, /teacherIds/);
-assert.match(read("services/exam-assignments.ts"), /não pode alterar atribuições de uma prova de outro professor/);
-assert.match(read("services/exam-assignments.ts"), /não pode inativar uma atribuição fora do seu escopo pedagógico/);
+assert.match(service, /não pode alterar atribuições de uma prova de outro professor/);
+assert.match(service, /não pode inativar uma atribuição fora do seu escopo pedagógico/);
+assert.match(service, /exam_assignments/);
 console.log("Exam assignment contracts passed.");

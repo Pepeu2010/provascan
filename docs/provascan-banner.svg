@@ -48,7 +48,7 @@
     <text x="433" y="31" text-anchor="middle" fill="#BBD7EF">TypeScript</text>
 
     <rect x="534" width="154" height="48" rx="24" fill="#10253A" stroke="#2A4B68"/>
-    <text x="611" y="31" text-anchor="middle" fill="#BBD7EF">Supabase</text>
+    <text x="611" y="31" text-anchor="middle" fill="#BBD7EF">Google Sheets</text>
   </g>
 
   <g transform="translate(868 182)" filter="url(#shadow)">

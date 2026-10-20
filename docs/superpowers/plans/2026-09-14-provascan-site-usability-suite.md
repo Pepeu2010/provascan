@@ -6,7 +6,7 @@
 
 **Architecture:** Keep UI orchestration in focused React components and extract deterministic workflow rules into framework-free TypeScript modules. Persist resumable state in versioned browser storage, persist durable template/report metadata through owner-scoped APIs, and use an allowlisted service worker that never caches private API payloads or uploaded images.
 
-**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Supabase/Postgres, browser File/Image APIs, service worker/PWA manifest, existing `tsx` verification scripts.
+**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Google Sheets, browser File/Image APIs, service worker/PWA manifest, existing `tsx` verification scripts.
 
 **Spec:** `docs/superpowers/specs/2026-09-14-provascan-site-usability-suite.md`
 

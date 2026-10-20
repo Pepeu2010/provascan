@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "ProvaScan",
   authors: [{ name: CREATOR_NAME }],
   description:
-    "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Supabase.",
+    "Plataforma para professores corrigirem provas objetivas por foto com apoio de OCR e Google Sheets.",
   manifest: "/manifest.webmanifest",
 };
 
