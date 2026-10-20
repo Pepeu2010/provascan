@@ -83,8 +83,15 @@ function toDraft(exam: TeacherExam): TeacherExamInput {
 
 async function jsonApi<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
-  const body = await response.json() as T & ApiError;
-  if (!response.ok) throw new Error(body.details?.join("\n") || body.error || "A operação não pôde ser concluída.");
+  const responseText = await response.text();
+  let body: (T & ApiError) | null = null;
+  try {
+    body = responseText ? JSON.parse(responseText) as T & ApiError : null;
+  } catch {
+    body = null;
+  }
+  if (!response.ok) throw new Error(body?.details?.join("\n") || body?.error || "O servidor não conseguiu concluir a operação. Tente novamente em instantes.");
+  if (!body) throw new Error("O servidor não confirmou o salvamento. Recarregue a lista antes de tentar novamente.");
   return body;
 }
 

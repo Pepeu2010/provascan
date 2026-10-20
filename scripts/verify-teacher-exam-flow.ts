@@ -89,6 +89,8 @@ assert.match(itemRoute, /actorId: session\.id/);
 assert.match(service, /\.eq\("creator_id", input\.actorId\)/);
 assert.match(service, /não pertence a você/);
 assert.match(workspace, /Salvar rascunho/);
+assert.match(workspace, /const responseText = await response\.text\(\)/);
+assert.match(workspace, /Recarregue a lista antes de tentar novamente/);
 assert.match(workspace, /Publicar prova/);
 assert.match(workspace, /Para quem é esta prova/);
 assert.match(workspace, /wholeYearLabel/);

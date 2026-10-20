@@ -14,4 +14,5 @@ assert.match(workspace, /state === "error"/);
 assert.match(workspace, /Tentar novamente/);
 assert.match(workspace, /Correções salvas/);
 assert.match(shell, /session\?\.role === "professor" && active === "\/dashboard"/);
+assert.ok(shell.includes('...(session?.role === "professor" ? [] :'), "Teacher header must not count exams from the legacy app-data source.");
 console.log("Teacher home routing and loading states verified.");
