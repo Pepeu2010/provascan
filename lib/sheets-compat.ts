@@ -1,5 +1,5 @@
 import "server-only";
-import { assertGoogleSheetsConfig, deletePrivateFiles, deleteRows, sheetsTable, updateRows, upsertRows, uploadPrivateFile } from "@/lib/google-sheets";
+import { appendRows, assertGoogleSheetsConfig, deletePrivateFiles, deleteRowsReturning, sheetsTable, updateRowsReturning, upsertRows, uploadPrivateFile } from "@/lib/google-sheets";
 
 // The compatibility query API exposes schema-dependent row fields to existing services.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,30 +58,18 @@ class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
 
   private async execute(): Promise<Result<TData>> {
     try {
-      const table = await sheetsTable(this.table);
-      const rows = table.all();
-      let selected = rows.filter((row) => this.filters.every((filter) => filter(row)));
-      for (const order of [...this.orders].reverse()) {
-        selected = [...selected].sort((left, right) => {
-          const leftNull = left[order.key] == null || left[order.key] === "";
-          const rightNull = right[order.key] == null || right[order.key] === "";
-          if (leftNull || rightNull) return leftNull === rightNull ? 0 : (leftNull === order.nullsFirst ? -1 : 1);
-          const result = compareValues(left[order.key], right[order.key]);
-          return order.ascending ? result : -result;
-        });
-      }
-
+      let selected: Row[] = [];
       let data: unknown;
       if (this.mode === "insert") {
         const toInsert = Array.isArray(this.payload) ? this.payload : [this.payload];
-        await table.append(toInsert);
+        await appendRows(this.table, toInsert);
         data = toInsert;
         selected = toInsert;
       } else if (this.mode === "update") {
-        await updateRows(this.table, (row) => this.filters.every((filter) => filter(row)), this.payload as Row);
-        data = selected.map((row) => ({ ...row, ...(this.payload as Row) }));
+        selected = await updateRowsReturning(this.table, (row) => this.filters.every((filter) => filter(row)), this.payload as Row);
+        data = selected;
       } else if (this.mode === "delete") {
-        await deleteRows(this.table, (row) => this.filters.every((filter) => filter(row)));
+        selected = await deleteRowsReturning(this.table, (row) => this.filters.every((filter) => filter(row)));
         data = selected;
       } else if (this.mode === "upsert") {
         const incoming = Array.isArray(this.payload) ? this.payload : [this.payload];
@@ -89,6 +77,17 @@ class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
         data = returned;
         selected = returned;
       } else {
+        const table = await sheetsTable(this.table);
+        selected = table.all().filter((row) => this.filters.every((filter) => filter(row)));
+        for (const order of [...this.orders].reverse()) {
+          selected = [...selected].sort((left, right) => {
+            const leftNull = left[order.key] == null || left[order.key] === "";
+            const rightNull = right[order.key] == null || right[order.key] === "";
+            if (leftNull || rightNull) return leftNull === rightNull ? 0 : (leftNull === order.nullsFirst ? -1 : 1);
+            const result = compareValues(left[order.key], right[order.key]);
+            return order.ascending ? result : -result;
+          });
+        }
         data = selected.slice(0, this.max).map((row) => this.projection === "*" ? row : Object.fromEntries(this.projection.split(",").map((key) => [key.trim(), row[key.trim()]])));
       }
 
