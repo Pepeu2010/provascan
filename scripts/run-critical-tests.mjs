@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const tsxCli = fileURLToPath(import.meta.resolve("tsx/cli"));
 const tests = [
+  "verify-sheets-query-values",
   "verify-google-sheets-codec",
   "verify-google-sheets-batching",
   "verify-google-sheets-row-integrity",
