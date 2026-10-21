@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const tsxCli = fileURLToPath(import.meta.resolve("tsx/cli"));
 const tests = [
+  "verify-answer-keys-workspace",
   "verify-sheets-query-values",
   "verify-google-sheets-codec",
   "verify-google-sheets-batching",
@@ -27,6 +28,8 @@ const tests = [
   "verify-universal-correction-flow",
   "verify-correction-ocr-safety",
   "verify-auth-flow",
+  "verify-correction-review-simplicity",
+  "verify-print-audit",
   "verify-internal-reporting",
   "verify-external-reporting",
   "verify-offline-sync-queue",

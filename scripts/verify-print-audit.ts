@@ -6,7 +6,7 @@ const route = readFileSync(join(process.cwd(), "app", "api", "teacher-exams", "[
 const studio = readFileSync(join(process.cwd(), "components", "print-studio.tsx"), "utf8");
 const center = readFileSync(join(process.cwd(), "components", "teacher-exams-workspace.tsx"), "utf8");
 assert.match(route, /hasSameOriginRequest/);
-assert.match(route, /getTeacherExam\(\{ actorId: session\.id, examId, institutionalView: session\.institutionalView \}\)/);
+assert.match(route, /getTeacherExam\(\{ actorId: session\.id, examId, institutionalView: session\.institutionalView, allowAssignedRead: true \}\)/);
 assert.match(route, /appendAuditEvent/);
 assert.match(studio, /\/print-events/);
 assert.match(studio, /recordPrintEvent\("cartoes_individuais"\)/);

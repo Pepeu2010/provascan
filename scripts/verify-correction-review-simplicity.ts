@@ -18,7 +18,8 @@ assert.doesNotMatch(source, /markedAnswers: index === 0/);
 assert.match(source, /explicitlyReviewed: false,\s*markedAnswers: \[\]/);
 assert.match(source, /detectedName: "",\s*identificationMethod: "manual",\s*matchedStudentId: ""/);
 assert.match(source, /<option value="">Selecione o aluno<\/option>/);
-assert.match(source, /const undecided = review\.answers\.some\(\(item\) => item\.explicitlyReviewed === false\)/);
-assert.match(source, /const uncertainBlank = review\.answers\.some/);
+assert.match(source, /const undecided = review\.answers\.filter\(needsAnswerReview\)/);
+assert.match(source, /function needsAnswerReview\(answer: ScanAnswer\)/);
+assert.match(source, /answer\.status === "LOW_CONFIDENCE" \|\| answer\.status === "MULTIPLE"/);
 
 console.log("Correction review simplicity checks passed.");
