@@ -1,5 +1,6 @@
 import "server-only";
 import { appendRows, assertGoogleSheetsConfig, deletePrivateFiles, deleteRowsReturning, sheetsTable, updateRowsReturning, upsertRows, uploadPrivateFile } from "@/lib/google-sheets";
+import { compareSheetsValues, equalSheetsValue, isSheetsNull } from "@/lib/sheets-query-values";
 
 // The compatibility query API exposes schema-dependent row fields to existing services.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7,18 +8,11 @@ type Row = Record<string, any>;
 type Result<T = Row[]> = { data: T; error: { message: string } | null; count: number };
 type Order = { key: string; ascending: boolean; nullsFirst: boolean };
 
-function compareValues(left: unknown, right: unknown) {
-  if (left == null || left === "") return right == null || right === "" ? 0 : -1;
-  if (right == null || right === "") return 1;
-  if (typeof left === "number" && typeof right === "number") return left - right;
-  return String(left).localeCompare(String(right), "pt-BR", { numeric: true, sensitivity: "base" });
-}
-
 class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
   private readonly filters: Array<(row: Row) => boolean> = [];
   private readonly orders: Order[] = [];
   private projection = "*";
-  private max = 500;
+  private max = Number.POSITIVE_INFINITY;
   private mode: "select" | "insert" | "update" | "delete" | "upsert" = "select";
   private payload: Row | Row[] = {};
   private one: "maybe" | "single" | null = null;
@@ -28,11 +22,11 @@ class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
   constructor(private readonly table: string) {}
 
   select(columns = "*", options?: unknown) { void options; this.projection = columns; return this; }
-  eq(key: string, value: unknown) { this.filters.push((row) => String(row[key] ?? "") === String(value ?? "")); return this; }
-  neq(key: string, value: unknown) { this.filters.push((row) => String(row[key] ?? "") !== String(value ?? "")); return this; }
-  in(key: string, values: unknown[]) { const expected = new Set(values.map(String)); this.filters.push((row) => expected.has(String(row[key] ?? ""))); return this; }
-  is(key: string, value: unknown) { this.filters.push((row) => value === null ? row[key] == null || row[key] === "" : row[key] === value); return this; }
-  lt(key: string, value: unknown) { this.filters.push((row) => compareValues(row[key], value) < 0); return this; }
+  eq(key: string, value: unknown) { this.filters.push((row) => equalSheetsValue(row[key], value)); return this; }
+  neq(key: string, value: unknown) { this.filters.push((row) => !equalSheetsValue(row[key], value)); return this; }
+  in(key: string, values: unknown[]) { const expected = new Set(values); this.filters.push((row) => expected.has(row[key])); return this; }
+  is(key: string, value: unknown) { this.filters.push((row) => value === null ? isSheetsNull(row[key]) : equalSheetsValue(row[key], value)); return this; }
+  lt(key: string, value: unknown) { this.filters.push((row) => compareSheetsValues(row[key], value) < 0); return this; }
   order(key: string, options?: { ascending?: boolean; nullsFirst?: boolean }) { this.orders.push({ key, ascending: options?.ascending ?? true, nullsFirst: options?.nullsFirst ?? false }); return this; }
   limit(value: number) { this.max = Math.max(0, value); return this; }
   maybeSingle() { this.one = "maybe"; return this as unknown as Query<Row | null>; }
@@ -81,10 +75,10 @@ class Query<TData = Row[]> implements PromiseLike<Result<TData>> {
         selected = table.all().filter((row) => this.filters.every((filter) => filter(row)));
         for (const order of [...this.orders].reverse()) {
           selected = [...selected].sort((left, right) => {
-            const leftNull = left[order.key] == null || left[order.key] === "";
-            const rightNull = right[order.key] == null || right[order.key] === "";
+            const leftNull = isSheetsNull(left[order.key]);
+            const rightNull = isSheetsNull(right[order.key]);
             if (leftNull || rightNull) return leftNull === rightNull ? 0 : (leftNull === order.nullsFirst ? -1 : 1);
-            const result = compareValues(left[order.key], right[order.key]);
+            const result = compareSheetsValues(left[order.key], right[order.key]);
             return order.ascending ? result : -result;
           });
         }
